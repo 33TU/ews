@@ -1,4 +1,4 @@
-package ews
+package codec
 
 // Opcode identifies a WebSocket frame's type.
 type Opcode uint8

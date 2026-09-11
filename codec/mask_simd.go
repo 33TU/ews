@@ -1,6 +1,6 @@
 //go:build goexperiment.simd && (amd64 || arm64 || wasm)
 
-package ews
+package codec
 
 import (
 	"simd/archsimd"

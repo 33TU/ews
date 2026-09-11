@@ -1,6 +1,6 @@
 //go:build !386 && !amd64 && !arm64 && !wasm
 
-package ews
+package codec
 
 import "encoding/binary"
 

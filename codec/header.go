@@ -1,4 +1,4 @@
-package ews
+package codec
 
 import "encoding/binary"
 

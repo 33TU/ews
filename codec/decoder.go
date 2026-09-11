@@ -1,4 +1,4 @@
-package ews
+package codec
 
 import "errors"
 

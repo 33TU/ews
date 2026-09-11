@@ -4,6 +4,8 @@ A lightweight WebSocket frame encoder and decoder for Go, built around plain `[]
 
 **Work in progress.** The API is still taking shape.
 
+The frame API lives in `github.com/33TU/ews/codec`; message compression lives in `github.com/33TU/ews/deflate`. The root is reserved for the planned client/server API.
+
 ## Design
 
 - Byte-oriented API without requiring `io.Reader` or `io.Writer`.
@@ -17,7 +19,7 @@ Read each header, then drain its payload before advancing to the next frame.
 For example, with a `readChunk` function supplying incoming bytes:
 
 ```go
-var dec ews.Decoder
+var dec codec.Decoder
 
 for {
     header, ok, err := dec.NextHeader()
@@ -43,7 +45,7 @@ for {
         payload, done := dec.Payload()
         if len(payload) != 0 {
             if header.Masked() {
-                offset = ews.Mask(payload, key, offset)
+                offset = codec.Mask(payload, key, offset)
             }
             // Process before calling the decoder again.
             handlePayload(payload)
@@ -77,9 +79,9 @@ Call `Reset` to discard pending input while retaining reusable storage.
 Encode a frame, then send its header followed by its payload:
 
 ```go
-var enc ews.Encoder
+var enc codec.Encoder
 
-if err := enc.Encode(true, ews.Text, []byte("Hello"), nil); err != nil {
+if err := enc.Encode(true, codec.Text, []byte("Hello"), nil); err != nil {
     return err
 }
 header := enc.HeaderBytes()
@@ -101,7 +103,7 @@ Compress a complete message before framing and masking it:
 
 ```go
 import (
-    "github.com/33TU/ews"
+    "github.com/33TU/ews/codec"
     "github.com/33TU/ews/deflate"
     "github.com/klauspost/compress/flate"
 )
@@ -115,8 +117,8 @@ compressed, err := compressor.Compress([]byte("Hello"))
 if err != nil {
     return err
 }
-var enc ews.Encoder
-if err := enc.EncodeCompressed(true, ews.Text, compressed, nil); err != nil {
+var enc codec.Encoder
+if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
     return err
 }
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
@@ -151,12 +153,12 @@ With takeover enabled, keep each helper dedicated to one connection direction an
 ```sh
 go test ./...
 go vet ./...
-go test -run '^$' -bench . -benchmem
+go test ./... -run '^$' -bench . -benchmem
 ```
 
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API.
 
 ```sh
 GOEXPERIMENT=simd go test ./...
-GOEXPERIMENT=simd go test -run '^$' -bench BenchmarkMask -benchmem
+GOEXPERIMENT=simd go test ./codec -run '^$' -bench BenchmarkMask -benchmem
 ```

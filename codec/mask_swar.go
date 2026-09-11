@@ -1,6 +1,6 @@
 //go:build (!goexperiment.simd && (amd64 || arm64 || wasm)) || 386
 
-package ews
+package codec
 
 import "unsafe"
 

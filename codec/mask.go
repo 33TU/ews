@@ -1,4 +1,4 @@
-package ews
+package codec
 
 // Mask masks or unmasks payload in place, returning the next offset modulo four.
 // Start each frame at offset zero and carry the returned offset between chunks.

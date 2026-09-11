@@ -1,26 +1,26 @@
-package ews_test
+package codec_test
 
 import (
 	"bytes"
 	"fmt"
 	"testing"
 
-	"github.com/33TU/ews"
+	"github.com/33TU/ews/codec"
 )
 
 func TestCodecRoundTrip(t *testing.T) {
 	frames := []struct {
 		final   bool
-		opcode  ews.Opcode
+		opcode  codec.Opcode
 		payload []byte
 	}{
-		{true, ews.Text, []byte("Hello")},
-		{false, ews.Binary, make([]byte, 125)},
-		{true, ews.Ping, nil},
-		{true, ews.Continuation, make([]byte, 126)},
-		{true, ews.Binary, make([]byte, 65535)},
-		{true, ews.Binary, make([]byte, 65536)},
-		{true, ews.Close, []byte{3, 232}},
+		{true, codec.Text, []byte("Hello")},
+		{false, codec.Binary, make([]byte, 125)},
+		{true, codec.Ping, nil},
+		{true, codec.Continuation, make([]byte, 126)},
+		{true, codec.Binary, make([]byte, 65535)},
+		{true, codec.Binary, make([]byte, 65536)},
+		{true, codec.Close, []byte{3, 232}},
 	}
 	for _, index := range []int{1, 3, 4, 5} {
 		for i := range frames[index].payload {
@@ -31,8 +31,8 @@ func TestCodecRoundTrip(t *testing.T) {
 	for _, masked := range []bool{false, true} {
 		for _, chunkSize := range []int{1, 7, 127, 4096, 1 << 20} {
 			t.Run(fmt.Sprintf("masked=%t/chunk=%d", masked, chunkSize), func(t *testing.T) {
-				var enc ews.Encoder
-				var dec ews.Decoder
+				var enc codec.Encoder
+				var dec codec.Decoder
 				for round := range 2 {
 					var wire []byte
 					for i, frame := range frames {
@@ -58,7 +58,7 @@ func TestCodecRoundTrip(t *testing.T) {
 					}
 
 					for i, frame := range frames {
-						var header ews.Header
+						var header codec.Header
 						for {
 							h, ok, err := dec.NextHeader()
 							if err != nil {
@@ -88,7 +88,7 @@ func TestCodecRoundTrip(t *testing.T) {
 						for {
 							chunk, done := dec.Payload()
 							if masked {
-								offset = ews.Mask(chunk, key, offset)
+								offset = codec.Mask(chunk, key, offset)
 							}
 							payload = append(payload, chunk...)
 							if done {

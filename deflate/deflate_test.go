@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/33TU/ews"
+	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/deflate"
 	"github.com/klauspost/compress/flate"
 )
@@ -183,12 +183,12 @@ func TestCompressedFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var enc ews.Encoder
+	var enc codec.Encoder
 	var wire []byte
 	for i := 0; i < len(compressed); i++ {
-		opcode := ews.Continuation
+		opcode := codec.Continuation
 		if i == 0 {
-			opcode = ews.Text
+			opcode = codec.Text
 		}
 		key := [4]byte{byte(i), 2, 3, 4}
 		if err := enc.EncodeCompressed(i == len(compressed)-1, opcode, compressed[i:i+1], &key); err != nil {
@@ -197,13 +197,13 @@ func TestCompressedFragments(t *testing.T) {
 		wire = append(wire, enc.HeaderBytes()...)
 		wire = append(wire, enc.PayloadBytes()...)
 		if i == 0 {
-			if err := enc.Encode(true, ews.Ping, nil, &[4]byte{}); err != nil {
+			if err := enc.Encode(true, codec.Ping, nil, &[4]byte{}); err != nil {
 				t.Fatal(err)
 			}
 			wire = append(wire, enc.HeaderBytes()...)
 		}
 	}
-	var dec ews.Decoder
+	var dec codec.Decoder
 	dec.Feed(wire)
 	var assembled []byte
 	first := true
@@ -216,7 +216,7 @@ func TestCompressedFragments(t *testing.T) {
 		if !done {
 			t.Fatal("incomplete frame")
 		}
-		if h.Opcode() == ews.Ping {
+		if h.Opcode() == codec.Ping {
 			if h.RSV1() {
 				t.Fatal("control frame has RSV1 set")
 			}
@@ -226,7 +226,7 @@ func TestCompressedFragments(t *testing.T) {
 			t.Fatal("RSV1 must only be set on the first fragment")
 		}
 		first = false
-		ews.Mask(p, [4]byte(h.MaskKey()), 0)
+		codec.Mask(p, [4]byte(h.MaskKey()), 0)
 		assembled = append(assembled, p...)
 		if h.Final() {
 			break
@@ -238,7 +238,7 @@ func TestCompressedFragments(t *testing.T) {
 		t.Fatalf("fragmented round trip: %v", err)
 	}
 	before := bytes.Clone(enc.HeaderBytes())
-	if err := enc.EncodeCompressed(true, ews.Ping, nil, nil); !errors.Is(err, ews.ErrInvalidCompressedFrame) {
+	if err := enc.EncodeCompressed(true, codec.Ping, nil, nil); !errors.Is(err, codec.ErrInvalidCompressedFrame) {
 		t.Fatal("compressed control frame accepted")
 	}
 	if !bytes.Equal(before, enc.HeaderBytes()) {
