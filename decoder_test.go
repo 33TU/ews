@@ -22,14 +22,14 @@ func TestDecoderSplitHeaders(t *testing.T) {
 			for split := 0; split < len(wire); split++ {
 				var d Decoder
 				d.Feed(wire[:split])
-				if _, ok, err := d.Next(); ok || err != nil {
+				if _, ok, err := d.NextHeader(); ok || err != nil {
 					t.Fatalf("header %x split %d: premature result %v, %v", wire, split, ok, err)
 				}
 				if !bytes.Equal(d.pending, wire[:split]) {
 					t.Fatal("incomplete header consumed input")
 				}
 				d.Feed(wire[split:])
-				h, ok, err := d.Next()
+				h, ok, err := d.NextHeader()
 				if !ok || err != nil || !bytes.Equal(h.Bytes(), wire) {
 					t.Fatalf("header %x split %d: got %x, %v, %v", wire, split, h.Bytes(), ok, err)
 				}
@@ -48,12 +48,12 @@ func TestDecoderStreamingPayload(t *testing.T) {
 	if p, done := d.Payload(); p != nil || !done {
 		t.Fatal("payload before first header must be nil, true")
 	}
-	h, ok, err := d.Next()
+	h, ok, err := d.NextHeader()
 	if !ok || err != nil || h.PayloadLen() != 5 {
-		t.Fatalf("Next: %v, %v", ok, err)
+		t.Fatalf("NextHeader: %v, %v", ok, err)
 	}
-	if _, ok, err := d.Next(); ok || err != ErrPayloadPending {
-		t.Fatal("Next must reject an unread payload")
+	if _, ok, err := d.NextHeader(); ok || err != ErrPayloadPending {
+		t.Fatal("NextHeader must reject an unread payload")
 	}
 	p, done := d.Payload()
 	if done || !bytes.Equal(p, first[6:]) || &p[0] != &first[6] {
@@ -70,11 +70,11 @@ func TestDecoderStreamingPayload(t *testing.T) {
 	if p, done := d.Payload(); p != nil || !done {
 		t.Fatal("completed payload must return nil, true")
 	}
-	if h, ok, err := d.Next(); !ok || err != nil || h.Opcode() != Ping {
+	if h, ok, err := d.NextHeader(); !ok || err != nil || h.Opcode() != Ping {
 		t.Fatal("failed to read empty ping")
 	}
-	if _, ok, err := d.Next(); !ok || err != nil {
-		t.Fatal("empty payload must allow immediate Next")
+	if _, ok, err := d.NextHeader(); !ok || err != nil {
+		t.Fatal("empty payload must allow immediate NextHeader")
 	}
 	if p, done := d.Payload(); !done || !bytes.Equal(p, []byte{0xff}) {
 		t.Fatal("incorrect last frame payload")
@@ -92,7 +92,7 @@ func TestDecoderInvalidLengths(t *testing.T) {
 	} {
 		var d Decoder
 		d.Feed(wire)
-		if _, ok, err := d.Next(); ok || err != ErrInvalidPayloadLength {
+		if _, ok, err := d.NextHeader(); ok || err != ErrInvalidPayloadLength {
 			t.Fatalf("invalid header %x: %v, %v", wire, ok, err)
 		}
 		if !bytes.Equal(d.pending, wire) || d.remaining != 0 {
@@ -105,7 +105,7 @@ func TestDecoderScratchAndReset(t *testing.T) {
 	var d Decoder
 	d.Feed([]byte{0x82})
 	d.Feed([]byte{3, 'a'})
-	if _, ok, err := d.Next(); !ok || err != nil {
+	if _, ok, err := d.NextHeader(); !ok || err != nil {
 		t.Fatal("failed to parse buffered header")
 	}
 	d.Feed([]byte{'b'}) // Compact pending bytes already backed by scratch.
@@ -118,7 +118,7 @@ func TestDecoderScratchAndReset(t *testing.T) {
 		t.Fatal("Reset failed to clear state and retain storage")
 	}
 	d.Feed([]byte{0x82, 0})
-	if _, ok, err := d.Next(); !ok || err != nil {
+	if _, ok, err := d.NextHeader(); !ok || err != nil {
 		t.Fatal("decoder unusable after Reset")
 	}
 }
@@ -151,7 +151,7 @@ func BenchmarkDecoderComplete(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
 					d.Feed(frame)
-					h, ok, err := d.Next()
+					h, ok, err := d.NextHeader()
 					if !ok || err != nil || h.PayloadLen() != uint64(size) {
 						b.Fatal("header:", ok, err)
 					}
@@ -174,11 +174,11 @@ func BenchmarkDecoderSplitHeader(b *testing.B) {
 	b.SetBytes(int64(len(frame)))
 	for b.Loop() {
 		d.Feed(frame[:1])
-		if _, ok, err := d.Next(); ok || err != nil {
+		if _, ok, err := d.NextHeader(); ok || err != nil {
 			b.Fatal("partial header:", ok, err)
 		}
 		d.Feed(frame[1:])
-		if _, ok, err := d.Next(); !ok || err != nil {
+		if _, ok, err := d.NextHeader(); !ok || err != nil {
 			b.Fatal("header:", ok, err)
 		}
 		if p, done := d.Payload(); !done || len(p) != 4096 {
@@ -196,7 +196,7 @@ func BenchmarkDecoderStreamPayload(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				d.Feed(frame[:MaxHeaderSize])
-				if _, ok, err := d.Next(); !ok || err != nil {
+				if _, ok, err := d.NextHeader(); !ok || err != nil {
 					b.Fatal("header:", ok, err)
 				}
 				for offset := MaxHeaderSize; offset < len(frame); offset += chunkSize {
@@ -220,14 +220,14 @@ func BenchmarkDecoderBatch(b *testing.B) {
 	for b.Loop() {
 		d.Feed(input)
 		for range count {
-			if _, ok, err := d.Next(); !ok || err != nil {
+			if _, ok, err := d.NextHeader(); !ok || err != nil {
 				b.Fatal("header:", ok, err)
 			}
 			if p, done := d.Payload(); !done || len(p) != 125 {
 				b.Fatal("incorrect frame boundary")
 			}
 		}
-		if _, ok, err := d.Next(); ok || err != nil {
+		if _, ok, err := d.NextHeader(); ok || err != nil {
 			b.Fatal("unexpected trailing frame:", ok, err)
 		}
 	}

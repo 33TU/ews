@@ -3,7 +3,7 @@ package ews
 import "errors"
 
 var (
-	// ErrPayloadPending means Next was called before draining the payload.
+	// ErrPayloadPending means NextHeader was called before draining the payload.
 	ErrPayloadPending = errors.New("ews: previous payload has not been consumed")
 	// ErrInvalidPayloadLength indicates a nonminimal or out-of-range length.
 	ErrInvalidPayloadLength = errors.New("ews: invalid payload length encoding")
@@ -37,9 +37,9 @@ func (d *Decoder) Feed(b []byte) {
 	d.pending = d.scratch
 }
 
-// Next reads a header; ok is false if incomplete. Errors consume nothing.
+// NextHeader reads a header; ok is false if incomplete. Errors consume nothing.
 // Unread payloads and invalid lengths are errors; other validation is up to the caller.
-func (d *Decoder) Next() (Header, bool, error) {
+func (d *Decoder) NextHeader() (Header, bool, error) {
 	var h Header
 	if d.remaining != 0 {
 		return h, false, ErrPayloadPending

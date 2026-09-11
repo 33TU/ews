@@ -20,7 +20,7 @@ For example, with a `readChunk` function supplying incoming bytes:
 var dec ews.Decoder
 
 for {
-    header, ok, err := dec.Next()
+    header, ok, err := dec.NextHeader()
     if err != nil {
         return err
     }
@@ -58,7 +58,7 @@ Returned payloads reference decoder input or storage. Copy payloads you need to 
 
 Payload bytes remain masked when the header's mask bit is set. Unmasking is the caller's responsibility, using `header.MaskKey()` and the running offset within that frame's payload. Headers are returned by value and remain valid across decoder calls.
 
-`Next` rejects invalid payload-length encodings. Other protocol checks, including reserved bits, opcodes, control-frame rules, and connection-specific masking requirements, belong to the caller.
+`NextHeader` rejects invalid payload-length encodings. Other protocol checks, including reserved bits, opcodes, control-frame rules, and connection-specific masking requirements, belong to the caller.
 
 Drain available payload bytes before feeding more input to avoid unnecessary buffering. `Payload` returns `nil, true` before the first header and after payload completion, including empty frames.
 
