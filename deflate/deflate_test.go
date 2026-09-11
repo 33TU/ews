@@ -247,36 +247,206 @@ func TestCompressedFragments(t *testing.T) {
 }
 
 func BenchmarkCompression(b *testing.B) {
-	payload := bytes.Repeat([]byte(`{"type":"update","value":12345}`), 128)
-	c, err := deflate.NewCompressor(flate.BestSpeed)
-	if err != nil {
-		b.Fatal(err)
-	}
-	compressed, err := c.Compress(payload)
-	if err != nil {
-		b.Fatal(err)
-	}
-	compressed = bytes.Clone(compressed)
-	var d deflate.Decompressor
-	if _, err := d.Decompress(compressed, len(payload)); err != nil {
-		b.Fatal(err)
-	}
-	b.Run("compress", func(b *testing.B) {
-		b.ReportAllocs()
-		b.SetBytes(int64(len(payload)))
-		for b.Loop() {
-			if _, err := c.Compress(payload); err != nil {
+	for _, takeover := range []bool{false, true} {
+		b.Run(fmt.Sprintf("takeover=%t", takeover), func(b *testing.B) {
+			payload := bytes.Repeat([]byte(`{"type":"update","value":12345}`), 128)
+			c, err := deflate.NewCompressor(flate.BestSpeed)
+			if err != nil {
 				b.Fatal(err)
 			}
-		}
-	})
-	b.Run("decompress", func(b *testing.B) {
-		b.ReportAllocs()
-		b.SetBytes(int64(len(payload)))
-		for b.Loop() {
+			c.ContextTakeover = takeover
+			compressed, err := c.Compress(payload)
+			if err != nil {
+				b.Fatal(err)
+			}
+			compressed = bytes.Clone(compressed)
+			d := deflate.Decompressor{ContextTakeover: takeover}
 			if _, err := d.Decompress(compressed, len(payload)); err != nil {
 				b.Fatal(err)
 			}
+			compressed, err = c.Compress(payload)
+			if err != nil {
+				b.Fatal(err)
+			}
+			compressed = bytes.Clone(compressed)
+			if _, err := d.Decompress(compressed, len(payload)); err != nil {
+				b.Fatal(err)
+			}
+			b.Run("compress", func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(payload)))
+				for b.Loop() {
+					if _, err := c.Compress(payload); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run("decompress", func(b *testing.B) {
+				b.ReportAllocs()
+				b.SetBytes(int64(len(payload)))
+				for b.Loop() {
+					if _, err := d.Decompress(compressed, len(payload)); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		})
+	}
+}
+
+func TestContextTakeover(t *testing.T) {
+	noise := make([]byte, 65536)
+	_, _ = rand.New(rand.NewSource(2)).Read(noise)
+	messages := [][]byte{noise, nil, nil, []byte("short"), noise[40000:50000], noise[50000:], bytes.Repeat([]byte("repeat"), 20000)}
+	for _, level := range []int{flate.NoCompression, flate.BestSpeed, flate.DefaultCompression, flate.BestCompression, flate.HuffmanOnly} {
+		t.Run(fmt.Sprint(level), func(t *testing.T) {
+			c, err := deflate.NewCompressor(level)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.ContextTakeover = true
+			d := deflate.Decompressor{ContextTakeover: true}
+			peer := deflate.Decompressor{ContextTakeover: true}
+			var wire bytes.Buffer
+			w, err := stdflate.NewWriter(&wire, stdflate.DefaultCompression)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			var history []byte
+			for round := 0; round < 2; round++ {
+				c.Reset()
+				d.Reset()
+				peer.Reset()
+				w.Reset(&wire)
+				history = history[:0]
+				for i, message := range messages {
+					compressed, err := c.Compress(message)
+					if err != nil {
+						t.Fatal(err)
+					}
+					got, err := d.Decompress(compressed, len(message))
+					if err != nil || !bytes.Equal(got, message) {
+						t.Fatalf("round %d message %d: %v", round, i, err)
+					}
+					// Returned output may be modified without corrupting retained history.
+					clear(got)
+					r := stdflate.NewReaderDict(bytes.NewReader(append(bytes.Clone(compressed), tail...)), history)
+					got, err = io.ReadAll(r)
+					r.Close()
+					if err != nil || !bytes.Equal(got, message) {
+						t.Fatalf("standard reader message %d: %v", i, err)
+					}
+					wire.Reset()
+					if _, err := w.Write(message); err != nil {
+						t.Fatal(err)
+					}
+					if err := w.Flush(); err != nil {
+						t.Fatal(err)
+					}
+					got, err = peer.Decompress(wire.Bytes()[:wire.Len()-4], len(message))
+					if err != nil || !bytes.Equal(got, message) {
+						t.Fatalf("standard writer message %d: %v", i, err)
+					}
+					history = append(history, message...)
+					history = history[max(0, len(history)-(32<<10)):]
+				}
+			}
+		})
+	}
+}
+
+func TestTakeoverHistoryAndReset(t *testing.T) {
+	message := make([]byte, 16000)
+	_, _ = rand.New(rand.NewSource(3)).Read(message)
+	c, err := deflate.NewCompressor(flate.DefaultCompression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ContextTakeover = true
+	d := deflate.Decompressor{ContextTakeover: true}
+	first, err := c.Compress(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first = bytes.Clone(first)
+	if _, err := d.Decompress(first, len(message)); err != nil {
+		t.Fatal(err)
+	}
+	second, err := c.Compress(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second) >= len(first)/2 {
+		t.Fatal("compressor did not reuse history")
+	}
+	second = bytes.Clone(second)
+	if got, err := d.Decompress(second, len(message)); err != nil || !bytes.Equal(got, message) {
+		t.Fatalf("history: %v", err)
+	}
+	d.Reset()
+	if _, err := d.Decompress(second, len(message)); err == nil {
+		t.Fatal("reset retained history")
+	}
+	c.Reset()
+	fresh, err := c.Compress(message)
+	if err != nil || !bytes.Equal(fresh, first) {
+		t.Fatal("compressor reset retained history")
+	}
+	for _, bad := range []struct {
+		payload []byte
+		limit   int
+	}{{[]byte{6}, len(message)}, {second, 10}} {
+		if _, err := d.Decompress(first, len(message)); err != nil {
+			t.Fatal(err)
 		}
-	})
+		if _, err := d.Decompress(bad.payload, bad.limit); err == nil {
+			t.Fatal("expected decode error")
+		}
+		if _, err := d.Decompress(second, len(message)); err == nil {
+			t.Fatal("decode error retained history")
+		}
+	}
+	// Switching modes after Reset must also discard history.
+	c.Reset()
+	d.Reset()
+	c.ContextTakeover = false
+	d.ContextTakeover = false
+	for i := 0; i < 2; i++ {
+		compressed, err := c.Compress(message)
+		if err != nil || !bytes.Equal(compressed, first) {
+			t.Fatal("no-context mode retained history")
+		}
+		if got, err := d.Decompress(compressed, len(message)); err != nil || !bytes.Equal(got, message) {
+			t.Fatalf("no-context mode: %v", err)
+		}
+	}
+}
+
+func TestTakeoverFinalBlocks(t *testing.T) {
+	history := make([]byte, 16000)
+	_, _ = rand.New(rand.NewSource(4)).Read(history)
+	d := deflate.Decompressor{ContextTakeover: true}
+	if _, err := d.Decompress(standardCompress(t, history, nil), len(history)); err != nil {
+		t.Fatal(err)
+	}
+	var wire bytes.Buffer
+	// An empty final block must not discard history from the preceding message.
+	for _, message := range [][]byte{nil, history[:1000]} {
+		w, err := stdflate.NewWriterDict(&wire, stdflate.DefaultCompression, history)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write(message); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wire.WriteByte(0)
+	got, err := d.Decompress(wire.Bytes(), 1000)
+	if err != nil || !bytes.Equal(got, history[:1000]) {
+		t.Fatalf("final block history: %v", err)
+	}
 }

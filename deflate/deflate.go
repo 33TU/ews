@@ -1,7 +1,6 @@
-// Package deflate implements permessage-deflate without context takeover.
+// Package deflate implements permessage-deflate.
 // Helpers operate on complete, unmasked message payloads.
-// Use them with no_context_takeover negotiated for the corresponding direction
-// and the default 32 KB compression window.
+// Configure context takeover to match negotiation and use the default 32 KB window.
 package deflate
 
 import (
@@ -18,8 +17,11 @@ var (
 	ErrInvalidLimit    = errors.New("ews/deflate: negative output limit")
 )
 
-// Compressor reuses storage but starts each message with fresh history.
+// Compressor compresses messages using reusable storage.
 type Compressor struct {
+	// ContextTakeover retains history between messages. Set before use or after Reset.
+	ContextTakeover bool
+
 	writer *flate.Writer
 	output bytes.Buffer
 }
@@ -38,7 +40,9 @@ func NewCompressor(level int) (*Compressor, error) {
 // Compress borrows its output until the next call. Input remains unchanged.
 func (c *Compressor) Compress(payload []byte) ([]byte, error) {
 	c.output.Reset()
-	c.writer.Reset(&c.output)
+	if !c.ContextTakeover {
+		c.writer.Reset(&c.output)
+	}
 	if _, err := c.writer.Write(payload); err != nil {
 		return nil, err
 	}
@@ -49,14 +53,24 @@ func (c *Compressor) Compress(payload []byte) ([]byte, error) {
 	return output[:len(output)-4], nil // Strip the permessage-deflate sync-flush tail.
 }
 
+// Reset clears message history and output, retaining storage and configuration.
+func (c *Compressor) Reset() {
+	c.output.Reset()
+	c.writer.Reset(&c.output)
+}
+
 type resetReader interface {
 	io.ReadCloser
 	flate.Resetter
 }
 
-// Decompressor reuses storage without retaining history between messages.
+// Decompressor decompresses messages using reusable storage.
 // The zero value is ready to use.
 type Decompressor struct {
+	// ContextTakeover retains history between messages. Set before use or after Reset.
+	ContextTakeover bool
+	history         []byte
+
 	reader resetReader
 	input  messageReader
 	output []byte
@@ -64,17 +78,24 @@ type Decompressor struct {
 
 // Decompress borrows its output until the next call. maxSize must be nonnegative.
 // It returns ErrMessageTooLarge if the decompressed size exceeds maxSize.
+// Decode errors clear history; reset both peers before continuing with takeover.
 func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
 	if maxSize < 0 {
 		return nil, ErrInvalidLimit
 	}
+	success := false
+	defer func() {
+		if !success {
+			d.history = d.history[:0]
+		}
+	}()
 	d.output = d.output[:0]
 	d.input.payload = payload
 	d.input.tail = inflateTail[:]
 	defer func() { d.input = messageReader{} }()
 	if d.reader == nil {
-		d.reader = flate.NewReader(&d.input).(resetReader)
-	} else if err := d.reader.Reset(&d.input, nil); err != nil {
+		d.reader = flate.NewReaderDict(&d.input, d.history).(resetReader)
+	} else if err := d.reader.Reset(&d.input, d.history); err != nil {
 		return nil, err
 	}
 	defer d.reader.Close()
@@ -90,12 +111,19 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
 		if len(d.output) > maxSize {
 			return nil, ErrMessageTooLarge
 		}
+		if d.ContextTakeover {
+			d.remember(d.output[len(d.output)-n:])
+		}
 		if err == io.EOF {
 			if len(d.input.payload) == 0 && len(d.input.tail) == 0 {
+				success = true
 				return d.output, nil
 			}
 			// RFC 7692 permits final DEFLATE blocks within a message.
 			dict := d.output[max(0, len(d.output)-(32<<10)):]
+			if d.ContextTakeover {
+				dict = d.history
+			}
 			if err := d.reader.Reset(&d.input, dict); err != nil {
 				return nil, err
 			}
@@ -108,6 +136,31 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
 			return nil, io.ErrNoProgress
 		}
 	}
+}
+
+// Reset clears message history and output, retaining storage and configuration.
+func (d *Decompressor) Reset() {
+	d.history = d.history[:0]
+	d.output = d.output[:0]
+	d.input = messageReader{}
+}
+
+func (d *Decompressor) remember(p []byte) {
+	const window = 32 << 10
+	if len(p) == 0 {
+		return
+	}
+	if cap(d.history) == 0 {
+		d.history = make([]byte, 0, window)
+	}
+	if len(p) >= window {
+		d.history = append(d.history[:0], p[len(p)-window:]...)
+		return
+	}
+	if n := len(d.history) + len(p) - window; n > 0 {
+		d.history = d.history[:copy(d.history, d.history[n:])]
+	}
+	d.history = append(d.history, p...)
 }
 
 // Restore the stripped sync-flush tail, then terminate the DEFLATE stream.

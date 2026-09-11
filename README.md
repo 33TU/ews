@@ -95,7 +95,7 @@ The output slices are borrowed. Each successful `Encode` replaces the current fr
 
 ## Compression
 
-The optional `ews/deflate` package uses `github.com/klauspost/compress/flate` for `permessage-deflate` without context takeover. Negotiate `no_context_takeover` for each direction that uses these helpers, with the default 32 KB window. Extension negotiation remains outside this package.
+The optional `ews/deflate` package uses `github.com/klauspost/compress/flate` for `permessage-deflate`. Both context-takeover modes are supported, using the default 32 KB window. The default is no context takeover; negotiate `no_context_takeover` for each direction using that mode. Extension negotiation remains outside this package.
 
 Compress a complete message before framing and masking it:
 
@@ -135,7 +135,16 @@ if err != nil {
 handle(message)
 ```
 
-Both helpers return borrowed output valid until their next call. Each message starts with fresh compression history, while allocated storage is reused. The frame decoder continues to expose raw payloads.
+Both helpers return borrowed output valid until their next call or `Reset()`. Storage is reused in either mode. The frame decoder continues to expose raw payloads.
+
+To retain history between compressed messages, configure each helper before use to match the negotiated mode for its direction:
+
+```go
+compressor.ContextTakeover = true
+decompressor := deflate.Decompressor{ContextTakeover: true}
+```
+
+With takeover enabled, keep each helper dedicated to one connection direction and process compressed messages in order. Uncompressed messages bypass the helpers and don't change history. Call `Reset()` before reusing a helper for a new connection or changing its mode; this retains storage and configuration. Decode errors clear history, so the existing takeover stream cannot simply continue after an error.
 
 ## Development
 
