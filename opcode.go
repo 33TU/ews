@@ -1,5 +1,6 @@
 package ews
 
+// Opcode identifies a WebSocket frame's type.
 type Opcode uint8
 
 const (

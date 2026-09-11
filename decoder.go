@@ -9,6 +9,7 @@ var (
 	ErrInvalidPayloadLength = errors.New("ews: invalid payload length encoding")
 )
 
+// Decoder incrementally decodes WebSocket frames. The zero value is ready to use.
 type Decoder struct {
 	pending   []byte
 	scratch   []byte
