@@ -4,9 +4,9 @@ import "errors"
 
 var (
 	// ErrPayloadPending means NextHeader was called before draining the payload.
-	ErrPayloadPending = errors.New("ews: previous payload has not been consumed")
+	ErrPayloadPending = errors.New("ews/codec: previous payload has not been consumed")
 	// ErrInvalidPayloadLength indicates a nonminimal or out-of-range length.
-	ErrInvalidPayloadLength = errors.New("ews: invalid payload length encoding")
+	ErrInvalidPayloadLength = errors.New("ews/codec: invalid payload length encoding")
 )
 
 // Decoder incrementally decodes WebSocket frames. The zero value is ready to use.

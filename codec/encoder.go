@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	ErrInvalidOpcode          = errors.New("ews: invalid opcode")
-	ErrInvalidControlFrame    = errors.New("ews: invalid control frame")
-	ErrInvalidCompressedFrame = errors.New("ews: only data frames may be compressed")
+	ErrInvalidOpcode          = errors.New("ews/codec: invalid opcode")
+	ErrInvalidControlFrame    = errors.New("ews/codec: invalid control frame")
+	ErrInvalidCompressedFrame = errors.New("ews/codec: only data frames may be compressed")
 )
 
 // Encoder prepares WebSocket frames. The zero value is ready to use.
