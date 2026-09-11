@@ -2,7 +2,7 @@
 
 A lightweight WebSocket frame encoder and decoder for Go, built around plain `[]byte`.
 
-**Work in progress.** The decoder and header accessors are implemented; the encoder is pending. The API is still taking shape.
+**Work in progress.** The API is still taking shape.
 
 ## Design
 
@@ -63,6 +63,27 @@ Payload bytes remain masked when the header's mask bit is set. Unmasking is the 
 Drain available payload bytes before feeding more input to avoid unnecessary buffering. `Payload` returns `nil, true` before the first header and after payload completion, including empty frames.
 
 Call `Reset` to discard pending input while retaining reusable storage.
+
+## Encoding
+
+Encode a frame, then send its header followed by its payload:
+
+```go
+var enc ews.Encoder
+
+if err := enc.Encode(true, ews.Text, []byte("Hello"), nil); err != nil {
+    return err
+}
+header := enc.HeaderBytes()
+payload := enc.PayloadBytes()
+// Send both slices completely before calling Encode or Reset again.
+```
+
+`Encode` borrows unmasked input without copying. Keep that input unchanged until it has been sent. With a mask key, it copies and masks the payload into reusable scratch storage, leaving input unchanged. A nil key means unmasked; any non-nil key must have length four or `Encode` panics. Client frames need a fresh key from `crypto/rand` for each frame; server frames use nil.
+
+Invalid opcodes and malformed control frames return errors without changing output. Message sequencing, UTF-8, and close status codes remain the caller's responsibility.
+
+The output slices are borrowed. Each successful `Encode` replaces the current frame; it does not accumulate frames. Call `Reset` to clear the frame while retaining scratch capacity, or encode the next frame directly after sending the current one.
 
 ## Development
 
