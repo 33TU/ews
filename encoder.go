@@ -36,11 +36,8 @@ func (e *Encoder) PayloadBytes() []byte {
 }
 
 // Encode borrows payload if key is nil; otherwise it masks a copy in scratch.
-// Non-nil keys must have length four or Encode panics. Errors leave the frame unchanged.
-func (e *Encoder) Encode(final bool, opcode Opcode, payload []byte, key []byte) error {
-	if key != nil && len(key) != 4 {
-		panic("ews: mask key must contain four bytes")
-	}
+// Errors leave the frame unchanged.
+func (e *Encoder) Encode(final bool, opcode Opcode, payload []byte, key *[4]byte) error {
 	switch opcode {
 	case Continuation, Text, Binary:
 	case Close, Ping, Pong:
@@ -73,7 +70,7 @@ func (e *Encoder) Encode(final bool, opcode Opcode, payload []byte, key []byte) 
 
 	var maskKey [4]byte
 	if key != nil {
-		copy(maskKey[:], key)
+		maskKey = *key
 		copy(h.raw[h.len:], maskKey[:])
 		h.raw[1] |= 0x80
 		h.len += 4

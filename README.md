@@ -79,7 +79,7 @@ payload := enc.PayloadBytes()
 // Send both slices completely before calling Encode or Reset again.
 ```
 
-`Encode` borrows unmasked input without copying. Keep that input unchanged until it has been sent. With a mask key, it copies and masks the payload into reusable scratch storage, leaving input unchanged. A nil key means unmasked; any non-nil key must have length four or `Encode` panics. Client frames need a fresh key from `crypto/rand` for each frame; server frames use nil.
+`Encode` borrows unmasked input without copying. Keep that input unchanged until it has been sent. With a mask key, it copies and masks the payload into reusable scratch storage, leaving input unchanged. The key is a `*[4]byte`; nil means unmasked. Client frames need a fresh key from `crypto/rand` for each frame; server frames use nil.
 
 Invalid opcodes and malformed control frames return errors without changing output. Message sequencing, UTF-8, and close status codes remain the caller's responsibility.
 
@@ -91,4 +91,11 @@ The output slices are borrowed. Each successful `Encode` replaces the current fr
 go test ./...
 go vet ./...
 go test -run '^$' -bench . -benchmem
+```
+
+Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API.
+
+```sh
+GOEXPERIMENT=simd go test ./...
+GOEXPERIMENT=simd go test -run '^$' -bench BenchmarkMask -benchmem
 ```
