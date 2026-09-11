@@ -38,6 +38,21 @@ func (h *Header) Final() bool {
 	return h.raw[0]&0x80 != 0
 }
 
+// RSV1 reports whether the first reserved bit is set.
+func (h *Header) RSV1() bool {
+	return h.raw[0]&0x40 != 0
+}
+
+// RSV2 reports whether the second reserved bit is set.
+func (h *Header) RSV2() bool {
+	return h.raw[0]&0x20 != 0
+}
+
+// RSV3 reports whether the third reserved bit is set.
+func (h *Header) RSV3() bool {
+	return h.raw[0]&0x10 != 0
+}
+
 // Opcode returns the frame's opcode.
 func (h *Header) Opcode() Opcode {
 	return Opcode(h.raw[0] & 0x0f)

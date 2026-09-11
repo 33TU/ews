@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrInvalidOpcode       = errors.New("ews: invalid opcode")
-	ErrInvalidControlFrame = errors.New("ews: invalid control frame")
+	ErrInvalidOpcode          = errors.New("ews: invalid opcode")
+	ErrInvalidControlFrame    = errors.New("ews: invalid control frame")
+	ErrInvalidCompressedFrame = errors.New("ews: only data frames may be compressed")
 )
 
 // Encoder prepares WebSocket frames. The zero value is ready to use.
@@ -33,6 +34,21 @@ func (e *Encoder) HeaderBytes() []byte {
 // PayloadBytes borrows the payload until the next Encode or Reset.
 func (e *Encoder) PayloadBytes() []byte {
 	return e.payload
+}
+
+// EncodeCompressed encodes precompressed message data, setting RSV1 on its first frame.
+// Continuation frames leave RSV1 clear. Control frames are rejected.
+func (e *Encoder) EncodeCompressed(final bool, opcode Opcode, payload []byte, key *[4]byte) error {
+	if opcode != Text && opcode != Binary && opcode != Continuation {
+		return ErrInvalidCompressedFrame
+	}
+	if err := e.Encode(final, opcode, payload, key); err != nil {
+		return err
+	}
+	if opcode != Continuation {
+		e.h.raw[0] |= 0x40
+	}
+	return nil
 }
 
 // Encode borrows payload if key is nil; otherwise it masks a copy in scratch.

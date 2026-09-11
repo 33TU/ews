@@ -93,6 +93,50 @@ Invalid opcodes and malformed control frames return errors without changing outp
 
 The output slices are borrowed. Each successful `Encode` replaces the current frame; it does not accumulate frames. Call `Reset` to clear the frame while retaining scratch capacity, or encode the next frame directly after sending the current one.
 
+## Compression
+
+The optional `ews/deflate` package uses `github.com/klauspost/compress/flate` for `permessage-deflate` without context takeover. Negotiate `no_context_takeover` for each direction that uses these helpers, with the default 32 KB window. Extension negotiation remains outside this package.
+
+Compress a complete message before framing and masking it:
+
+```go
+import (
+    "github.com/33TU/ews"
+    "github.com/33TU/ews/deflate"
+    "github.com/klauspost/compress/flate"
+)
+
+// Create once and reuse across messages.
+compressor, err := deflate.NewCompressor(flate.BestSpeed)
+if err != nil {
+    return err
+}
+compressed, err := compressor.Compress([]byte("Hello"))
+if err != nil {
+    return err
+}
+var enc ews.Encoder
+if err := enc.EncodeCompressed(true, ews.Text, compressed, nil); err != nil {
+    return err
+}
+// Send enc.HeaderBytes(), then enc.PayloadBytes().
+```
+
+`EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
+
+On receipt, use `header.RSV1()` on the first data frame to identify a compressed message. Unmask each frame, collect its data fragments through FIN, then decompress the assembled payload. Interleaved control frames are handled separately.
+
+```go
+var decompressor deflate.Decompressor // Reuse across messages.
+message, err := decompressor.Decompress(compressed, 8<<20) // Maximum 8 MiB output.
+if err != nil {
+    return err
+}
+handle(message)
+```
+
+Both helpers return borrowed output valid until their next call. Each message starts with fresh compression history, while allocated storage is reused. The frame decoder continues to expose raw payloads.
+
 ## Development
 
 ```sh
