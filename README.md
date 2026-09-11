@@ -4,7 +4,7 @@ A lightweight WebSocket frame encoder and decoder for Go, built around plain `[]
 
 **Work in progress.** The API is still taking shape.
 
-The frame API lives in `github.com/33TU/ews/codec`; message compression lives in `github.com/33TU/ews/deflate`. The root is reserved for the planned client/server API.
+The frame API lives in `github.com/33TU/ews/codec`, message compression in `github.com/33TU/ews/deflate`, and message protocol handling in `github.com/33TU/ews/protocol`. The root is reserved for the planned client/server API.
 
 ## Design
 
@@ -147,6 +147,55 @@ decompressor := deflate.Decompressor{ContextTakeover: true}
 ```
 
 With takeover enabled, keep each helper dedicated to one connection direction and process compressed messages in order. Uncompressed messages bypass the helpers and don't change history. Call `Reset()` before reusing a helper for a new connection or changing its mode; this retains storage and configuration. Decode errors clear history, so the existing takeover stream cannot simply continue after an error.
+
+## Protocol sender and receiver
+
+`protocol.Receiver` assembles incoming messages and validates masking, fragmentation, UTF-8, and close codes. `protocol.Sender` appends complete outgoing frames into a caller-owned buffer. Neither owns the transport or an output queue.
+
+```go
+import "github.com/33TU/ews/protocol"
+
+receiver, err := protocol.NewReceiver(protocol.ReceiverConfig{
+    Role:           protocol.Server,
+    MaxMessageSize: 8 << 20,
+})
+if err != nil {
+    return err
+}
+sender, err := protocol.NewSender(protocol.SenderConfig{Role: protocol.Server})
+if err != nil {
+    return err
+}
+
+var output []byte
+output, err = sender.Append(output, codec.Text, []byte("Hello"), false)
+if err != nil {
+    return err
+}
+```
+
+`Append` grows the supplied buffer as needed and preserves its existing bytes, so frames can be batched. Its final argument requests compression. Errors return the original destination unchanged. The sender retains neither the destination nor the payload; client frames receive fresh masking keys. Reuse the buffer's capacity after its contents have been written. The caller manages partial writes, queue limits, and backpressure.
+
+Feed received bytes with `receiver.Feed(input)`, then call `receiver.NextEvent()` until it needs more input. Input is borrowed without modification; keep it unchanged until consumed or the next `Feed` returns. Event payloads are borrowed until the next `NextEvent` or `Reset` call.
+
+Messages arrive as complete `codec.Text` or `codec.Binary` events. Ping, pong, and close events are delivered separately, with no automatic output. Respond to a ping by appending a pong with the same payload. On a close event, stop sending data and append a close reply if one has not already been appended:
+
+```go
+switch event.Opcode {
+case codec.Ping:
+    output, err = sender.Append(output, codec.Pong, event.Payload, false)
+case codec.Close:
+    if !sender.CloseSent() {
+        output, err = sender.Append(output, codec.Close, event.Payload, false)
+    }
+}
+```
+
+`sender.AppendClose(output, 1000, "bye")` initiates a close. `CloseSent()` means a close was appended, not yet written to the transport. `receiver.CloseReceived()` records the peer's close. The caller coordinates these states, flushes output, and handles transport shutdown and timeouts. A receiver stops processing input after a close or terminal error. A sender rejects further data after appending a close, but permits pong replies while waiting for the peer.
+
+Enable negotiated receive compression with `ReceiverConfig.Compression` and `ContextTakeover`. Configure the send direction with `SenderConfig.Compression = &protocol.Compression{Level: flate.BestSpeed, ContextTakeover: true}`. Each direction is independent; configure it to match the handshake. Only the default 32 KB window is supported. The receiver's message limit applies to both assembled wire data and expanded payloads; the default is 8 MiB. Outgoing messages use one frame.
+
+A `*protocol.Error` is a terminal receive failure with a suggested close `Code`; the caller can append a close and terminate the connection. The caller also handles EOF and deadlines. Senders and receivers share no mutable state and can run independently, but calls on each individual object must be serialized. Copy borrowed events before handing them to another goroutine. `Reset()` clears protocol and compression history for reuse on a new connection, retaining storage and configuration.
 
 ## Development
 
