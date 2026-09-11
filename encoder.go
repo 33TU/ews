@@ -80,7 +80,7 @@ func (e *Encoder) Encode(final bool, opcode Opcode, payload []byte, key *[4]byte
 		e.payload = payload
 	} else {
 		e.scratch = slices.Grow(e.scratch[:0], len(payload))[:len(payload)]
-		mask(e.scratch, payload, maskKey)
+		mask(e.scratch, payload, maskKey, 0)
 		e.payload = e.scratch
 	}
 	e.h = h

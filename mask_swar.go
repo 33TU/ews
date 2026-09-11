@@ -1,34 +1,53 @@
-//go:build !goexperiment.simd || (!amd64 && !arm64 && !wasm)
+//go:build (!goexperiment.simd && (amd64 || arm64 || wasm)) || 386
 
 package ews
 
-import "encoding/binary"
+import "unsafe"
 
-func mask(dst, src []byte, key [4]byte) {
+func mask(dst, src []byte, key [4]byte, offset uint8) {
+	key = rotateMaskKey(key, offset)
 	dst = dst[:len(src)]
+	n := len(src)
 
-	k32 := binary.LittleEndian.Uint32(key[:])
+	k32 := *(*uint32)(unsafe.Pointer(&key))
 	k64 := uint64(k32) | uint64(k32)<<32
 
-	for len(src) >= 32 {
-		binary.LittleEndian.PutUint64(dst[0:8], binary.LittleEndian.Uint64(src[0:8])^k64)
-		binary.LittleEndian.PutUint64(dst[8:16], binary.LittleEndian.Uint64(src[8:16])^k64)
-		binary.LittleEndian.PutUint64(dst[16:24], binary.LittleEndian.Uint64(src[16:24])^k64)
-		binary.LittleEndian.PutUint64(dst[24:32], binary.LittleEndian.Uint64(src[24:32])^k64)
-		src, dst = src[32:], dst[32:]
-	}
+	s := unsafe.Pointer(unsafe.SliceData(src))
+	d := unsafe.Pointer(unsafe.SliceData(dst))
 
-	for len(src) >= 8 {
-		binary.LittleEndian.PutUint64(dst[:8], binary.LittleEndian.Uint64(src[:8])^k64)
-		src, dst = src[8:], dst[8:]
+	i := 0
+	for n-i >= 64 {
+		*(*uint64)(unsafe.Add(d, i+0)) = *(*uint64)(unsafe.Add(s, i+0)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+8)) = *(*uint64)(unsafe.Add(s, i+8)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+16)) = *(*uint64)(unsafe.Add(s, i+16)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+24)) = *(*uint64)(unsafe.Add(s, i+24)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+32)) = *(*uint64)(unsafe.Add(s, i+32)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+40)) = *(*uint64)(unsafe.Add(s, i+40)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+48)) = *(*uint64)(unsafe.Add(s, i+48)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+56)) = *(*uint64)(unsafe.Add(s, i+56)) ^ k64
+		i += 64
 	}
-
-	if len(src) >= 4 {
-		binary.LittleEndian.PutUint32(dst[:4], binary.LittleEndian.Uint32(src[:4])^k32)
-		src, dst = src[4:], dst[4:]
+	if n-i >= 32 {
+		*(*uint64)(unsafe.Add(d, i+0)) = *(*uint64)(unsafe.Add(s, i+0)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+8)) = *(*uint64)(unsafe.Add(s, i+8)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+16)) = *(*uint64)(unsafe.Add(s, i+16)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+24)) = *(*uint64)(unsafe.Add(s, i+24)) ^ k64
+		i += 32
 	}
-
-	for i, v := range src {
-		dst[i] = v ^ key[i]
+	if n-i >= 16 {
+		*(*uint64)(unsafe.Add(d, i+0)) = *(*uint64)(unsafe.Add(s, i+0)) ^ k64
+		*(*uint64)(unsafe.Add(d, i+8)) = *(*uint64)(unsafe.Add(s, i+8)) ^ k64
+		i += 16
+	}
+	if n-i >= 8 {
+		*(*uint64)(unsafe.Add(d, i+0)) = *(*uint64)(unsafe.Add(s, i+0)) ^ k64
+		i += 8
+	}
+	if n-i >= 4 {
+		*(*uint32)(unsafe.Add(d, i)) = *(*uint32)(unsafe.Add(s, i)) ^ k32
+		i += 4
+	}
+	for ; i < n; i++ {
+		*(*byte)(unsafe.Add(d, i)) = *(*byte)(unsafe.Add(s, i)) ^ key[i&3]
 	}
 }

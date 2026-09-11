@@ -34,9 +34,17 @@ for {
     }
 
     handleHeader(header)
+    var key [4]byte
+    if header.Masked() {
+        copy(key[:], header.MaskKey())
+    }
+    var offset uint8
     for {
         payload, done := dec.Payload()
         if len(payload) != 0 {
+            if header.Masked() {
+                offset = ews.Mask(payload, key, offset)
+            }
             // Process before calling the decoder again.
             handlePayload(payload)
         }
@@ -56,7 +64,7 @@ for {
 
 Returned payloads reference decoder input or storage. Copy payloads you need to retain beyond the next decoder call.
 
-Payload bytes remain masked when the header's mask bit is set. Unmasking is the caller's responsibility, using `header.MaskKey()` and the running offset within that frame's payload. Headers are returned by value and remain valid across decoder calls.
+Payload bytes remain masked when the header's mask bit is set. Use `Mask` to unmask in place, carrying its returned offset between chunks and starting at zero for each frame. This modifies the borrowed input; copy first if you need to preserve it. Headers are returned by value and remain valid across decoder calls.
 
 `NextHeader` rejects invalid payload-length encodings. Other protocol checks, including reserved bits, opcodes, control-frame rules, and connection-specific masking requirements, belong to the caller.
 
