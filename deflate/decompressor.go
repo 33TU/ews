@@ -23,11 +23,11 @@ type resetReader interface {
 type Decompressor struct {
 	// ContextTakeover retains history between messages. Set before use or after Reset.
 	ContextTakeover bool
-	history         []byte
 
-	reader resetReader
-	input  messageReader
-	output []byte
+	reader  resetReader
+	input   messageReader
+	output  []byte
+	history []byte
 }
 
 // Decompress borrows its output until the next call. maxSize must be nonnegative.
