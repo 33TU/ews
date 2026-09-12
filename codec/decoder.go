@@ -90,17 +90,22 @@ func (d *Decoder) NextHeader() (Header, bool, error) {
 // Bytes are borrowed until the next decoder call. Returns nil, false if waiting
 // for input, or nil, true if no payload remains (including before the first header).
 func (d *Decoder) Payload() (chunk []byte, done bool) {
+	return d.PayloadN(len(d.pending))
+}
+
+// PayloadN is like Payload but consumes at most n bytes. If n <= 0, it consumes nothing.
+func (d *Decoder) PayloadN(n int) (chunk []byte, done bool) {
 	if d.remaining == 0 {
 		return nil, true
 	}
-	if len(d.pending) == 0 {
+	if n <= 0 || len(d.pending) == 0 {
 		return nil, false
 	}
 
-	n := min(uint64(len(d.pending)), d.remaining)
-	chunk = d.pending[:int(n):int(n)]
-	d.pending = d.pending[int(n):]
-	d.remaining -= n
+	n = int(min(uint64(min(n, len(d.pending))), d.remaining))
+	chunk = d.pending[:n:n]
+	d.pending = d.pending[n:]
+	d.remaining -= uint64(n)
 
 	return chunk, d.remaining == 0
 }

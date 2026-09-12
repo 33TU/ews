@@ -7,6 +7,42 @@ import (
 	"testing"
 )
 
+func TestDecoderPayloadN(t *testing.T) {
+	var d Decoder
+	if p, done := d.PayloadN(1); p != nil || !done {
+		t.Fatal("expected completed payload before a header")
+	}
+	wire := []byte{0x82, 5, 'a', 'b', 'c'}
+	d.Feed(wire)
+	if _, ok, err := d.NextHeader(); !ok || err != nil {
+		t.Fatalf("header: %v, %v", ok, err)
+	}
+	for _, n := range []int{-1, 0} {
+		if p, done := d.PayloadN(n); p != nil || done {
+			t.Fatalf("limit %d: got %q, %v", n, p, done)
+		}
+	}
+	if p, done := d.PayloadN(2); string(p) != "ab" || done || cap(p) != 2 || &p[0] != &wire[2] {
+		t.Fatal("expected two borrowed bytes")
+	}
+	if p, done := d.PayloadN(99); string(p) != "c" || done {
+		t.Fatal("expected remaining available byte")
+	}
+	if p, done := d.PayloadN(1); p != nil || done {
+		t.Fatal("expected to wait for input")
+	}
+	d.Feed([]byte{'d', 'e', 0x82, 0})
+	if p, done := d.PayloadN(99); string(p) != "de" || !done {
+		t.Fatal("expected end of payload without consuming next header")
+	}
+	if _, ok, err := d.NextHeader(); !ok || err != nil {
+		t.Fatalf("next header: %v, %v", ok, err)
+	}
+	if p, done := d.PayloadN(0); p != nil || !done {
+		t.Fatal("expected completed empty payload")
+	}
+}
+
 func TestDecoderPreserve(t *testing.T) {
 	var d Decoder
 	var b [1]byte
