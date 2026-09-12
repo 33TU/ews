@@ -23,6 +23,11 @@ func (d *Decoder) Reset() {
 	d.remaining = 0
 }
 
+// Buffered returns the number of fed bytes not yet consumed.
+func (d *Decoder) Buffered() int {
+	return len(d.pending)
+}
+
 // Feed appends input, borrowing b when no input is pending.
 func (d *Decoder) Feed(b []byte) {
 	if len(b) == 0 {
