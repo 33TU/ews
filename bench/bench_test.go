@@ -156,7 +156,7 @@ func BenchmarkEcho(b *testing.B) {
 	}{{"ews", ewsServer}, {"gws", gwsServer}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
-			for _, conns := range []int{1, 32} {
+			for _, conns := range []int{1, 32, 128} {
 				for _, s := range servers {
 					name := fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, s.name)
 					b.Run(name, func(b *testing.B) {
@@ -172,13 +172,17 @@ func BenchmarkEcho(b *testing.B) {
 							c.Write(codec.Binary, msg)
 							c.ReadMessage()
 						}
-						per := b.N / conns
 						b.ReportAllocs()
 						b.SetBytes(int64(size))
 						b.ResetTimer()
 						var wg sync.WaitGroup
 						errs := make(chan error, conns)
-						for _, c := range clients {
+						for i, c := range clients {
+							// Spread b.N messages exactly across connections.
+							per := b.N / conns
+							if i < b.N%conns {
+								per++
+							}
 							wg.Add(1)
 							go func() {
 								defer wg.Done()
