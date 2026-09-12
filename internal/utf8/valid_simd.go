@@ -3,9 +3,9 @@
 package utf8
 
 import (
-	"encoding/binary"
 	"simd/archsimd"
 	"unicode/utf8"
+	"unsafe"
 )
 
 // wideThreshold is the input size from which the 256-bit kernel pays off.
@@ -32,23 +32,34 @@ var (
 // needs byte permutes that archsimd offers only on amd64. Ported from
 // github.com/33TU/json-experiment.
 func Valid(src []byte) bool {
-	src = src[:len(src):len(src)] // Skip capacity recomputation when reslicing.
-
 	// ASCII is the common case and the lookup kernel is slower on it than
-	// plain word loads, so skip the ASCII prefix first. The kernel treats a
-	// skipped prefix as preceding ASCII, which is exactly what it is.
+	// plain word loads, so skip the ASCII prefix first, 32, 16, then 8 bytes
+	// at a time. The kernel treats a skipped prefix as preceding ASCII, which
+	// is exactly what it is.
 	const high = 0x8080808080808080
-	for len(src) >= 32 {
-		words := binary.LittleEndian.Uint64(src) | binary.LittleEndian.Uint64(src[8:]) |
-			binary.LittleEndian.Uint64(src[16:]) | binary.LittleEndian.Uint64(src[24:])
+	data := unsafe.Pointer(unsafe.SliceData(src))
+	i := 0
+	for i+32 <= len(src) {
+		words := *(*uint64)(unsafe.Add(data, i)) | *(*uint64)(unsafe.Add(data, i+8)) |
+			*(*uint64)(unsafe.Add(data, i+16)) | *(*uint64)(unsafe.Add(data, i+24))
 		if words&high != 0 {
 			break
 		}
-		src = src[32:]
+		i += 32
 	}
-	for len(src) >= 8 && binary.LittleEndian.Uint64(src)&high == 0 {
-		src = src[8:]
+	if i+16 <= len(src) && (*(*uint64)(unsafe.Add(data, i))|*(*uint64)(unsafe.Add(data, i+8)))&high == 0 {
+		i += 16
 	}
+	if i+8 <= len(src) && *(*uint64)(unsafe.Add(data, i))&high == 0 {
+		i += 8
+	}
+	for i < len(src) && src[i] < utf8.RuneSelf {
+		i++
+	}
+	if i == len(src) {
+		return true
+	}
+	src = src[i:]
 	if len(src) < 32 {
 		return utf8.Valid(src)
 	}
