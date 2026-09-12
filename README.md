@@ -163,7 +163,7 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 ```
 
-`Upgrade` returns the raw connection; the caller keeps it for deadlines and closing. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+`Upgrade` returns the raw connection; the caller keeps it for deadlines and closing. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into the message buffer. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
 
 ## Development
 

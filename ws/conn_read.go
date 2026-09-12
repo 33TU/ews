@@ -2,6 +2,7 @@ package ws
 
 import (
 	"io"
+	"slices"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/internal/proto"
@@ -78,6 +79,25 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 }
 
+// readInto reads up to n bytes of the open frame's payload from the transport
+// into the message buffer's spare capacity, bypassing the read buffer. The
+// size budget has already admitted n. The receiver has no buffered input.
+func (c *Conn) readInto(n int) error {
+	c.msg = slices.Grow(c.msg, n)
+	spare := c.msg[len(c.msg) : len(c.msg)+n]
+	got, err := c.read(spare)
+	if err != nil {
+		return err
+	}
+	c.rx.Feed(spare[:got])
+	chunk, _, err := c.rx.PayloadN(got) // Unmasks in place; chunk aliases spare.
+	if err != nil {
+		return c.fail(err)
+	}
+	c.msg = c.msg[:len(c.msg)+len(chunk)]
+	return nil
+}
+
 // readDirect reads frame payload from the transport into b, bypassing the read
 // buffer. The receiver has no buffered input and len(b) is within the frame.
 func (c *Conn) readDirect(b []byte) (int, error) {
@@ -116,9 +136,20 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			if done && len(c.msg) == 0 && !c.rx.MessageOpen() {
 				return c.finishMessage(op, chunk) // Single-frame message in one chunk: borrowed.
 			}
-			c.msg = append(c.msg, chunk...)
-			if done {
-				break
+			if len(chunk) != 0 || done {
+				c.msg = append(c.msg, chunk...)
+				if done {
+					break
+				}
+				continue
+			}
+			// Frame open, nothing buffered. A remainder at least as large as
+			// the read buffer goes straight into the message buffer.
+			if remaining := c.rx.Remaining(); remaining >= uint64(len(c.buf)) {
+				if err := c.readInto(int(remaining)); err != nil {
+					return 0, nil, err
+				}
+				continue
 			}
 			if err := c.fill(); err != nil {
 				return 0, nil, err
