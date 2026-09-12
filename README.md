@@ -183,6 +183,12 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
 
 All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk. 13.3.x and 13.5.x report unimplemented, since offers asking the server for a window smaller than 32 KB are declined and those connections run uncompressed.
 
+`bench` is a separate module comparing echo servers end to end against other libraries over loopback TCP, driven by the same ews client:
+
+```sh
+cd bench && go test -run '^$' -bench . -benchtime=1s
+```
+
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.
 
 ```sh
