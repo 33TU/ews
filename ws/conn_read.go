@@ -2,10 +2,10 @@ package ws
 
 import (
 	"io"
-	"unicode/utf8"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/internal/proto"
+	"github.com/33TU/ews/internal/utf8"
 )
 
 // NextMessage returns the opcode of the next text or binary message, dispatching

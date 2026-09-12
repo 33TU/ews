@@ -160,8 +160,11 @@ chunk is returned borrowed, with no copy; this is the common case for small
 messages. Otherwise chunks are appended to the message buffer. A frame whose
 length exceeds the remaining budget fails with 1009 before its payload is read.
 The budget does not apply to `Read`, since the caller controls memory there.
-A complete text message is validated with one `utf8.Valid` pass and fails with
-1007. `Read` cannot validate, since it never holds the message; gws makes the
+A complete text message is validated with one pass of `internal/utf8.Valid`
+and fails with 1007. That package defers to the standard library by default;
+under `GOEXPERIMENT=simd` on amd64 it skips the ASCII prefix eight bytes at a
+time and validates the rest with SIMD lookups, ported from
+github.com/33TU/json-experiment. `Read` cannot validate, since it never holds the message; gws makes the
 same choice for its streaming reader. The reactor will validate the same way
 as `ReadMessage`, since it assembles whole messages.
 
