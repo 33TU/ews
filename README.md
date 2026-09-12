@@ -156,7 +156,7 @@ go vet ./...
 go test ./... -run '^$' -bench . -benchmem
 ```
 
-Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. On amd64 the same flag also enables SIMD UTF-8 validation of text messages, with a 256-bit path when AVX2 is available.
+Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.
 
 ```sh
 GOEXPERIMENT=simd go test ./...

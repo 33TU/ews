@@ -161,10 +161,12 @@ messages. Otherwise chunks are appended to the message buffer. A frame whose
 length exceeds the remaining budget fails with 1009 before its payload is read.
 The budget does not apply to `Read`, since the caller controls memory there.
 A complete text message is validated with one pass of `internal/utf8.Valid`
-and fails with 1007. That package defers to the standard library by default;
-under `GOEXPERIMENT=simd` on amd64 it skips the ASCII prefix with 32-byte word
-loads and validates the rest with SIMD lookups, both ported from
-github.com/33TU/json-experiment. Pure ASCII returns without touching the kernel. `Read` cannot validate, since it never holds the message; gws makes the
+and fails with 1007. That package skips the ASCII prefix with 32-byte word
+loads, so pure ASCII returns without touching a validator, then checks the
+rest with a shift-based DFA by default, or with SIMD lookups ported from
+github.com/33TU/json-experiment under `GOEXPERIMENT=simd` on amd64. Against
+the standard library, the DFA is 1.4 to 2 times faster on non-ASCII text and
+the SIMD kernel 5 to 8 times. `Read` cannot validate, since it never holds the message; gws makes the
 same choice for its streaming reader. The reactor will validate the same way
 as `ReadMessage`, since it assembles whole messages.
 
