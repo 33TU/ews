@@ -157,7 +157,10 @@ frames as they come.
 `ReadMessage` is `NextMessage` plus assembly with the size budget. When the
 first frame is final and its payload completes in a single core chunk, the
 chunk is returned borrowed, with no copy; this is the common case for small
-messages. Otherwise chunks are appended to the message buffer. A frame whose
+messages. Otherwise chunks are appended to the message buffer, and once nothing is
+buffered a remainder at least as large as the read buffer is read from the
+transport straight into the message buffer's spare capacity, so a large frame
+costs one copy of its first chunk and as few reads as the kernel allows. A frame whose
 length exceeds the remaining budget fails with 1009 before its payload is read.
 The budget does not apply to `Read`, since the caller controls memory there.
 A complete text message is validated with one pass of `internal/utf8.Valid`
