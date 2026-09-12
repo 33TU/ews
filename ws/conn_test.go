@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
 )
 
@@ -527,7 +528,7 @@ func TestInvalidConfig(t *testing.T) {
 		{Role: 2},
 		{ReadBufferSize: -1},
 		{MaxMessageSize: -1},
-		{Compression: &ws.Compression{}},
+		{Compression: &handshake.Compression{}},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
 			t.Fatalf("%+v accepted", cfg)

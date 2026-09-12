@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/internal/proto"
 )
 
@@ -23,15 +24,6 @@ const (
 	NoStatus = proto.NoStatus
 )
 
-// Compression describes negotiated permessage-deflate parameters.
-// It is reserved for a later step; Config.Compression must be nil for now.
-type Compression struct {
-	Level                  int
-	SendContextTakeover    bool
-	ReceiveContextTakeover bool
-	MinSize                int
-}
-
 // Config describes the local endpoint and negotiated parameters.
 type Config struct {
 	Role Role
@@ -40,7 +32,7 @@ type Config struct {
 	// MaxMessageSize bounds ReadMessage. Zero uses DefaultMaxMessageSize.
 	MaxMessageSize int
 	// Compression must be nil; permessage-deflate is not supported yet.
-	Compression *Compression
+	Compression *handshake.Compression
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler
 }

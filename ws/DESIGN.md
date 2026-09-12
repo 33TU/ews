@@ -258,6 +258,16 @@ nc.Close()
   out as two writes. Coalescing small frames into one buffer would save a
   syscall and a TLS record.
 
+## Handshake
+
+`handshake` holds the opening handshake rules as pure functions over header
+values, so a `net/http` server, a client, and a future reactor share them.
+The negotiated `handshake.Compression` is what `ws.Config` takes; `ws`
+depends on `handshake`, never the reverse. The root `ews` package is the only
+place `net/http` appears: `Upgrade` validates, hijacks, writes the 101, and
+returns the raw connection for `ws.NewConn`. `examples/echo` is the Autobahn
+target; the suite passes with 6.4.x non-strict by design.
+
 ## Tests to port and add
 
 - Message round trips from the removed `protocol` package: roles, chunk sizes

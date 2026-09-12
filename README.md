@@ -148,6 +148,21 @@ decompressor := deflate.Decompressor{ContextTakeover: true}
 
 With takeover enabled, keep each helper dedicated to one connection direction and process compressed messages in order. Uncompressed messages bypass the helpers and don't change history. Call `Reset()` before reusing a helper for a new connection or changing its mode; this retains storage and configuration. Decode errors clear history, so the existing takeover stream cannot simply continue after an error.
 
+## Handshake and upgrade
+
+`handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation, and subprotocol selection. The root package connects it to `net/http`:
+
+```go
+conn, res, err := ews.Upgrade(w, r, handshake.Options{Protocols: []string{"chat"}})
+if err != nil {
+    return // An HTTP error has been written.
+}
+defer conn.Close()
+c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
+```
+
+`Upgrade` returns the raw connection; the caller keeps it for deadlines and closing. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+
 ## Development
 
 ```sh
@@ -155,6 +170,16 @@ go test ./...
 go vet ./...
 go test ./... -run '^$' -bench . -benchmem
 ```
+
+`examples/echo` serves the endpoint the Autobahn test suite expects. With a container runtime:
+
+```sh
+go run ./examples/echo &
+docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/reports:/reports" \
+  crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
+```
+
+All cases pass except that 6.4.x report non-strict, since text is validated per message rather than per chunk. Cases 12.x and 13.x need compression, which is not implemented yet.
 
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.
 
