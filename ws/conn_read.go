@@ -2,6 +2,7 @@ package ws
 
 import (
 	"io"
+	"unicode/utf8"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/internal/proto"
@@ -27,7 +28,8 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 // Read copies payload of the current message into b, spanning continuation
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
 // the end of the message and before NextMessage has been called. Transport EOF
-// mid-message is io.ErrUnexpectedEOF.
+// mid-message is io.ErrUnexpectedEOF. Text read in chunks is not UTF-8
+// validated; only complete messages can be.
 func (c *Conn) Read(b []byte) (int, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -87,7 +89,8 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 
 // ReadMessage returns the next complete text or binary message. The payload is
 // borrowed until the next read call or Reset. Messages larger than
-// Config.MaxMessageSize fail with close code 1009.
+// Config.MaxMessageSize fail with close code 1009; text that is not valid UTF-8
+// fails with 1007.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	op, err := c.NextMessage()
 	if err != nil {
@@ -104,8 +107,7 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 				return 0, nil, c.fail(err)
 			}
 			if done && len(c.msg) == 0 && !c.rx.MessageOpen() {
-				c.inMessage = false
-				return op, chunk, nil // Single-frame message in one chunk: borrowed.
+				return c.finishMessage(op, chunk) // Single-frame message in one chunk: borrowed.
 			}
 			c.msg = append(c.msg, chunk...)
 			if done {
@@ -116,13 +118,21 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			}
 		}
 		if !c.rx.MessageOpen() {
-			c.inMessage = false
-			return op, c.msg, nil
+			return c.finishMessage(op, c.msg)
 		}
 		if err := c.nextFrame(); err != nil {
 			return 0, nil, err
 		}
 	}
+}
+
+// finishMessage validates an assembled message before returning it.
+func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []byte, error) {
+	c.inMessage = false
+	if op == codec.Text && !utf8.Valid(payload) {
+		return 0, nil, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidUTF8})
+	}
+	return op, payload, nil
 }
 
 // discard drains the rest of the current message.

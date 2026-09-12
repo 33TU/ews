@@ -330,6 +330,41 @@ func TestProtocolError(t *testing.T) {
 	}
 }
 
+func TestTextValidation(t *testing.T) {
+	server, peer := raw(t, ws.Config{})
+	wire := append(frame(t, 0x01, []byte{0xe2, 0x82}), frame(t, 0x80, []byte{0x41})...) // Broken rune across frames.
+	wait := run(t, func() error {
+		if _, err := peer.Write(wire); err != nil {
+			return err
+		}
+		h, p := readFrame(t, peer)
+		if h.Opcode() != codec.Close || len(p) != 2 || p[0] != 3 || p[1] != 239 {
+			return fmt.Errorf("expected close 1007, got %d %x", h.Opcode(), p)
+		}
+		return nil
+	})
+	_, _, err := server.ReadMessage()
+	var we *ws.Error
+	if !errors.As(err, &we) || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidUTF8) {
+		t.Fatal(err)
+	}
+	wait()
+
+	// Chunked reads deliver text unvalidated; only whole messages can be checked.
+	server, peer = raw(t, ws.Config{})
+	wait = run(t, func() error {
+		_, err := peer.Write(frame(t, 0x81, []byte{255, 254}))
+		return err
+	})
+	if op, err := server.NextMessage(); err != nil || op != codec.Text {
+		t.Fatal(op, err)
+	}
+	if p, err := io.ReadAll(server); err != nil || !bytes.Equal(p, []byte{255, 254}) {
+		t.Fatalf("%x %v", p, err)
+	}
+	wait()
+}
+
 func TestMessageTooLarge(t *testing.T) {
 	// The failed server never reads again, so the client must not echo the close.
 	server, client := pair(t, ws.Config{MaxMessageSize: 10}, ws.Config{ControlHandler: silentClose{}})

@@ -29,7 +29,6 @@ type Receiver struct {
 	maskOffset uint8
 
 	messageOpcode codec.Opcode // Open message, or zero.
-	utf8          utf8Validator
 
 	control       [125]byte
 	controlLen    uint8
@@ -139,17 +138,15 @@ func (r *Receiver) Next() (Kind, error) {
 
 		r.header, r.remaining = h, h.PayloadLen()
 		if r.remaining == 0 {
-			if err := r.finishFrame(); err != nil {
-				return NeedInput, err
-			}
+			r.finishFrame()
 		}
 		return DataFrame, nil
 	}
 }
 
-// Payload consumes available bytes of the open data frame, unmasked and
-// UTF-8 checked. The chunk is borrowed until the next call. done reports
-// frame completion; it is true when no frame is open.
+// Payload consumes available bytes of the open data frame, unmasked. The
+// chunk is borrowed until the next call. done reports frame completion; it is
+// true when no frame is open.
 func (r *Receiver) Payload() ([]byte, bool, error) {
 	if r.failed != nil {
 		return nil, false, r.failed
@@ -179,14 +176,9 @@ func (r *Receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
 			r.maskOffset = codec.Mask(chunk, r.maskKey, r.maskOffset)
 		}
 		r.remaining -= uint64(len(chunk))
-		if r.messageOpcode == codec.Text && !r.utf8.feed(chunk) {
-			return nil, false, r.fail(1007, ErrInvalidUTF8)
-		}
 	}
 	if done {
-		if err := r.finishFrame(); err != nil {
-			return nil, false, err
-		}
+		r.finishFrame()
 	}
 	return chunk, done, nil
 }
@@ -201,7 +193,6 @@ func (r *Receiver) accept(h codec.Header) error {
 			return ErrProtocol
 		}
 		r.messageOpcode = h.Opcode()
-		r.utf8.reset()
 	case codec.Continuation:
 		if r.messageOpcode == 0 {
 			return ErrProtocol
@@ -217,15 +208,10 @@ func (r *Receiver) accept(h codec.Header) error {
 }
 
 // finishFrame closes the drained data frame and, if final, the message.
-func (r *Receiver) finishFrame() error {
-	if !r.header.Final() {
-		return nil
+func (r *Receiver) finishFrame() {
+	if r.header.Final() {
+		r.messageOpcode = 0
 	}
-	if r.messageOpcode == codec.Text && !r.utf8.complete() {
-		return r.fail(1007, ErrInvalidUTF8)
-	}
-	r.messageOpcode = 0
-	return nil
 }
 
 func (r *Receiver) finishControl() (Kind, error) {

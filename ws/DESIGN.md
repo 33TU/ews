@@ -28,8 +28,9 @@ reactor (later)                event loop: feed the core from readiness callback
 ```
 
 The push core owns the protocol rules: mask bit per role, RSV checks,
-fragmentation state, control-frame limits, incremental UTF-8 validation for
-text, close-code validation, and the close state machine. It emits frame-level
+fragmentation state, control-frame limits, close-code validation, and the
+close state machine. Text UTF-8 validation is not a frame rule: a chunk is not
+a string, so whoever assembles a message validates it once, in one pass. It emits frame-level
 events: a validated header, then unmasked payload chunks borrowed until the
 next call. This is the role the removed `protocol` receiver played; it returns
 as an internal package with frame-level output rather than a public API.
@@ -71,7 +72,8 @@ func (c *Conn) NextMessage() (codec.Opcode, error)
 func (c *Conn) Read(b []byte) (int, error)
 
 // ReadMessage returns the next complete message. The payload is borrowed until
-// the next read call or Reset. Messages over MaxMessageSize fail with 1009.
+// the next read call or Reset. Messages over MaxMessageSize fail with 1009;
+// text that is not valid UTF-8 fails with 1007. Read delivers text unvalidated.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error)
 
 // Write sends one message as a single frame. payload is not retained after return.
@@ -132,10 +134,8 @@ read again.
 Core rules per frame, all failing with 1002 unless noted: mask bit must match
 role; RSV2 and RSV3 clear; RSV1 clear until compression is negotiated; known
 opcode; control frames final and at most 125 bytes; continuation only while a
-message is open; no new data opcode while one is open. Text payload is UTF-8
-validated incrementally: the validator carries up to three pending bytes across
-chunks and frames, fails with 1007 on the first bad chunk, and fails at message
-end if a rune is incomplete. Control payloads go to a fixed 125-byte array.
+message is open; no new data opcode while one is open. Control payloads go to a
+fixed 125-byte array.
 
 `NextMessage` drains any remaining payload of the current message, then loops
 over core events until a text or binary header arrives, dispatching control
@@ -160,6 +160,10 @@ chunk is returned borrowed, with no copy; this is the common case for small
 messages. Otherwise chunks are appended to the message buffer. A frame whose
 length exceeds the remaining budget fails with 1009 before its payload is read.
 The budget does not apply to `Read`, since the caller controls memory there.
+A complete text message is validated with one `utf8.Valid` pass and fails with
+1007. `Read` cannot validate, since it never holds the message; gws makes the
+same choice for its streaming reader. The reactor will validate the same way
+as `ReadMessage`, since it assembles whole messages.
 
 Control frames complete: call the handler. After `OnClose` returns nil, the
 current read returns `*CloseError` and every later read returns it again. An
@@ -255,8 +259,8 @@ nc.Close()
   1, 7, and 65536, through both `Read` and `ReadMessage`.
 - Fragmentation with interleaved control frames, read in caller buffers of
   varying sizes, including the direct-to-buffer path for large frames.
-- Incremental UTF-8: runes split across chunks and frames, invalid sequences
-  mid-message, incomplete rune at message end.
+- Text validation through `ReadMessage`, including a rune broken across
+  frames, and unvalidated delivery through `Read`.
 - The invalid-frame table with expected close codes, including RSV1 while
   compression is nil.
 - `NextMessage` discarding an undrained message.

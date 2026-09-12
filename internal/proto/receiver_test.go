@@ -69,9 +69,6 @@ func TestInvalidFrames(t *testing.T) {
 		{"close length", frame(t, 0x88, []byte{1}, false), 1002},
 		{"close code", frame(t, 0x88, []byte{3, 237}, false), 1002},
 		{"close utf8", frame(t, 0x88, []byte{3, 232, 255}, false), 1007},
-		{"text utf8", frame(t, 0x81, []byte{255}, false), 1007},
-		{"fragmented utf8", append(frame(t, 0x01, []byte{0xf0, 0x9f}, false), frame(t, 0x80, nil, false)...), 1007},
-		{"split rune broken", append(frame(t, 0x01, []byte{0xe2}, false), frame(t, 0x80, []byte{0x41}, false)...), 1007},
 		{"nonminimal length", []byte{0x82, 126, 0, 1}, 1002},
 		{"invalid length", []byte{0x82, 127, 128, 0, 0, 0, 0, 0, 0, 0}, 1002},
 	}
