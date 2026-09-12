@@ -38,6 +38,15 @@ func (d *Decoder) Feed(b []byte) {
 	d.pending = d.scratch
 }
 
+// Preserve copies pending input into reusable storage so the feed buffer can be reused.
+func (d *Decoder) Preserve() {
+	if len(d.pending) == 0 {
+		return
+	}
+	d.scratch = append(d.scratch[:0], d.pending...)
+	d.pending = d.scratch
+}
+
 // NextHeader reads a header; ok is false if incomplete. Errors consume nothing.
 // Unread payloads and invalid lengths are errors; other validation is up to the caller.
 func (d *Decoder) NextHeader() (Header, bool, error) {

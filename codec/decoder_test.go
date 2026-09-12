@@ -7,6 +7,32 @@ import (
 	"testing"
 )
 
+func TestDecoderPreserve(t *testing.T) {
+	var d Decoder
+	var b [1]byte
+	wire := []byte{0x82, 126, 0, 126}
+	for _, v := range wire {
+		d.Preserve()
+		b[0] = v
+		d.Feed(b[:])
+	}
+	d.Preserve()
+	d.Preserve()
+	b[0] = 0
+	h, ok, err := d.NextHeader()
+	if !ok || err != nil || !bytes.Equal(h.Bytes(), wire) {
+		t.Fatalf("header = %x, %v, %v", h.Bytes(), ok, err)
+	}
+	b[0] = 42
+	d.Feed(b[:])
+	d.Preserve()
+	b[0] = 0
+	p, done := d.Payload()
+	if !bytes.Equal(p, []byte{42}) || done {
+		t.Fatalf("payload = %x, done = %v", p, done)
+	}
+}
+
 func TestDecoderSplitHeaders(t *testing.T) {
 	headers := [][]byte{
 		{0x82, 5}, {0x82, 126, 0, 126},
