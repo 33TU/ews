@@ -11,7 +11,15 @@ import (
 var (
 	ErrMessageTooLarge = errors.New("ews/deflate: decompressed message exceeds limit")
 	ErrInvalidLimit    = errors.New("ews/deflate: negative output limit")
+	ErrNoMessage       = errors.New("ews/deflate: no message in progress")
 )
+
+// ChunkSource supplies the compressed bytes of one message in order. Chunks
+// are borrowed until the next call and may be empty. It returns io.EOF after
+// the last chunk. Any other error ends the message and is returned by Read.
+type ChunkSource interface {
+	NextChunk() ([]byte, error)
+}
 
 type resetReader interface {
 	io.ReadCloser
@@ -24,10 +32,13 @@ type Decompressor struct {
 	// ContextTakeover retains history between messages. Set before use or after Reset.
 	ContextTakeover bool
 
-	reader  resetReader
-	input   messageReader
-	output  []byte
-	history []byte
+	reader    resetReader
+	input     messageReader
+	output    []byte // Decompress result; also the reset dictionary in slice mode.
+	history   []byte // Sliding window: across messages with takeover, within one when streaming.
+	streaming bool
+	active    bool
+	done      bool // Last byte delivered; the next Read returns io.EOF.
 }
 
 // Decompress borrows its output until the next call. maxSize must be nonnegative.
@@ -37,66 +48,133 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
 	if maxSize < 0 {
 		return nil, ErrInvalidLimit
 	}
-	success := false
-	defer func() {
-		if !success {
-			d.history = d.history[:0]
-		}
-	}()
-	d.output = d.output[:0]
-	d.input.payload = payload
-	d.input.tail = inflateTail[:]
-	defer func() { d.input = messageReader{} }()
-	if d.reader == nil {
-		d.reader = flate.NewReaderDict(&d.input, d.history).(resetReader)
-	} else if err := d.reader.Reset(&d.input, d.history); err != nil {
+	if err := d.begin(nil, payload); err != nil {
 		return nil, err
 	}
-	defer d.reader.Close()
-
+	d.output = d.output[:0]
 	for {
 		size := 32 << 10
 		if remaining := maxSize - len(d.output); remaining < size {
 			size = remaining + 1
 		}
 		d.output = slices.Grow(d.output, size)
-		n, err := d.reader.Read(d.output[len(d.output) : len(d.output)+size])
+		n, err := d.Read(d.output[len(d.output) : len(d.output)+size])
 		d.output = d.output[:len(d.output)+n]
 		if len(d.output) > maxSize {
+			d.finish(false)
 			return nil, ErrMessageTooLarge
 		}
-		if d.ContextTakeover {
-			d.remember(d.output[len(d.output)-n:])
-		}
 		if err == io.EOF {
-			if len(d.input.payload) == 0 && len(d.input.tail) == 0 {
-				success = true
-				return d.output, nil
-			}
-			// RFC 7692 permits final DEFLATE blocks within a message.
-			dict := d.output[max(0, len(d.output)-(32<<10)):]
-			if d.ContextTakeover {
-				dict = d.history
-			}
-			if err := d.reader.Reset(&d.input, dict); err != nil {
-				return nil, err
-			}
-			continue
+			return d.output, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		if n == 0 {
-			return nil, io.ErrNoProgress
+	}
+}
+
+// Begin starts decompressing a message streamed from src; drain it with Read.
+// A message still in progress is abandoned, which clears history.
+func (d *Decompressor) Begin(src ChunkSource) error {
+	return d.begin(src, nil)
+}
+
+// Read decompresses into p and returns io.EOF, with no data, after the last
+// byte of the message. Output is never returned together with io.EOF.
+// Any other error ends the message and clears history.
+func (d *Decompressor) Read(p []byte) (int, error) {
+	if !d.active {
+		return 0, ErrNoMessage
+	}
+	if d.done {
+		d.finish(true)
+		return 0, io.EOF
+	}
+	for {
+		n, err := d.reader.Read(p)
+		if n != 0 && (d.ContextTakeover || d.streaming) {
+			d.remember(p[:n])
 		}
+		if err == io.EOF {
+			if d.input.exhausted() {
+				if n == 0 {
+					d.finish(true)
+					return 0, io.EOF
+				}
+				d.done = true
+				return n, nil
+			}
+			// RFC 7692 permits final DEFLATE blocks within a message; continue
+			// with the message so far as the dictionary.
+			if err := d.reader.Reset(&d.input, d.dict(n)); err != nil {
+				return 0, d.fail(err)
+			}
+			if n != 0 {
+				return n, nil
+			}
+			continue
+		}
+		if err != nil {
+			return 0, d.fail(err)
+		}
+		if n == 0 {
+			return 0, d.fail(io.ErrNoProgress)
+		}
+		return n, nil
 	}
 }
 
 // Reset clears message history and output, retaining storage and configuration.
 func (d *Decompressor) Reset() {
-	d.history = d.history[:0]
+	d.finish(false)
 	d.output = d.output[:0]
+}
+
+func (d *Decompressor) begin(src ChunkSource, payload []byte) error {
+	if d.active {
+		d.finish(false)
+	}
+	if !d.ContextTakeover {
+		d.history = d.history[:0]
+	}
+	d.input = messageReader{src: src, payload: payload, tail: inflateTail[:], eof: src == nil}
+	d.streaming = src != nil
+	d.active, d.done = true, false
+	if d.reader == nil {
+		d.reader = flate.NewReaderDict(&d.input, d.history).(resetReader)
+		return nil
+	}
+	if err := d.reader.Reset(&d.input, d.history); err != nil {
+		return d.fail(err)
+	}
+	return nil
+}
+
+// dict is the dictionary for a mid-message reset: the retained history when
+// it is being maintained, otherwise the tail of the output so far. In slice
+// mode Read is only called by Decompress with the spare capacity of d.output,
+// so the n bytes just produced sit directly after it.
+func (d *Decompressor) dict(n int) []byte {
+	if d.ContextTakeover || d.streaming {
+		return d.history
+	}
+	out := d.output[:len(d.output)+n]
+	return out[max(0, len(out)-(32<<10)):]
+}
+
+func (d *Decompressor) fail(err error) error {
+	d.finish(false)
+	return err
+}
+
+// finish ends the current message. Failure discards history, since the
+// takeover stream cannot continue past a corrupt message.
+func (d *Decompressor) finish(ok bool) {
+	if !ok || !d.ContextTakeover {
+		d.history = d.history[:0]
+	}
 	d.input = messageReader{}
+	d.active, d.done, d.streaming = false, false, false
 }
 
 func (d *Decompressor) remember(p []byte) {
@@ -120,27 +198,61 @@ func (d *Decompressor) remember(p []byte) {
 // Restore the stripped sync-flush tail, then terminate the DEFLATE stream.
 var inflateTail = [...]byte{0, 0, 0xff, 0xff, 1, 0, 0, 0xff, 0xff}
 
+// messageReader feeds the inflater from a slice or a ChunkSource, then the tail.
 type messageReader struct {
+	src     ChunkSource
 	payload []byte
 	tail    []byte
+	eof     bool // No more chunks; in slice mode from the start.
+}
+
+func (r *messageReader) exhausted() bool {
+	return r.eof && len(r.payload) == 0 && len(r.tail) == 0
+}
+
+// fill pulls the next nonempty chunk. It returns false at end of input or on error.
+func (r *messageReader) fill() (bool, error) {
+	for len(r.payload) == 0 && !r.eof {
+		chunk, err := r.src.NextChunk()
+		if err == io.EOF {
+			r.eof = true
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		r.payload = chunk
+	}
+	return len(r.payload) != 0, nil
 }
 
 func (r *messageReader) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n := copy(p, r.payload)
-	r.payload = r.payload[n:]
-	m := copy(p[n:], r.tail)
-	r.tail = r.tail[m:]
-	if n+m == 0 {
+	ok, err := r.fill()
+	if err != nil {
+		return 0, err
+	}
+	if ok {
+		n := copy(p, r.payload)
+		r.payload = r.payload[n:]
+		return n, nil
+	}
+	n := copy(p, r.tail)
+	r.tail = r.tail[n:]
+	if n == 0 {
 		return 0, io.EOF
 	}
-	return n + m, nil
+	return n, nil
 }
 
 func (r *messageReader) ReadByte() (byte, error) {
-	if len(r.payload) != 0 {
+	ok, err := r.fill()
+	if err != nil {
+		return 0, err
+	}
+	if ok {
 		b := r.payload[0]
 		r.payload = r.payload[1:]
 		return b, nil
