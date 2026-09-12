@@ -107,6 +107,14 @@ func TestConfirmRejects(t *testing.T) {
 		})
 	}
 	resp := good
+	resp.Extensions = "permessage-deflate; client_max_window_bits=15; client_max_window_bits"
+	if _, err := handshake.Confirm(req, resp, opts); err != handshake.ErrBadExtension {
+		t.Fatal("duplicate parameter accepted")
+	}
+	resp.Extensions = "permessage-deflate; server_max_window_bits=15; client_max_window_bits=15"
+	if _, err := handshake.Confirm(req, resp, opts); err != nil {
+		t.Fatalf("unoffered client_max_window_bits=15 must be harmless: %v", err)
+	}
 	resp.Extensions = "permessage-deflate; server_max_window_bits=12; server_no_context_takeover"
 	res, err := handshake.Confirm(req, resp, opts)
 	if err != nil || res.Compression == nil || res.Compression.ReceiveContextTakeover || !res.Compression.SendContextTakeover {

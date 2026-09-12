@@ -52,7 +52,8 @@ func Confirm(req Request, resp Response, opts Options) (Result, error) {
 	}
 	p, ok := parseDeflate(exts[0])
 	// We did not offer client_max_window_bits, so the server may not set it.
-	if !ok || p.clientMaxWindowBits != 0 {
+	// Some servers do anyway; 15 is the window we use, so it changes nothing.
+	if !ok || p.clientMaxWindowBits != 0 && p.clientMaxWindowBits != 15 {
 		return Result{}, ErrBadExtension
 	}
 	takeover := opts.Compression.ContextTakeover
