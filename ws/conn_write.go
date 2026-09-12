@@ -6,13 +6,36 @@ import (
 	"github.com/33TU/ews/codec"
 )
 
-// Write sends one text or binary message as a single frame.
+// Write sends one text or binary message as a single frame, compressed when
+// negotiated and at least Compression.MinSize bytes long.
 // payload is not retained after Write returns.
 func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
 	}
+	if c.compression != nil && len(payload) >= c.compression.MinSize {
+		return c.sendCompressed(op, payload)
+	}
 	return c.send(op, payload)
+}
+
+func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	comp := c.compressor
+	if comp == nil {
+		comp = getCompressor(c.compression.Level)
+		defer putCompressor(c.compression.Level, comp) // After the write: body borrows its output.
+	}
+	compressed, err := comp.Compress(payload)
+	if err != nil {
+		return err
+	}
+	header, body, err := c.tx.EncodeCompressed(op, compressed)
+	if err != nil {
+		return err
+	}
+	return c.write(header, body)
 }
 
 // Ping sends a ping with at most 125 payload bytes.

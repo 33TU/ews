@@ -16,6 +16,8 @@ var (
 	ErrInvalidUTF8 = proto.ErrInvalidUTF8
 	// ErrMessageTooLarge means a message exceeds Config.MaxMessageSize.
 	ErrMessageTooLarge = proto.ErrMessageTooLarge
+	// ErrInvalidData means a compressed message could not be decompressed.
+	ErrInvalidData = proto.ErrInvalidData
 	// ErrInvalidConfig means NewConn or Reset received an invalid Config.
 	ErrInvalidConfig = errors.New("ews/ws: invalid configuration")
 )

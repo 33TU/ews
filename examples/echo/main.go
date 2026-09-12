@@ -12,20 +12,27 @@ import (
 	"github.com/33TU/ews"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
+	"github.com/klauspost/compress/flate"
 )
 
 func main() {
 	addr := flag.String("addr", ":9001", "listen address")
+	compress := flag.Bool("compress", true, "offer permessage-deflate")
 	flag.Parse()
 
+	var opts handshake.Options
+	if *compress {
+		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		conn, _, err := ews.Upgrade(w, r, handshake.Options{})
+		conn, res, err := ews.Upgrade(w, r, opts)
 		if err != nil {
 			return
 		}
 		defer conn.Close()
 
-		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 32 << 20})
+		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 32 << 20, Compression: res.Compression})
 		if err != nil {
 			log.Print(err)
 			return
@@ -34,8 +41,7 @@ func main() {
 			conn.SetDeadline(time.Now().Add(time.Minute))
 			op, p, err := c.ReadMessage()
 			if err != nil {
-				var ce *ws.CloseError
-				if !errors.As(err, &ce) {
+				if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 					log.Printf("%s: %v", conn.RemoteAddr(), err)
 				}
 				return

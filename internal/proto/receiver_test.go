@@ -14,9 +14,9 @@ func TestFragmentsAndControls(t *testing.T) {
 	for _, masked := range []bool{false, true} {
 		t.Run(fmt.Sprintf("masked=%t", masked), func(t *testing.T) {
 			var r proto.Receiver
-			r.Init(proto.Client)
+			r.Init(proto.Client, false)
 			if masked {
-				r.Init(proto.Server)
+				r.Init(proto.Server, false)
 			}
 			payload := []byte("A😀B€C")
 			var wire []byte
@@ -58,6 +58,7 @@ func TestInvalidFrames(t *testing.T) {
 	}{
 		{"masked server", frame(t, 0x81, nil, true), 1002},
 		{"rsv1", frame(t, 0xc1, nil, false), 1002},
+		{"rsv1 control", frame(t, 0xc9, nil, false), 1002},
 		{"rsv2", frame(t, 0xa1, nil, false), 1002},
 		{"rsv3", frame(t, 0x91, nil, false), 1002},
 		{"opcode", frame(t, 0x83, nil, false), 1002},
@@ -76,7 +77,7 @@ func TestInvalidFrames(t *testing.T) {
 		for _, chunk := range []int{1, 1 << 16} {
 			t.Run(fmt.Sprintf("%s/chunk=%d", tt.name, chunk), func(t *testing.T) {
 				var r proto.Receiver
-				r.Init(proto.Client)
+				r.Init(proto.Client, false)
 				_, err := drive(t, &r, tt.wire, chunk)
 				var pe *proto.Error
 				if !errors.As(err, &pe) || pe.Code != tt.code {
@@ -86,7 +87,7 @@ func TestInvalidFrames(t *testing.T) {
 				if _, again := r.Next(); again != err {
 					t.Fatal("failure was not terminal")
 				}
-				r.Init(proto.Client)
+				r.Init(proto.Client, false)
 				if _, err := drive(t, &r, frame(t, 0x81, []byte("ok"), false), chunk); err != nil {
 					t.Fatalf("Init did not recover: %v", err)
 				}
@@ -95,9 +96,36 @@ func TestInvalidFrames(t *testing.T) {
 	}
 }
 
+func TestCompressedFlag(t *testing.T) {
+	var r proto.Receiver
+	r.Init(proto.Client, true)
+	wire := append(frame(t, 0x41, []byte{1}, false), frame(t, 0x80, []byte{2}, false)...) // RSV1 text, continuation.
+	wire = append(wire, frame(t, 0x82, []byte{3}, false)...)                              // Plain binary.
+	events, err := drive(t, &r, wire, len(wire))
+	if err != nil || len(events) != 2 {
+		t.Fatalf("%+v %v", events, err)
+	}
+	r.Init(proto.Client, true)
+	r.Feed(frame(t, 0x41, []byte{1}, false))
+	if kind, err := r.Next(); kind != proto.DataFrame || err != nil || !r.MessageCompressed() {
+		t.Fatal("compressed flag not set")
+	}
+	r.Init(proto.Client, true)
+	for _, bad := range [][]byte{
+		frame(t, 0xc9, nil, false), // RSV1 ping.
+		append(frame(t, 0x01, nil, false), frame(t, 0xc0, nil, false)...), // RSV1 continuation.
+		append(frame(t, 0x41, nil, false), frame(t, 0xc0, nil, false)...), // RSV1 continuation of compressed.
+	} {
+		r.Init(proto.Client, true)
+		if _, err := drive(t, &r, bad, len(bad)); err == nil {
+			t.Fatalf("accepted %x", bad)
+		}
+	}
+}
+
 func TestCloseReceived(t *testing.T) {
 	var r proto.Receiver
-	r.Init(proto.Client)
+	r.Init(proto.Client, false)
 	wire := append(frame(t, 0x88, []byte{3, 232, 'b', 'y', 'e'}, false), frame(t, 0x81, []byte("late"), false)...)
 	events, err := drive(t, &r, wire, len(wire))
 	if err != nil || len(events) != 1 || !events[0].control || events[0].opcode != codec.Close {

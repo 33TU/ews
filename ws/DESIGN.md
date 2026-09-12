@@ -4,7 +4,7 @@ Message I/O over an already-upgraded WebSocket transport, built on `codec`. The
 handshake and extension negotiation live elsewhere; `ws` receives the
 negotiated result through `Config`.
 
-Status: step 1 implemented in `internal/proto` and `ws`. Compression is a follow-up step.
+Status: steps 1 and 2 implemented; `handshake` and the root `Upgrade` exist. Fragmented send and the reactor remain.
 
 ## Principles
 
@@ -48,7 +48,7 @@ type Config struct {
 	Role           Role
 	ReadBufferSize int            // bytes per transport read; 0 = 4 KiB
 	MaxMessageSize int            // bound for ReadMessage; 0 = 8 MiB
-	Compression    *Compression   // reserved; nil until the compression step
+	Compression    *handshake.Compression // negotiated parameters, or nil
 	ControlHandler ControlHandler // nil: default ping, pong, and close behavior
 }
 
@@ -224,21 +224,21 @@ nc.Close()
 
 1. This document: push core, `NextMessage`, `Read`, `ReadMessage`, `Write`,
    `Ping`, `Pong`, `Close`, control handler, close state machine. No deflate.
-2. Compression on the blocking API. `Config.Compression` becomes live with
-   direction-based fields (`Level`, `SendContextTakeover`,
-   `ReceiveContextTakeover`, `MinSize`). RSV1 on a first data frame is
-   accepted. `ReadMessage` assembles the compressed bytes through FIN and calls
-   `deflate.Decompress`, bounded by `MaxMessageSize`. `Read` gets streaming
-   inflate: add an `io.Reader`-driven entry to `deflate.Decompressor` next to
-   `Decompress` (the internal `messageReader` already appends the tail and
-   can wrap a source as easily as a slice; the final-block reset, history
-   update, and size bound carry over). `ws` supplies a source that drains the
-   core and fills from the transport when empty, the structure gorilla and
-   coder use, and the flate reader writes straight into the caller's `b`.
-   `Write` compresses when negotiated and `len(payload) >= MinSize`. A flate
-   writer holds hundreds of kilobytes; without `SendContextTakeover` it is
-   stateless between messages and can come from a shared pool. Nothing in the
-   step 1 API changes.
+2. Compression on the blocking API, done. `Config.Compression` takes the
+   negotiated `handshake.Compression`. The core accepts RSV1 on a first data
+   frame when negotiated. `ReadMessage` assembles the compressed bytes through
+   FIN and calls `deflate.Decompress`, bounded by `MaxMessageSize`, so the
+   limit covers both wire and inflated size. `Read` streams: `deflate` gained
+   `Begin` and `Read` over a `ChunkSource`, and `ws` supplies borrowed chunks
+   straight from the core, filling from the transport and dispatching control
+   frames as it goes, while the inflater writes into the caller's buffer. A
+   transport error during a compressed message ends the connection because
+   the inflater cannot resume. `Write` compresses when `len(payload) >=
+   MinSize`. Helpers without context takeover come from shared pools, one per
+   flate level; with takeover each connection owns its own. Pooled
+   decompressors stay attached until the next read so borrowed output holds.
+   Offers asking this server for a window under 32 KB are declined and run
+   uncompressed, which Autobahn 13.3.x and 13.5.x report as unimplemented.
 3. Fragmented send: `BeginMessage(op)`, `WriteChunk(b)` as non-final frames,
    `EndMessage()` as an empty FIN frame, so the sender never needs to know
    which chunk is last. Streaming compress fits, since the flate writer is

@@ -105,7 +105,7 @@ func TestRoundTrip(t *testing.T) {
 				var s proto.Sender
 				var r proto.Receiver
 				s.Init(role)
-				r.Init(1 - role)
+				r.Init(1-role, false)
 				var wire []byte
 				for _, m := range messages {
 					wire = append(wire, encode(t, &s, m.op, m.payload)...)
@@ -137,7 +137,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 				var s proto.Sender
 				var r proto.Receiver
 				s.Init(role)
-				r.Init(1 - role)
+				r.Init(1-role, false)
 				payload := bytes.Repeat([]byte("x"), size)
 				wire := make([]byte, 0, size+14)
 				b.ReportAllocs()

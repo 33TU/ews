@@ -8,6 +8,7 @@ var (
 	ErrProtocol        = errors.New("ews/ws: invalid frame or message sequence")
 	ErrInvalidUTF8     = errors.New("ews/ws: invalid UTF-8")
 	ErrMessageTooLarge = errors.New("ews/ws: message exceeds limit")
+	ErrInvalidData     = errors.New("ews/ws: invalid compressed message data")
 )
 
 // Error is a terminal receive failure and the close code that describes it.

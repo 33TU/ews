@@ -21,6 +21,12 @@ func TestSender(t *testing.T) {
 	if _, _, err := s.Encode(codec.Continuation, nil); err != proto.ErrProtocol {
 		t.Fatal("continuation accepted")
 	}
+	if h, _, err := s.EncodeCompressed(codec.Binary, []byte{0}); err != nil || h[0]&0x40 == 0 {
+		t.Fatal("compressed frame without RSV1")
+	}
+	if _, _, err := s.EncodeCompressed(codec.Ping, nil); err != proto.ErrProtocol {
+		t.Fatal("compressed control frame accepted")
+	}
 	for _, tt := range []struct {
 		code   uint16
 		reason string
@@ -37,7 +43,7 @@ func TestSender(t *testing.T) {
 		t.Fatal(err)
 	}
 	var r proto.Receiver
-	r.Init(proto.Server)
+	r.Init(proto.Server, false)
 	events, err := drive(t, &r, append(bytes.Clone(h), b...), 1)
 	if err != nil || len(events) != 1 {
 		t.Fatalf("events %+v, err %v", events, err)

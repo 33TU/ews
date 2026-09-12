@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
+	"github.com/klauspost/compress/flate"
 )
 
 // pair connects a server and a client Conn over net.Pipe.
@@ -528,7 +530,8 @@ func TestInvalidConfig(t *testing.T) {
 		{Role: 2},
 		{ReadBufferSize: -1},
 		{MaxMessageSize: -1},
-		{Compression: &handshake.Compression{}},
+		{Compression: &handshake.Compression{Level: 10}},
+		{Compression: &handshake.Compression{MinSize: -1}},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
 			t.Fatalf("%+v accepted", cfg)
@@ -692,4 +695,263 @@ func BenchmarkWrite(b *testing.B) {
 			})
 		}
 	}
+}
+
+func compressionPair(t *testing.T, clientTakeover, serverTakeover bool, minSize int) (server, client *ws.Conn) {
+	t.Helper()
+	sc := &handshake.Compression{Level: flate.BestSpeed, MinSize: minSize, SendContextTakeover: serverTakeover, ReceiveContextTakeover: clientTakeover}
+	cc := &handshake.Compression{Level: flate.BestSpeed, MinSize: minSize, SendContextTakeover: clientTakeover, ReceiveContextTakeover: serverTakeover}
+	return pair(t, ws.Config{Compression: sc, ReadBufferSize: 64}, ws.Config{Compression: cc, ReadBufferSize: 64})
+}
+
+func TestCompressedRoundTrip(t *testing.T) {
+	msgs := messages()
+	for _, takeover := range []string{"none", "client", "server", "both"} {
+		for _, minSize := range []int{0, 1000} {
+			for _, direction := range []string{"client->server", "server->client"} {
+				for _, bufSize := range []int{0, 1, 7, 65536} {
+					t.Run(fmt.Sprintf("takeover=%s/min=%d/%s/buf=%d", takeover, minSize, direction, bufSize), func(t *testing.T) {
+						server, client := compressionPair(t, takeover == "client" || takeover == "both", takeover == "server" || takeover == "both", minSize)
+						src, dst := client, server
+						if direction != "client->server" {
+							src, dst = server, client
+						}
+						wait := run(t, func() error {
+							for round := 0; round < 2; round++ { // Takeover history spans messages.
+								for _, m := range msgs {
+									if err := src.Write(m.op, m.payload); err != nil {
+										return err
+									}
+								}
+							}
+							return nil
+						})
+						buf := make([]byte, bufSize)
+						for round := 0; round < 2; round++ {
+							for i, m := range msgs {
+								var op codec.Opcode
+								var got []byte
+								var err error
+								if bufSize == 0 {
+									op, got, err = dst.ReadMessage()
+								} else {
+									op, err = dst.NextMessage()
+									for err == nil {
+										var n int
+										n, err = dst.Read(buf)
+										got = append(got, buf[:n]...)
+									}
+									if err == io.EOF {
+										err = nil
+									}
+								}
+								if err != nil || op != m.op || !bytes.Equal(got, m.payload) {
+									t.Fatalf("round %d message %d: op %d, %d bytes, %v", round, i, op, len(got), err)
+								}
+							}
+						}
+						wait()
+					})
+				}
+			}
+		}
+	}
+}
+
+// TestCompressedWire checks the frames a compressing Conn emits and that it
+// accepts a fragmented compressed message with a ping in the middle.
+func TestCompressedWire(t *testing.T) {
+	comp := &handshake.Compression{Level: flate.BestSpeed, MinSize: 8}
+	server, peer := raw(t, ws.Config{Compression: comp, ReadBufferSize: 16})
+	payload := bytes.Repeat([]byte("compress me "), 100)
+
+	wait := run(t, func() error {
+		h, p := readFrame(t, peer)
+		if !h.RSV1() || h.Opcode() != codec.Text {
+			return fmt.Errorf("expected compressed text frame, got %x", h.Bytes())
+		}
+		var d deflate.Decompressor
+		out, err := d.Decompress(p, len(payload))
+		if err != nil || !bytes.Equal(out, payload) {
+			return fmt.Errorf("wire payload: %v", err)
+		}
+		h, p = readFrame(t, peer)
+		if h.RSV1() || string(p) != "tiny" {
+			return fmt.Errorf("short message must go uncompressed: %x", h.Bytes())
+		}
+
+		c, err := deflate.NewCompressor(flate.BestSpeed)
+		if err != nil {
+			return err
+		}
+		compressed, err := c.Compress(payload)
+		if err != nil {
+			return err
+		}
+		var enc codec.Encoder
+		key := &[4]byte{9, 8, 7, 6}
+		for i := 0; i < len(compressed); i += 5 {
+			end := min(i+5, len(compressed))
+			op, final := codec.Continuation, end == len(compressed)
+			if i == 0 {
+				op = codec.Text
+			}
+			if err := enc.EncodeCompressed(final, op, compressed[i:end], key); err != nil {
+				return err
+			}
+			if _, err := peer.Write(append(bytes.Clone(enc.HeaderBytes()), enc.PayloadBytes()...)); err != nil {
+				return err
+			}
+			if i == 5 {
+				if _, err := peer.Write(frame(t, 0x89, []byte("ping"))); err != nil {
+					return err
+				}
+				if h, p := readFrame(t, peer); h.Opcode() != codec.Pong || string(p) != "ping" {
+					return fmt.Errorf("expected pong")
+				}
+			}
+		}
+		return nil
+	})
+	if err := server.Write(codec.Text, payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Write(codec.Text, []byte("tiny")); err != nil {
+		t.Fatal(err)
+	}
+	op, err := server.NextMessage()
+	if err != nil || op != codec.Text {
+		t.Fatal(op, err)
+	}
+	got, err := io.ReadAll(server)
+	if err != nil || !bytes.Equal(got, payload) {
+		t.Fatalf("%d bytes, %v", len(got), err)
+	}
+	wait()
+}
+
+func TestCompressedErrors(t *testing.T) {
+	comp := &handshake.Compression{Level: flate.BestSpeed}
+	for _, streaming := range []bool{false, true} {
+		server, peer := raw(t, ws.Config{Compression: comp})
+		wait := run(t, func() error {
+			if _, err := peer.Write(frame(t, 0xc1, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff})); err != nil {
+				return err
+			}
+			if h, p := readFrame(t, peer); h.Opcode() != codec.Close || len(p) < 2 || uint16(p[0])<<8|uint16(p[1]) != 1007 {
+				return fmt.Errorf("expected close 1007, got %d %x", h.Opcode(), p)
+			}
+			return nil
+		})
+		var err error
+		if streaming {
+			if _, err = server.NextMessage(); err == nil {
+				_, err = server.Read(make([]byte, 16))
+			}
+		} else {
+			_, _, err = server.ReadMessage()
+		}
+		var we *ws.Error
+		if !errors.As(err, &we) || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidData) {
+			t.Fatalf("streaming=%t: %v", streaming, err)
+		}
+		wait()
+	}
+
+	// Compressed wire fits the budget but the message does not.
+	server, client := pair(t, ws.Config{Compression: comp, MaxMessageSize: 100}, ws.Config{Compression: comp, ControlHandler: silentClose{}})
+	big := bytes.Repeat([]byte("a"), 1000)
+	go client.Write(codec.Binary, big) // Read by the server before failing.
+	wait := run(t, func() error {
+		_, _, err := client.ReadMessage()
+		var ce *ws.CloseError
+		if !errors.As(err, &ce) || ce.Code != 1009 {
+			return fmt.Errorf("client expected close 1009, got %v", err)
+		}
+		return nil
+	})
+	_, _, err := server.ReadMessage()
+	var we *ws.Error
+	if !errors.As(err, &we) || we.Code != 1009 {
+		t.Fatal(err)
+	}
+	wait()
+}
+
+func TestNextMessageDiscardsCompressed(t *testing.T) {
+	server, client := compressionPair(t, true, true, 0)
+	wait := run(t, func() error {
+		if err := client.Write(codec.Binary, bytes.Repeat([]byte("a"), 10000)); err != nil {
+			return err
+		}
+		return client.Write(codec.Text, []byte("second"))
+	})
+	if _, err := server.NextMessage(); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := server.Read(make([]byte, 1)); n != 1 || err != nil {
+		t.Fatal(n, err)
+	}
+	op, p, err := server.ReadMessage()
+	if err != nil || op != codec.Text || string(p) != "second" {
+		t.Fatalf("%d %q %v", op, p, err)
+	}
+	wait()
+}
+
+func BenchmarkCompressed(b *testing.B) {
+	comp := &handshake.Compression{Level: flate.BestSpeed}
+	payload := bytes.Repeat([]byte("compressible payload "), 4096/21)
+	wire := func(role ws.Role) []byte {
+		var buf bytes.Buffer
+		c, err := ws.NewConn(struct {
+			io.Reader
+			io.Writer
+		}{nil, &buf}, ws.Config{Role: role, Compression: comp})
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := c.Write(codec.Binary, payload); err != nil {
+			b.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	b.Run("ReadMessage", func(b *testing.B) {
+		c, _ := ws.NewConn(&replay{wire: wire(ws.Client)}, ws.Config{Role: ws.Server, Compression: comp})
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			if _, p, err := c.ReadMessage(); err != nil || len(p) != len(payload) {
+				b.Fatal(len(p), err)
+			}
+		}
+	})
+	b.Run("Read", func(b *testing.B) {
+		c, _ := ws.NewConn(&replay{wire: wire(ws.Client)}, ws.Config{Role: ws.Server, Compression: comp})
+		buf := make([]byte, 64<<10)
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			if _, err := c.NextMessage(); err != nil {
+				b.Fatal(err)
+			}
+			for {
+				if _, err := c.Read(buf); err == io.EOF {
+					break
+				} else if err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	})
+	b.Run("Write", func(b *testing.B) {
+		c, _ := ws.NewConn(discard{}, ws.Config{Role: ws.Server, Compression: comp})
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			if err := c.Write(codec.Binary, payload); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

@@ -19,8 +19,9 @@ const (
 // Receiver validates incoming frames and tracks message state. Use Init.
 // Calls must be serialized. Failures are terminal until Init.
 type Receiver struct {
-	role Role
-	dec  codec.Decoder
+	role        Role
+	compression bool // RSV1 is meaningful on first data frames.
+	dec         codec.Decoder
 
 	header     codec.Header // Most recent data frame header.
 	remaining  uint64       // Unread payload of the open data frame.
@@ -29,6 +30,7 @@ type Receiver struct {
 	maskOffset uint8
 
 	messageOpcode codec.Opcode // Open message, or zero.
+	compressed    bool         // Open message had RSV1 set.
 
 	control       [125]byte
 	controlLen    uint8
@@ -40,9 +42,10 @@ type Receiver struct {
 }
 
 // Init prepares the receiver for a connection, retaining decoder storage.
-func (r *Receiver) Init(role Role) {
+// compression allows RSV1 on the first frame of a message.
+func (r *Receiver) Init(role Role, compression bool) {
 	dec := r.dec
-	*r = Receiver{role: role, dec: dec}
+	*r = Receiver{role: role, compression: compression, dec: dec}
 	r.dec.Reset()
 }
 
@@ -75,6 +78,9 @@ func (r *Receiver) MessageOpen() bool { return r.messageOpcode != 0 }
 
 // MessageOpcode returns the open message's opcode, or zero.
 func (r *Receiver) MessageOpcode() codec.Opcode { return r.messageOpcode }
+
+// MessageCompressed reports whether the most recent message started with RSV1.
+func (r *Receiver) MessageCompressed() bool { return r.compressed }
 
 // ControlOpcode returns the opcode of the last complete control frame.
 func (r *Receiver) ControlOpcode() codec.Opcode { return r.controlOpcode }
@@ -184,21 +190,21 @@ func (r *Receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
 }
 
 func (r *Receiver) accept(h codec.Header) error {
-	if h.Masked() != (r.role == Server) || h.RSV1() || h.RSV2() || h.RSV3() {
+	if h.Masked() != (r.role == Server) || h.RSV2() || h.RSV3() {
 		return ErrProtocol
 	}
 	switch h.Opcode() {
 	case codec.Text, codec.Binary:
-		if r.messageOpcode != 0 {
+		if r.messageOpcode != 0 || h.RSV1() && !r.compression {
 			return ErrProtocol
 		}
-		r.messageOpcode = h.Opcode()
+		r.messageOpcode, r.compressed = h.Opcode(), h.RSV1()
 	case codec.Continuation:
-		if r.messageOpcode == 0 {
+		if r.messageOpcode == 0 || h.RSV1() {
 			return ErrProtocol
 		}
 	case codec.Close, codec.Ping, codec.Pong:
-		if !h.Final() || h.PayloadLen() > 125 {
+		if !h.Final() || h.RSV1() || h.PayloadLen() > 125 {
 			return ErrProtocol
 		}
 	default:

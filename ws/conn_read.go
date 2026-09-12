@@ -18,6 +18,7 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 	if err := c.discard(); err != nil {
 		return 0, err
 	}
+	c.releaseDecompressor()
 	if err := c.nextFrame(); err != nil {
 		return 0, err
 	}
@@ -29,7 +30,9 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
 // the end of the message and before NextMessage has been called. Transport EOF
 // mid-message is io.ErrUnexpectedEOF. Text read in chunks is not UTF-8
-// validated; only complete messages can be.
+// validated; only complete messages can be. Compressed messages are inflated
+// as they stream; a transport error during one ends the connection, since the
+// inflater cannot resume.
 func (c *Conn) Read(b []byte) (int, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -39,6 +42,9 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 	if len(b) == 0 {
 		return 0, nil
+	}
+	if c.rx.MessageCompressed() {
+		return c.inflate(b)
 	}
 	for {
 		chunk, done, err := c.rx.PayloadN(len(b))
@@ -89,8 +95,9 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 
 // ReadMessage returns the next complete text or binary message. The payload is
 // borrowed until the next read call or Reset. Messages larger than
-// Config.MaxMessageSize fail with close code 1009; text that is not valid UTF-8
-// fails with 1007.
+// Config.MaxMessageSize, before or after decompression, fail with close code
+// 1009; text that is not valid UTF-8 and undecodable compressed data fail
+// with 1007.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	op, err := c.NextMessage()
 	if err != nil {
@@ -126,9 +133,15 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	}
 }
 
-// finishMessage validates an assembled message before returning it.
+// finishMessage decompresses and validates an assembled message.
 func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []byte, error) {
 	c.inMessage = false
+	if c.rx.MessageCompressed() {
+		var err error
+		if payload, err = c.decompress(payload); err != nil {
+			return 0, nil, err
+		}
+	}
 	if op == codec.Text && !utf8.Valid(payload) {
 		return 0, nil, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidUTF8})
 	}
@@ -137,6 +150,7 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 
 // discard drains the rest of the current message.
 func (c *Conn) discard() error {
+	c.inflating = false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -233,7 +247,7 @@ func (c *Conn) handleControl() error {
 		}
 	}
 	if err != nil {
-		c.readErr, c.inMessage = err, false
+		c.readErr, c.inMessage, c.inflating = err, false, false
 	}
 	return err
 }
@@ -244,6 +258,6 @@ func (c *Conn) fail(err error) error {
 		c.sendClose(pe.Code)
 		err = &Error{Code: pe.Code, Err: pe.Err}
 	}
-	c.readErr, c.inMessage = err, false
+	c.readErr, c.inMessage, c.inflating = err, false, false
 	return err
 }

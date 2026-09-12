@@ -124,6 +124,8 @@ if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
 ```
 
+With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams. Connections without context takeover share pooled compressors and decompressors; with takeover each connection keeps its own.
+
 `EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
 
 On receipt, use `header.RSV1()` on the first data frame to identify a compressed message. Unmask each frame, collect its data fragments through FIN, then decompress the assembled payload. Interleaved control frames are handled separately.
@@ -179,7 +181,7 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
   crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
 ```
 
-All cases pass except that 6.4.x report non-strict, since text is validated per message rather than per chunk. Cases 12.x and 13.x need compression, which is not implemented yet.
+All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk. 13.3.x and 13.5.x report unimplemented, since offers asking the server for a window smaller than 32 KB are declined and those connections run uncompressed.
 
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.
 

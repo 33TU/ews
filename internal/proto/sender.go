@@ -30,6 +30,19 @@ func (s *Sender) CloseSent() bool { return s.closeSent }
 // Encode prepares one complete frame. After a close frame only pongs are
 // accepted. Client frames are masked with a fresh key.
 func (s *Sender) Encode(op codec.Opcode, payload []byte) (header, body []byte, err error) {
+	return s.encode(op, payload, false)
+}
+
+// EncodeCompressed prepares one complete text or binary frame carrying
+// already-compressed payload, with RSV1 set.
+func (s *Sender) EncodeCompressed(op codec.Opcode, payload []byte) (header, body []byte, err error) {
+	if op != codec.Text && op != codec.Binary {
+		return nil, nil, ErrProtocol
+	}
+	return s.encode(op, payload, true)
+}
+
+func (s *Sender) encode(op codec.Opcode, payload []byte, compressed bool) (header, body []byte, err error) {
 	if s.closeSent && op != codec.Pong {
 		return nil, nil, ErrClosing
 	}
@@ -52,7 +65,12 @@ func (s *Sender) Encode(op codec.Opcode, payload []byte) (header, body []byte, e
 		rand.Read(s.key[:])
 		key = &s.key
 	}
-	if err := s.enc.Encode(true, op, payload, key); err != nil {
+	if compressed {
+		err = s.enc.EncodeCompressed(true, op, payload, key)
+	} else {
+		err = s.enc.Encode(true, op, payload, key)
+	}
+	if err != nil {
 		return nil, nil, err
 	}
 	if op == codec.Close {
