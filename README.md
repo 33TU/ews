@@ -183,7 +183,7 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
 
 All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk. 13.3.x and 13.5.x report unimplemented, since offers asking the server for a window smaller than 32 KB are declined and those connections run uncompressed.
 
-`bench` is a separate module comparing echo servers end to end against other libraries over loopback TCP, driven by the same ews client:
+`bench` is a separate module comparing echo servers end to end against other libraries over loopback TCP, driven by the same ews client. Results from a recent run are in `bench/RESULTS.md`:
 
 ```sh
 cd bench && go test -run '^$' -bench . -benchtime=1s

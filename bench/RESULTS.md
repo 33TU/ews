@@ -1,0 +1,62 @@
+# Echo benchmark results
+
+Generated 2026-09-13 from `go test -run '^$' -bench . -benchtime=1s` in this module at ews commit `c9eb028`.
+
+## Setup
+
+- CPU: 13th Gen Intel(R) Core(TM) i9-13900H
+- Kernel: 6.12.0-211.53.1.el10_2.x86_64
+- Go: go1.27.0
+- gws: v1.10.2
+
+Echo servers behind `httptest` on loopback TCP, all driven by the same ews client, one ping-pong at a time per connection. Throughput counts payload bytes in one direction per round trip. Allocations are process-wide per message; the ews client allocates nothing, so they are effectively the server's.
+
+- `ews`: `ws.Conn` with `ReadMessage` and `Write`, default 4 KiB read buffer.
+- `gws`: event-driven `ReadLoop` with an `OnMessage` echo, gws's documented server shape.
+- `gws-pull`: gws's `ReadMessage` in a loop, the like-for-like shape against ews.
+
+Compression is permessage-deflate at flate level 1 with context takeover in both directions. gws is configured for 15-bit windows to match the 32 KB window ews uses; its default is 12 bits, which ews does not implement. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+
+Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable.
+
+## Uncompressed
+
+| Size | Conns | ews | gws | gws-pull | allocs/op ews / gws / gws-pull |
+|---|---|---|---|---|---|
+| 64 B | 1 | 5 MB/s | 5 MB/s | 5 MB/s | 0 / 1 / 1 |
+| 64 B | 32 | 40 MB/s | 39 MB/s | 39 MB/s | 0 / 1 / 1 |
+| 64 B | 128 | 44 MB/s | 42 MB/s | 46 MB/s | 0 / 1 / 1 |
+| 1 KiB | 1 | 75 MB/s | 82 MB/s | 80 MB/s | 0 / 1 / 1 |
+| 1 KiB | 32 | 694 MB/s | 713 MB/s | 708 MB/s | 0 / 1 / 1 |
+| 1 KiB | 128 | 794 MB/s | 748 MB/s | 735 MB/s | 0 / 1 / 1 |
+| 16 KiB | 1 | 1.1 GB/s | 1.0 GB/s | 1.1 GB/s | 0 / 1 / 1 |
+| 16 KiB | 32 | 7.8 GB/s | 7.9 GB/s | 7.8 GB/s | 0 / 1 / 1 |
+| 16 KiB | 128 | 8.3 GB/s | 7.9 GB/s | 8.2 GB/s | 0 / 1 / 1 |
+| 256 KiB | 1 | 3.1 GB/s | 678 MB/s | 638 MB/s | 0 / 5 (540784 B) / 5 (540785 B) |
+| 256 KiB | 32 | 14.1 GB/s | 7.1 GB/s | 7.0 GB/s | 0 / 5 (540785 B) / 5 (540785 B) |
+| 256 KiB | 128 | 7.4 GB/s | 6.5 GB/s | 6.5 GB/s | 0 / 5 (540785 B) / 5 (540784 B) |
+
+## Compressed
+
+| Size | Conns | ews | gws | gws-pull | allocs/op ews / gws / gws-pull |
+|---|---|---|---|---|---|
+| 64 B | 1 | 4 MB/s | 3 MB/s | 3 MB/s | 0 / 1 / 1 |
+| 64 B | 32 | 26 MB/s | 19 MB/s | 22 MB/s | 0 / 1 / 1 |
+| 64 B | 128 | 26 MB/s | 21 MB/s | 20 MB/s | 0 / 1 / 1 |
+| 1 KiB | 1 | 50 MB/s | 44 MB/s | 42 MB/s | 0 / 1 / 1 |
+| 1 KiB | 32 | 380 MB/s | 291 MB/s | 297 MB/s | 0 / 1 / 1 |
+| 1 KiB | 128 | 371 MB/s | 300 MB/s | 262 MB/s | 0 / 1 / 1 |
+| 16 KiB | 1 | 553 MB/s | 502 MB/s | 495 MB/s | 0 / 1 / 1 |
+| 16 KiB | 32 | 3.9 GB/s | 3.5 GB/s | 3.4 GB/s | 0 / 1 / 1 |
+| 16 KiB | 128 | 3.0 GB/s | 3.0 GB/s | 2.5 GB/s | 0 / 1 / 1 |
+| 256 KiB | 1 | 1.3 GB/s | 436 MB/s | 413 MB/s | 0 / 16 (1319054 B) / 16 (1319045 B) |
+| 256 KiB | 32 | 7.7 GB/s | 2.6 GB/s | 2.8 GB/s | 0 / 16 (1318712 B) / 16 (1318714 B) |
+| 256 KiB | 128 | 5.9 GB/s | 2.9 GB/s | 3.0 GB/s | 0 / 16 (1318709 B) / 16 (1318708 B) |
+
+## Reading the numbers
+
+- Small messages are bound by loopback round trips, so all three tie uncompressed. Compressed, ews leads by about a quarter because its deflate path allocates nothing and reuses pooled or per-connection helpers.
+- 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
+- Large messages favor ews by 25 percent to 6 times. gws allocates a buffer above its pool threshold on every such message, over half a megabyte uncompressed and over a megabyte compressed.
+- At 128 connections with 256 KiB messages both libraries are bound by memory bandwidth, with 128 quarter-megabyte buffers in flight on each side.
+- gws's `ReadLoop` and `ReadMessage` share the whole frame path and measure the same within noise.
