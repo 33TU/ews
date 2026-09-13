@@ -37,10 +37,12 @@ type Queue struct {
 	timer    *time.Timer
 
 	// Writer-side storage, reused across flushes. bufs keeps the backing
-	// array that net.Buffers.WriteTo consumes.
+	// array; nb is the header net.Buffers.WriteTo consumes, kept as a field
+	// so it does not escape to the heap on every flush.
 	flushArena    []byte
 	flushSegments []segment
 	bufs          [][]byte
+	nb            net.Buffers
 }
 
 // segment is one queued frame: a range of the arena, or external bytes that
@@ -303,8 +305,8 @@ func (q *Queue) flush() error {
 				q.bufs = append(q.bufs, q.flushArena[s.start:s.end])
 			}
 		}
-		bufs := net.Buffers(q.bufs) // A copy of the header; WriteTo consumes only the copy.
-		_, err := bufs.WriteTo(c.rw)
+		q.nb = q.bufs
+		_, err := q.nb.WriteTo(c.rw)
 		clear(q.bufs) // Drop references to prepared frames.
 		return err
 	}
