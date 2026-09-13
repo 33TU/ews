@@ -52,6 +52,26 @@ func (c *Conn) putCompressor(comp *deflate.Compressor) {
 	compressorPool(c.compression).Put(comp)
 }
 
+// compressorLease is a compressor in use for one write or batch; release
+// returns a pooled one to its pool once the frame bodies borrowing its output
+// have been written. Callers hold wmu.
+type compressorLease struct {
+	*deflate.Compressor
+	c      *Conn
+	shared bool
+}
+
+func (c *Conn) leaseCompressor() *compressorLease {
+	comp, shared := c.compressorFor()
+	return &compressorLease{comp, c, shared}
+}
+
+func (l *compressorLease) release() {
+	if l.shared {
+		l.c.putCompressor(l.Compressor)
+	}
+}
+
 // compressorFor returns the compressor for the next message, attaching a
 // pooled one when the send direction has takeover. When shared is true the
 // caller returns it to the pool after the write, since the frame body borrows

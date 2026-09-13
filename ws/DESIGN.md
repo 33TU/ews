@@ -199,6 +199,11 @@ any goroutine, including a control handler on the read goroutine. Steps:
    is one TLS record; larger payloads take two writes, since the copy would
    cost more than it saves. An empty payload writes the header alone.
 
+`Batch` queues messages, borrowing payloads, and `Flush` encodes them all
+under one lock into one contiguous buffer for a single write, so a fan-out
+burst costs one syscall instead of one per message. `WriteFrom` streams an
+`io.Reader` in `FragmentSize` chunks through the fragmented-send path.
+
 Outgoing text is not UTF-8 validated; that is the caller's job.
 
 A protocol failure writes its close frame from the reading goroutine. A peer

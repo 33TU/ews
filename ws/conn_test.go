@@ -1222,6 +1222,92 @@ func TestWriteFrom(t *testing.T) {
 	wait()
 }
 
+func TestBatch(t *testing.T) {
+	msgs := [][]byte{[]byte("one"), bytes.Repeat([]byte("two "), 100), nil, bytes.Repeat([]byte("four"), 5000)}
+
+	// A writer without writev sees exactly one Write per Flush.
+	rec := new(recorder)
+	c, err := ws.NewConn(rec, ws.Config{Role: ws.Server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := c.NewBatch()
+	if err := b.Flush(); err != nil || len(rec.writes) != 0 {
+		t.Fatal("empty flush must be a no-op")
+	}
+	for _, m := range msgs {
+		if err := b.Write(codec.Binary, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := b.Write(codec.Ping, nil); err != ws.ErrProtocol {
+		t.Fatal("control frame accepted into a batch")
+	}
+	if b.Len() != len(msgs) {
+		t.Fatal(b.Len())
+	}
+	if err := b.Flush(); err != nil || len(rec.writes) != 1 || b.Len() != 0 {
+		t.Fatalf("writes %d, len %d, %v", len(rec.writes), b.Len(), err)
+	}
+	var dec codec.Decoder
+	dec.Feed(rec.writes[0])
+	for i, want := range msgs {
+		h, ok, err := dec.NextHeader()
+		if !ok || err != nil || h.Opcode() != codec.Binary || !h.Final() {
+			t.Fatalf("frame %d: %v %v", i, ok, err)
+		}
+		p, done := dec.Payload()
+		if !done || !bytes.Equal(p, want) {
+			t.Fatalf("frame %d payload mismatch", i)
+		}
+	}
+
+	// Through real peers, masked client frames and compressed with takeover,
+	// interleaved with direct writes and reused across flushes.
+	for _, compress := range []bool{false, true} {
+		var server, client *ws.Conn
+		if compress {
+			server, client = compressionPair(t, true, true, 0)
+		} else {
+			server, client = pair(t, ws.Config{}, ws.Config{})
+		}
+		wait := run(t, func() error {
+			for round := 0; round < 2; round++ {
+				for i, want := range append(msgs, []byte("direct")) {
+					if _, p, err := server.ReadMessage(); err != nil || !bytes.Equal(p, want) {
+						return fmt.Errorf("compress=%t round %d message %d: %v", compress, round, i, err)
+					}
+				}
+			}
+			return nil
+		})
+		b := client.NewBatch()
+		for round := 0; round < 2; round++ {
+			for _, m := range msgs {
+				b.Write(codec.Binary, m)
+			}
+			if err := b.Flush(); err != nil {
+				t.Fatal(err)
+			}
+			if err := client.Write(codec.Binary, []byte("direct")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		wait()
+	}
+
+	// A fragmented message in progress blocks a flush.
+	server, _ := pair(t, ws.Config{}, ws.Config{})
+	if err := server.BeginMessage(codec.Text); err != nil {
+		t.Fatal(err)
+	}
+	b = server.NewBatch()
+	b.Write(codec.Text, []byte("x"))
+	if err := b.Flush(); err != ws.ErrMessageOpen {
+		t.Fatalf("flush during fragmented message: %v", err)
+	}
+}
+
 func TestNextMessageDiscardsCompressed(t *testing.T) {
 	server, client := compressionPair(t, true, true, 0)
 	wait := run(t, func() error {
