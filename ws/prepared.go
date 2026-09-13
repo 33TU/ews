@@ -161,7 +161,7 @@ func (c *Conn) WritePrepared(p *Prepared) error {
 		return err
 	}
 	if q := c.queue; q != nil {
-		seq, err := q.enqueue(nil, nil, p, frame, true)
+		seq, err := q.enqueue(nil, nil, p, frame)
 		c.wmu.Unlock()
 		return await(q, seq, err)
 	}

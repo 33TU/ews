@@ -35,7 +35,7 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 // caller to await after releasing wmu. Callers hold wmu.
 func (c *Conn) sendFrame(header, body []byte) (*Queue, uint64, error) {
 	if q := c.queue; q != nil {
-		seq, err := q.enqueue(header, body, nil, nil, true)
+		seq, err := q.enqueue(header, body, nil, nil)
 		return q, seq, err
 	}
 	return nil, 0, c.write(header, body)

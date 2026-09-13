@@ -122,10 +122,10 @@ func TestQueue(t *testing.T) {
 	}
 	for q.Pending() != 0 {
 	}
-	if err := q.Send(codec.Binary, make([]byte, 60)); err != nil {
-		t.Fatal(err)
+	if err := q.Send(codec.Binary, make([]byte, 160)); err != nil {
+		t.Fatal("an empty queue must accept a message larger than the limit:", err)
 	}
-	if err := q.Send(codec.Binary, make([]byte, 60)); err != ws.ErrQueueFull {
+	if err := q.Send(codec.Binary, make([]byte, 1)); err != ws.ErrQueueFull {
 		t.Fatalf("over the limit: %v", err)
 	}
 	if err := q.Send(codec.Ping, nil); err != ws.ErrProtocol {

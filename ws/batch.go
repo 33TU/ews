@@ -91,7 +91,7 @@ func (b *Batch) Flush() error {
 	}
 	if q := c.queue; q != nil {
 		// The arena is reused only after this returns, so it can be referenced.
-		seq, err := q.enqueue(nil, nil, nil, b.arena, true)
+		seq, err := q.enqueue(nil, nil, nil, b.arena)
 		c.wmu.Unlock()
 		return await(q, seq, err)
 	}

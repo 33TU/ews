@@ -60,8 +60,10 @@ type segment struct {
 const queueLinger = 10 * time.Millisecond
 
 // NewQueue attaches a queue to c, or returns the one it already has. limit
-// bounds bytes queued by Send; beyond it Send returns ErrQueueFull rather
-// than blocking, so a slow peer cannot stall the sender. Zero means 1 MiB.
+// is a high-water mark on bytes queued by Send and SendPrepared: an empty
+// queue accepts any message, and a message that would push a nonempty queue
+// past the limit is refused with ErrQueueFull rather than blocking, so a slow
+// peer cannot stall the sender. Zero means 1 MiB.
 func (c *Conn) NewQueue(limit int) *Queue {
 	if limit <= 0 {
 		limit = 1 << 20
@@ -98,7 +100,7 @@ func (q *Queue) Send(op codec.Opcode, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = q.enqueue(header, body, nil, nil, false)
+	_, err = q.enqueue(header, body, nil, nil)
 	return err
 }
 
@@ -118,7 +120,7 @@ func (q *Queue) SendPrepared(p *Prepared) error {
 	if err != nil {
 		return err
 	}
-	_, err = q.enqueue(nil, nil, p, frame, false)
+	_, err = q.enqueue(nil, nil, p, frame)
 	return err
 }
 
@@ -143,33 +145,33 @@ func (q *Queue) Wait() error {
 	return q.waitLocked(q.enqueued)
 }
 
-// reserve fails when n more bytes would exceed the limit. Callers hold wmu.
+// reserve applies the limit before a message is encoded, since encoding
+// advances compressor state that a refused message must not consume. n is
+// the payload size, close enough to the frame size for a high-water mark.
+// Callers hold wmu.
 func (q *Queue) reserve(n int) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.err != nil {
 		return q.err
 	}
-	if q.size+n > q.limit {
+	if q.size != 0 && q.size+n > q.limit {
 		return ErrQueueFull
 	}
 	return nil
 }
 
 // enqueue appends one frame, copied from header and body or referenced as
-// ext, and returns its sequence number. force skips the limit, for
-// synchronous callers that wait for the write anyway. Callers hold wmu, which
-// makes enqueue order the encode order.
-func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte, force bool) (uint64, error) {
+// ext, and returns its sequence number. The limit is reserve's business, so
+// synchronous callers that wait for the write skip it. Callers hold wmu,
+// which makes enqueue order the encode order.
+func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.err != nil {
 		return 0, q.err
 	}
 	n := len(header) + len(body) + len(ext)
-	if !force && q.size+n > q.limit {
-		return 0, ErrQueueFull
-	}
 	if ext != nil {
 		if p != nil {
 			p.Retain()
