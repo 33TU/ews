@@ -18,7 +18,7 @@ var (
 	ErrMessageTooLarge = proto.ErrMessageTooLarge
 	// ErrInvalidData means a compressed message could not be decompressed.
 	ErrInvalidData = proto.ErrInvalidData
-	// ErrInvalidConfig means NewConn or Reset received an invalid Config.
+	// ErrInvalidConfig means NewConn received an invalid Config.
 	ErrInvalidConfig = errors.New("ews/ws: invalid configuration")
 	// ErrMessageOpen means a fragmented message is in progress, so Write and
 	// BeginMessage must wait for EndMessage.
