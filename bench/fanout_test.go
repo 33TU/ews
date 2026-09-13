@@ -11,6 +11,7 @@ import (
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
+	"github.com/klauspost/compress/flate"
 )
 
 // BenchmarkFanout measures a server answering each request with a burst of
@@ -87,6 +88,101 @@ func BenchmarkFanout(b *testing.B) {
 				wg.Wait()
 				b.StopTimer()
 				b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "req/s")
+			})
+		}
+	}
+}
+
+// BenchmarkBroadcast measures one message delivered to every connection:
+// encoded per connection with Write, encoded once with WritePrepared, or
+// handed to each connection's Queue. Throughput is in messages delivered.
+func BenchmarkBroadcast(b *testing.B) {
+	const conns, size = 512, 256
+	for _, compress := range []bool{false, true} {
+		for _, mode := range []string{"write", "prepared", "queue"} {
+			b.Run(fmt.Sprintf("compress=%t/conns=%d/%s", compress, conns, mode), func(b *testing.B) {
+				var mu sync.Mutex
+				var servers []*ws.Conn
+				var opts handshake.Options
+				if compress {
+					opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1}
+				}
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					conn, res, err := ews.Upgrade(w, r, opts)
+					if err != nil {
+						return
+					}
+					defer conn.Close()
+					c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
+					mu.Lock()
+					servers = append(servers, c)
+					mu.Unlock()
+					for {
+						if _, _, err := c.ReadMessage(); err != nil {
+							return
+						}
+					}
+				}))
+				defer srv.Close()
+				received := make(chan struct{}, conns)
+				for i := 0; i < conns; i++ {
+					c := dial(b, srv.URL, compress)
+					go func() {
+						for {
+							if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
+								return
+							}
+							received <- struct{}{}
+						}
+					}()
+				}
+				for {
+					mu.Lock()
+					ready := len(servers) == conns
+					mu.Unlock()
+					if ready {
+						break
+					}
+				}
+				var queues []*ws.Queue
+				if mode == "queue" {
+					for _, c := range servers {
+						queues = append(queues, c.NewQueue(0))
+					}
+				}
+				msg := payload(size, compress)
+				b.ReportAllocs()
+				b.SetBytes(int64(size * conns))
+				b.ResetTimer()
+				for b.Loop() {
+					switch mode {
+					case "write":
+						for _, c := range servers {
+							if err := c.Write(codec.Binary, msg); err != nil {
+								b.Fatal(err)
+							}
+						}
+					case "prepared":
+						p, _ := ws.Prepare(codec.Binary, msg)
+						for _, c := range servers {
+							if err := c.WritePrepared(p); err != nil {
+								b.Fatal(err)
+							}
+						}
+					case "queue":
+						p, _ := ws.Prepare(codec.Binary, msg)
+						for _, q := range queues {
+							if err := q.SendPrepared(p); err != nil {
+								b.Fatal(err)
+							}
+						}
+					}
+					for i := 0; i < conns; i++ {
+						<-received
+					}
+				}
+				b.StopTimer()
+				b.ReportMetric(float64(b.N)*conns/b.Elapsed().Seconds(), "msgs/s")
 			})
 		}
 	}

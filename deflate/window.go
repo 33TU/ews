@@ -26,6 +26,12 @@ func (w *Window) size() int {
 	return windowSize
 }
 
+// Add records payload as compressed or decompressed data sent through some
+// other path, such as a message compressed once for many recipients, so the
+// history stays in step with the peer's. A compressor that was continuing
+// this window primes again on its next message.
+func (w *Window) Add(payload []byte) { w.remember(payload) }
+
 // Reset forgets the history, retaining storage.
 func (w *Window) Reset() {
 	w.buf = w.buf[:0]

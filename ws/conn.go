@@ -74,6 +74,7 @@ type Conn struct {
 	UserData any
 
 	rw           io.ReadWriter
+	role         Role
 	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
 	limit        int
 	fragmentSize int // WriteFrom chunk size.
@@ -93,9 +94,12 @@ type Conn struct {
 	inflating    bool                  // Read is streaming the current message through the inflater.
 
 	wmu          sync.Mutex
+	iomu         sync.Mutex // Serializes transport writes; taken inside wmu by direct writers, alone by a Queue.
 	tx           proto.Sender
+	queue        *Queue              // Set by NewQueue; data frames then go through it.
 	sendWindow   *deflate.Window     // Send-direction history when takeover is negotiated.
 	compressor   *deflate.Compressor // Attached while continuing sendWindow's stream.
+	scratch      []byte              // Holds a shared compressor\'s output until written.
 	fragOp       codec.Opcode        // Open fragmented message's opcode, or zero.
 	fragFirst    bool                // The next fragment carries fragOp.
 	fragCompress bool                // The open fragmented message is compressed.
@@ -143,6 +147,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.buf = c.buf[:size]
 
 	c.rw = rw
+	c.role = cfg.Role
 	_, c.vectored = rw.(interface {
 		SyscallConn() (syscall.RawConn, error)
 	})
@@ -164,6 +169,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.wmu.Lock()
 	c.tx.Init(proto.Role(cfg.Role))
 	c.fragOp, c.fragHeld = 0, false
+	c.queue = nil
 	c.releaseCompressor()
 	if c.idleTimer != nil {
 		c.idleTimer.Stop()

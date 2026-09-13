@@ -17,8 +17,9 @@ type Batch struct {
 }
 
 type batchMsg struct {
-	op      codec.Opcode
-	payload []byte
+	op       codec.Opcode
+	payload  []byte
+	prepared *Prepared
 }
 
 // NewBatch returns an empty batch for c.
@@ -29,8 +30,14 @@ func (b *Batch) Write(op codec.Opcode, payload []byte) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
 	}
-	b.msgs = append(b.msgs, batchMsg{op, payload})
+	b.msgs = append(b.msgs, batchMsg{op: op, payload: payload})
 	return nil
+}
+
+// WritePrepared queues a prepared message; on a server its shared bytes are
+// copied into the batch's single write.
+func (b *Batch) WritePrepared(p *Prepared) {
+	b.msgs = append(b.msgs, batchMsg{prepared: p})
 }
 
 // Len returns the number of queued messages.
@@ -51,44 +58,34 @@ func (b *Batch) Flush() error {
 	c := b.c
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
+	if c.queue != nil {
+		return ErrQueued
+	}
 	if c.fragOp != 0 {
 		return ErrMessageOpen
 	}
-
-	var comp = (*compressorLease)(nil)
-	compressed := false
 	for _, m := range b.msgs {
-		payload := m.payload
-		useCompression := c.compression != nil && len(payload) >= c.minSize
-		if useCompression {
-			if comp == nil {
-				comp = c.leaseCompressor()
-				defer comp.release()
-			}
-			var err error
-			if payload, err = comp.Compress(payload, c.sendWindow); err != nil {
+		if m.prepared != nil && c.role == Server {
+			frame, err := c.preparedFrame(m.prepared)
+			if err != nil {
 				return err
 			}
-			compressed = true
+			b.arena = append(b.arena, frame...)
+			continue
 		}
-		var header, body []byte
-		var err error
-		if useCompression {
-			header, body, err = c.tx.EncodeCompressed(m.op, payload)
-		} else {
-			header, body, err = c.tx.Encode(m.op, payload)
+		op, payload := m.op, m.payload
+		if m.prepared != nil {
+			op, payload = m.prepared.op, m.prepared.payload
 		}
+		header, body, err := c.encodeData(op, payload)
 		if err != nil {
 			return err
 		}
 		b.arena = slices.Grow(b.arena, len(header)+len(body))
 		b.arena = append(append(b.arena, header...), body...)
 	}
-	if _, err := c.rw.Write(b.arena); err != nil {
-		return err
-	}
-	if compressed {
-		c.noteCompressed()
-	}
-	return nil
+	c.iomu.Lock()
+	_, err := c.rw.Write(b.arena)
+	c.iomu.Unlock()
+	return err
 }

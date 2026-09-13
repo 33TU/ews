@@ -204,6 +204,19 @@ under one lock into one contiguous buffer for a single write, so a fan-out
 burst costs one syscall instead of one per message. `WriteFrom` streams an
 `io.Reader` in `FragmentSize` chunks through the fragmented-send path.
 
+`Prepared` encodes a message once for many recipients; server frames carry
+no mask, so the bytes are shared, with a compressed variant per compression
+configuration built on first use. That variant is compressed against an
+empty dictionary, which any peer decodes; on a takeover connection the send
+window is advanced and the attached compressor re-primes once on its next
+message, through the window generation counter. `Queue` is the one place
+`ws` runs a goroutine, and only while the queue is nonempty: `Send` encodes
+under the write lock into an arena and returns, the writer swaps arenas and
+writes everything accumulated in one writev, and a slow peer fails `Send`
+with `ErrQueueFull` at the byte limit rather than stalling the sender. Data
+writes bypassing an active queue return `ErrQueued`, since a compressed frame
+encoded at `Send` time must not be overtaken on the wire.
+
 Outgoing text is not UTF-8 validated; that is the caller's job.
 
 A protocol failure writes its close frame from the reading goroutine. A peer

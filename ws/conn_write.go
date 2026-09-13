@@ -15,10 +15,43 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
 	}
-	if c.compression != nil && len(payload) >= c.minSize {
-		return c.sendCompressed(op, payload)
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if c.queue != nil {
+		return ErrQueued
 	}
-	return c.send(op, payload)
+	if c.fragOp != 0 {
+		return ErrMessageOpen
+	}
+	header, body, err := c.encodeData(op, payload)
+	if err != nil {
+		return err
+	}
+	return c.write(header, body)
+}
+
+// encodeData encodes one data message, compressing per the connection's
+// settings. The output is borrowed until the next encode. Callers hold wmu.
+func (c *Conn) encodeData(op codec.Opcode, payload []byte) (header, body []byte, err error) {
+	if c.compression == nil || len(payload) < c.minSize {
+		return c.tx.Encode(op, payload)
+	}
+	comp, shared := c.compressorFor()
+	compressed, err := comp.Compress(payload, c.sendWindow)
+	if err == nil {
+		header, body, err = c.tx.EncodeCompressed(op, compressed)
+	}
+	if shared {
+		// The body borrows the compressor's output; copy it so the compressor
+		// can go back to the pool now rather than after the write.
+		body = append(c.scratch[:0], body...)
+		c.scratch = body
+		c.putCompressor(comp)
+	}
+	if err == nil {
+		c.noteCompressed()
+	}
+	return header, body, err
 }
 
 // fromPool holds WriteFrom chunk buffers; a buffer smaller than the
@@ -105,6 +138,9 @@ func (c *Conn) BeginMessage(op codec.Opcode) error {
 	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
+	if c.queue != nil {
+		return ErrQueued
+	}
 	if c.fragOp != 0 {
 		return ErrMessageOpen
 	}
@@ -179,31 +215,6 @@ func (c *Conn) endFragmented(err error) error {
 	return err
 }
 
-func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
-	c.wmu.Lock()
-	defer c.wmu.Unlock()
-	if c.fragOp != 0 {
-		return ErrMessageOpen
-	}
-	comp, shared := c.compressorFor()
-	if shared {
-		defer c.putCompressor(comp) // After the write: the body borrows its output.
-	}
-	compressed, err := comp.Compress(payload, c.sendWindow)
-	if err != nil {
-		return err
-	}
-	header, body, err := c.tx.EncodeCompressed(op, compressed)
-	if err != nil {
-		return err
-	}
-	if err := c.write(header, body); err != nil {
-		return err
-	}
-	c.noteCompressed()
-	return nil
-}
-
 // Ping sends a ping with at most 125 payload bytes.
 func (c *Conn) Ping(payload []byte) error { return c.send(codec.Ping, payload) }
 
@@ -249,8 +260,11 @@ func (c *Conn) send(op codec.Opcode, payload []byte) error {
 const coalesceLimit = 16 << 10
 
 // write sends header and body: one writev on kernel sockets, one copied
-// write for small frames elsewhere, and two writes for large ones.
+// write for small frames elsewhere, and two writes for large ones. Callers
+// hold wmu; the transport lock keeps a Queue's writes from interleaving.
 func (c *Conn) write(header, body []byte) error {
+	c.iomu.Lock()
+	defer c.iomu.Unlock()
 	switch {
 	case len(body) == 0:
 		_, err := c.rw.Write(header)

@@ -25,6 +25,10 @@ var (
 	ErrMessageOpen = errors.New("ews/ws: fragmented message in progress")
 	// ErrNoMessage means WriteChunk or EndMessage was called without BeginMessage.
 	ErrNoMessage = errors.New("ews/ws: no fragmented message in progress")
+	// ErrQueued means the connection has a Queue, so data frames must go through it.
+	ErrQueued = errors.New("ews/ws: data writes must go through the connection's queue")
+	// ErrQueueFull means a Queue has reached its byte limit.
+	ErrQueueFull = errors.New("ews/ws: send queue full")
 )
 
 // Error is a terminal protocol failure. A close frame carrying Code has been

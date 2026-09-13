@@ -38,38 +38,22 @@ func (c *Conn) getCompressor() *deflate.Compressor {
 	if comp, ok := compressorPool(c.compression).Get().(*deflate.Compressor); ok {
 		return comp
 	}
-	// The configuration was validated by Reset.
-	if bits := c.compression.SendWindowBits; bits != 0 && bits != 15 {
-		comp, _ := deflate.NewCompressorWindow(bits)
-		return comp
+	return newCompressor(c.compression)
+}
+
+// newCompressor builds the compressor a validated configuration calls for.
+func newCompressor(comp *handshake.Compression) *deflate.Compressor {
+	if bits := comp.SendWindowBits; bits != 0 && bits != 15 {
+		c, _ := deflate.NewCompressorWindow(bits)
+		return c
 	}
-	comp, _ := deflate.NewCompressor(c.compression.Level)
-	return comp
+	c, _ := deflate.NewCompressor(comp.Level)
+	return c
 }
 
 func (c *Conn) putCompressor(comp *deflate.Compressor) {
 	comp.Reset()
 	compressorPool(c.compression).Put(comp)
-}
-
-// compressorLease is a compressor in use for one write or batch; release
-// returns a pooled one to its pool once the frame bodies borrowing its output
-// have been written. Callers hold wmu.
-type compressorLease struct {
-	*deflate.Compressor
-	c      *Conn
-	shared bool
-}
-
-func (c *Conn) leaseCompressor() *compressorLease {
-	comp, shared := c.compressorFor()
-	return &compressorLease{comp, c, shared}
-}
-
-func (l *compressorLease) release() {
-	if l.shared {
-		l.c.putCompressor(l.Compressor)
-	}
 }
 
 // compressorFor returns the compressor for the next message, attaching a
