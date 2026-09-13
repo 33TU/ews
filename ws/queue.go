@@ -86,7 +86,7 @@ func (q *Queue) Send(op codec.Opcode, payload []byte) error {
 	c := q.c
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	if c.fragOp != 0 {
+	if c.frag.op != 0 {
 		return ErrMessageOpen
 	}
 	// Check the limit before encoding: an encode advances compressor state,

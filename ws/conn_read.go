@@ -218,7 +218,7 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 
 // discard drains the rest of the current message.
 func (c *Conn) discard() error {
-	c.inflating = false
+	c.decomp.streaming = false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -315,7 +315,7 @@ func (c *Conn) handleControl() error {
 		}
 	}
 	if err != nil {
-		c.readErr, c.inMessage, c.inflating = err, false, false
+		c.readErr, c.inMessage, c.decomp.streaming = err, false, false
 	}
 	return err
 }
@@ -326,6 +326,6 @@ func (c *Conn) fail(err error) error {
 		c.sendClose(pe.Code)
 		err = &Error{Code: pe.Code, Err: pe.Err}
 	}
-	c.readErr, c.inMessage, c.inflating = err, false, false
+	c.readErr, c.inMessage, c.decomp.streaming = err, false, false
 	return err
 }

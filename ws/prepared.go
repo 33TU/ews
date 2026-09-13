@@ -101,10 +101,10 @@ func (p *Prepared) Release() {
 // when the connection compresses and the payload clears MinSize, else plain.
 // It reports whether the compressed variant was chosen. Callers hold wmu.
 func (p *Prepared) frameFor(c *Conn) ([]byte, bool) {
-	if c.compression == nil || len(p.payload) < c.minSize {
+	if c.comp.config == nil || len(p.payload) < c.comp.minSize {
 		return p.frame, false
 	}
-	return p.compressedFor(c.compression), true
+	return p.compressedFor(c.comp.config), true
 }
 
 func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
@@ -175,15 +175,15 @@ func (c *Conn) WritePrepared(p *Prepared) error {
 // preparedFrame checks the connection state and picks the variant to send,
 // recording a compressed one in the send window. Callers hold wmu.
 func (c *Conn) preparedFrame(p *Prepared) ([]byte, error) {
-	if c.fragOp != 0 {
+	if c.frag.op != 0 {
 		return nil, ErrMessageOpen
 	}
 	if c.tx.CloseSent() {
 		return nil, ErrClosing
 	}
 	frame, compressed := p.frameFor(c)
-	if compressed && c.sendWindow != nil {
-		c.sendWindow.Add(p.payload)
+	if compressed && c.comp.window != nil {
+		c.comp.window.Add(p.payload)
 	}
 	return frame, nil
 }

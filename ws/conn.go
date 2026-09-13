@@ -2,12 +2,10 @@ package ws
 
 import (
 	"io"
-	"net"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/internal/proto"
@@ -73,42 +71,31 @@ type Conn struct {
 	// UserData holds application state. Concurrent access is the caller's responsibility.
 	UserData any
 
+	// Transport and configuration, fixed by Reset.
 	rw           io.ReadWriter
 	role         Role
 	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
-	limit        int
-	fragmentSize int // WriteFrom chunk size.
-	compression  *handshake.Compression
-	minSize      int  // Payloads below this go uncompressed.
-	shared       bool // Never attach a compressor.
+	limit        int  // MaxMessageSize.
+	fragmentSize int  // WriteFrom chunk size.
 
+	// Read side, used by the one goroutine reading at a time.
 	rx        proto.Receiver
 	buf       []byte  // Transport read buffer.
 	msg       *msgBuf // ReadMessage assembly, pooled; held until the next read.
 	inMessage bool    // NextMessage returned and Read has not reached io.EOF.
 	readErr   error   // Terminal read state.
-	srcErr    error   // Error raised while feeding the inflater.
+	decomp    decompressorContext
 
-	decompressor *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
-	recvWindow   *deflate.Window       // Receive-direction history when takeover is negotiated.
-	inflating    bool                  // Read is streaming the current message through the inflater.
-
-	wmu          sync.Mutex
-	iomu         sync.Mutex // Serializes transport writes; taken inside wmu by direct writers, alone by a Queue.
-	tx           proto.Sender
-	queue        *Queue              // Set by NewQueue; data frames then go through it.
-	sendWindow   *deflate.Window     // Send-direction history when takeover is negotiated.
-	compressor   *deflate.Compressor // Attached while continuing sendWindow's stream.
-	scratch      []byte              // Holds a shared compressor\'s output until written.
-	fragOp       codec.Opcode        // Open fragmented message's opcode, or zero.
-	fragFirst    bool                // The next fragment carries fragOp.
-	fragCompress bool                // The open fragmented message is compressed.
-	fragHeld     bool                // The compressor was taken for the message in shared mode.
-	idle         time.Duration
-	idleTimer    *time.Timer
-	lastCompress time.Time
-	bufArr       [2][]byte // Backing storage for bufs; WriteTo consumes the slice.
-	bufs         net.Buffers
+	// Write side. wmu guards encoder and compressor state and is held only
+	// briefly; iomu serializes transport writes, taken inside wmu by direct
+	// writers and alone by a Queue's writer.
+	wmu   sync.Mutex
+	iomu  sync.Mutex
+	tx    proto.Sender
+	queue *Queue // Set by NewQueue; synchronous sends then join it.
+	comp  compressorContext
+	frag  fragmentState
+	out   writeBuffers
 }
 
 // NewConn wraps an upgraded transport.
@@ -152,31 +139,31 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 		SyscallConn() (syscall.RawConn, error)
 	})
 	c.ControlHandler = cfg.ControlHandler
-	c.compression = cfg.Compression
+	c.comp.config = cfg.Compression
 	if cfg.Compression != nil {
-		c.minSize = cfg.Compression.MinSize
-		if c.minSize == 0 {
-			c.minSize = DefaultMinSize
+		c.comp.minSize = cfg.Compression.MinSize
+		if c.comp.minSize == 0 {
+			c.comp.minSize = DefaultMinSize
 		}
 	}
 	c.rx.Init(proto.Role(cfg.Role), cfg.Compression != nil)
 	c.releaseMsg()
-	c.inMessage, c.inflating = false, false
-	c.readErr, c.srcErr = nil, nil
+	c.inMessage, c.decomp.streaming = false, false
+	c.readErr, c.decomp.srcErr = nil, nil
 	c.releaseDecompressor()
-	c.recvWindow = window(c.recvWindow, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover, bits(cfg.Compression, false))
+	c.decomp.window = window(c.decomp.window, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover, bits(cfg.Compression, false))
 
 	c.wmu.Lock()
 	c.tx.Init(proto.Role(cfg.Role))
-	c.fragOp, c.fragHeld = 0, false
+	c.frag.op, c.frag.heldCompressor = 0, false
 	c.queue = nil
 	c.releaseCompressor()
-	if c.idleTimer != nil {
-		c.idleTimer.Stop()
+	if c.comp.releaseTimer != nil {
+		c.comp.releaseTimer.Stop()
 	}
-	c.idle = cfg.CompressionIdle
-	c.shared = cfg.CompressionShared
-	c.sendWindow = window(c.sendWindow, cfg.Compression != nil && cfg.Compression.SendContextTakeover, bits(cfg.Compression, true))
+	c.comp.releaseAfter = cfg.CompressionIdle
+	c.comp.shared = cfg.CompressionShared
+	c.comp.window = window(c.comp.window, cfg.Compression != nil && cfg.Compression.SendContextTakeover, bits(cfg.Compression, true))
 	c.wmu.Unlock()
 	return nil
 }

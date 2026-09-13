@@ -63,7 +63,7 @@ func (b *Batch) Flush() error {
 	}()
 	c := b.c
 	c.wmu.Lock()
-	if c.fragOp != 0 {
+	if c.frag.op != 0 {
 		c.wmu.Unlock()
 		return ErrMessageOpen
 	}
