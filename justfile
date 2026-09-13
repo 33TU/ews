@@ -45,9 +45,9 @@ bench-echo benchtime="1s":
 bench-echo-simd benchtime="1s":
     cd bench && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | go run ./cmd/results > RESULTS-simd.md
 
-# Fan-out benchmark: many small messages per event, batched and unbatched.
+# Fan-out and broadcast benchmarks: bursts per event and one message to many connections.
 bench-fanout:
-    cd bench && go test -run '^$' -bench Fanout -benchmem
+    cd bench && go test -run '^$' -bench 'Fanout|Broadcast' -benchmem
 
 # Run the Autobahn test suite against examples/echo (needs docker or podman).
 autobahn:
