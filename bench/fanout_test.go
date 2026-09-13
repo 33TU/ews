@@ -169,6 +169,7 @@ func BenchmarkBroadcast(b *testing.B) {
 								b.Fatal(err)
 							}
 						}
+						p.Release()
 					case "queue":
 						p, _ := ws.Prepare(codec.Binary, msg)
 						for _, q := range queues {
@@ -176,6 +177,7 @@ func BenchmarkBroadcast(b *testing.B) {
 								b.Fatal(err)
 							}
 						}
+						p.Release() // Queues hold their own references until written.
 					}
 					for i := 0; i < conns; i++ {
 						<-received

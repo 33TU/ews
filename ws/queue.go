@@ -3,6 +3,7 @@ package ws
 import (
 	"net"
 	"sync"
+	"time"
 
 	"github.com/33TU/ews/codec"
 )
@@ -31,11 +32,15 @@ type Queue struct {
 	err      error
 	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
 	written  uint64 // Frames written so far.
+	parked   bool   // The writer is lingering, waiting on wake.
+	wake     chan struct{}
+	timer    *time.Timer
 
-	// Writer-side storage, reused across flushes.
+	// Writer-side storage, reused across flushes. bufs keeps the backing
+	// array that net.Buffers.WriteTo consumes.
 	flushArena    []byte
 	flushSegments []segment
-	bufs          net.Buffers
+	bufs          [][]byte
 }
 
 // segment is one queued frame: a range of the arena, or external bytes that
@@ -45,6 +50,12 @@ type segment struct {
 	ext        []byte
 	p          *Prepared
 }
+
+// queueLinger is how long an idle writer goroutine waits for more frames
+// before exiting. Senders faster than this keep it alive and pay a channel
+// send per wake instead of a goroutine start; slower ones hold no goroutine
+// between messages. A parked goroutine costs only its stack.
+const queueLinger = 10 * time.Millisecond
 
 // NewQueue attaches a queue to c, or returns the one it already has. limit
 // bounds bytes queued by Send; beyond it Send returns ErrQueueFull rather
@@ -58,7 +69,7 @@ func (c *Conn) NewQueue(limit int) *Queue {
 	if c.queue != nil {
 		return c.queue
 	}
-	q := &Queue{c: c, limit: limit}
+	q := &Queue{c: c, limit: limit, wake: make(chan struct{}, 1)}
 	q.cond.L = &q.mu
 	c.queue = q
 	return q
@@ -169,9 +180,13 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte, force bool
 	}
 	q.size += n
 	q.enqueued++
-	if !q.running {
+	switch {
+	case !q.running:
 		q.running = true
 		go q.run()
+	case q.parked:
+		q.parked = false
+		q.wake <- struct{}{} // Buffered; the writer drains it before parking again.
 	}
 	return q.enqueued, nil
 }
@@ -195,11 +210,15 @@ func (q *Queue) waitLocked(seq uint64) error {
 	return q.err
 }
 
-// run writes queued frames until the queue is empty, then exits, so an idle
-// connection holds no goroutine.
+// run writes queued frames until the queue has been empty for queueLinger,
+// then exits, so an idle connection holds no goroutine.
 func (q *Queue) run() {
 	for {
 		q.mu.Lock()
+		// Wait, lingering, while there is nothing to write; linger returns
+		// with mu held either way.
+		for len(q.segments) == 0 && q.err == nil && q.linger() {
+		}
 		if len(q.segments) == 0 || q.err != nil {
 			q.running = false
 			q.cond.Broadcast()
@@ -241,6 +260,33 @@ func (q *Queue) run() {
 	}
 }
 
+// linger parks the writer for queueLinger or until a frame arrives. It is
+// called with mu held and returns with mu held; true means frames arrived.
+func (q *Queue) linger() bool {
+	q.parked = true
+	q.mu.Unlock()
+	if q.timer == nil {
+		q.timer = time.NewTimer(queueLinger)
+	} else {
+		q.timer.Reset(queueLinger)
+	}
+	select {
+	case <-q.wake:
+		q.timer.Stop()
+		q.mu.Lock()
+		return true
+	case <-q.timer.C:
+		q.mu.Lock()
+		if !q.parked {
+			// A frame arrived as the timer fired; take its wake token.
+			<-q.wake
+			return true
+		}
+		q.parked = false
+		return false
+	}
+}
+
 // flush writes the writer-side frames under the transport lock only, so
 // enqueue keeps going while a slow peer is being written to: one writev on a
 // socket, one coalesced write elsewhere.
@@ -257,8 +303,9 @@ func (q *Queue) flush() error {
 				q.bufs = append(q.bufs, q.flushArena[s.start:s.end])
 			}
 		}
-		_, err := q.bufs.WriteTo(c.rw)
-		clear(q.bufs)
+		bufs := net.Buffers(q.bufs) // A copy of the header; WriteTo consumes only the copy.
+		_, err := bufs.WriteTo(c.rw)
+		clear(q.bufs) // Drop references to prepared frames.
 		return err
 	}
 	buf := writePool.Get().(*[]byte)
