@@ -278,7 +278,9 @@ values, so a `net/http` server, a client, and a future reactor share them.
 The negotiated `handshake.Compression` is what `ws.Config` takes; `ws`
 depends on `handshake`, never the reverse. The root `ews` package is the only
 place `net/http` appears: `Upgrade` validates, hijacks, writes the 101, and
-returns the raw connection for `ws.NewConn`. `examples/echo` is the Autobahn
+returns the raw connection for `ws.NewConn`; `Dial` opens TCP or TLS, writes
+the request, reads the response, confirms it, and returns the same pair, with
+`DialOptions` holding the transport concerns the pure package cannot. `examples/echo` is the Autobahn
 target; the suite passes with 6.4.x non-strict by design.
 
 ## Tests to port and add

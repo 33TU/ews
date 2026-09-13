@@ -164,7 +164,20 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 ```
 
-`Upgrade` returns the raw connection; the caller keeps it for deadlines and closing. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+The client side is `Dial`, which takes a ws or wss URL and returns the same pair:
+
+```go
+conn, res, err := ews.Dial(ctx, "wss://example.com/socket", ews.DialOptions{
+    Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed}},
+})
+if err != nil {
+    return err // A *ews.HandshakeError carries the status and headers of a refusal.
+}
+defer conn.Close()
+c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
+```
+
+Both return the raw connection; the caller keeps it for deadlines and closing. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
 
 ## Development
 

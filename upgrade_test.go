@@ -27,10 +27,7 @@ func echoServer(t *testing.T, opts handshake.Options) *httptest.Server {
 			return
 		}
 		defer conn.Close()
-		if res.Protocol != "" {
-			conn.Write(nil) // Exercise the raw conn before wrapping.
-		}
-		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server})
+		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 		if err != nil {
 			t.Error(err)
 			return
