@@ -16,6 +16,7 @@ type Compressor struct {
 	writer *flate.Writer
 	output bytes.Buffer
 
+	window   int     // Largest dictionary worth priming with: the encoder's window.
 	attached *Window // Window whose stream the encoder currently continues.
 	gen      uint64  // The window's generation when we last touched it.
 	mid      bool    // A chunked message is in progress; the next chunk continues it.
@@ -24,7 +25,7 @@ type Compressor struct {
 // NewCompressor creates a compressor using a flate compression level and the
 // full 32 KB window.
 func NewCompressor(level int) (*Compressor, error) {
-	c := new(Compressor)
+	c := &Compressor{window: windowSize}
 	var err error
 	c.writer, err = flate.NewWriter(&c.output, level)
 	if err != nil {
@@ -40,7 +41,7 @@ func NewCompressorWindow(windowBits int) (*Compressor, error) {
 	if windowBits < 8 || windowBits > 15 {
 		return nil, ErrInvalidWindow
 	}
-	c := new(Compressor)
+	c := &Compressor{window: 1 << windowBits}
 	var err error
 	c.writer, err = flate.NewWriterWindow(&c.output, 1<<windowBits)
 	if err != nil {
@@ -69,7 +70,13 @@ func (c *Compressor) CompressChunk(payload []byte, w *Window, final bool) ([]byt
 	// writing. Otherwise prime from the window. Always ResetDict, never
 	// Reset: the writer's plain Reset re-primes with the previous dictionary.
 	if !c.mid && (w == nil || w != c.attached || w.gen != c.gen) {
-		c.writer.ResetDict(&c.output, w.dict())
+		// Priming costs about as much as compressing the dictionary, and the
+		// encoder cannot reach past its window, so prime with that much.
+		dict := w.dict()
+		if len(dict) > c.window {
+			dict = dict[len(dict)-c.window:]
+		}
+		c.writer.ResetDict(&c.output, dict)
 	}
 	if _, err := c.writer.Write(payload); err != nil {
 		c.attached, c.mid = nil, false
