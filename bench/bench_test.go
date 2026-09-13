@@ -62,8 +62,39 @@ func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
 	socket.WriteMessage(message.Opcode, message.Bytes())
 }
 
+// gwsPullServer echoes through gws's pull-style ReadMessage instead of the
+// event-driven ReadLoop.
+func gwsPullServer(compress bool) *httptest.Server {
+	up := gwsUpgrader(compress, gws.BuiltinEventHandler{})
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		socket, err := up.Upgrade(w, r)
+		if err != nil {
+			return
+		}
+		for {
+			msg, err := socket.ReadMessage()
+			if err != nil {
+				return
+			}
+			socket.WriteMessage(msg.Opcode, msg.Bytes())
+			msg.Close()
+		}
+	}))
+}
+
 func gwsServer(compress bool) *httptest.Server {
-	up := gws.NewUpgrader(gwsEcho{}, &gws.ServerOption{
+	up := gwsUpgrader(compress, gwsEcho{})
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		socket, err := up.Upgrade(w, r)
+		if err != nil {
+			return
+		}
+		socket.ReadLoop()
+	}))
+}
+
+func gwsUpgrader(compress bool, handler gws.Event) *gws.Upgrader {
+	return gws.NewUpgrader(handler, &gws.ServerOption{
 		ReadMaxPayloadSize: 64 << 20,
 		PermessageDeflate: gws.PermessageDeflate{
 			Enabled:               compress,
@@ -74,13 +105,6 @@ func gwsServer(compress bool) *httptest.Server {
 			Level:                 flate.BestSpeed,
 		},
 	})
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		socket, err := up.Upgrade(w, r)
-		if err != nil {
-			return
-		}
-		socket.ReadLoop()
-	}))
 }
 
 // ---- client (ews for both servers) ----------------------------------------
@@ -153,7 +177,7 @@ func BenchmarkEcho(b *testing.B) {
 	servers := []struct {
 		name  string
 		start func(bool) *httptest.Server
-	}{{"ews", ewsServer}, {"gws", gwsServer}}
+	}{{"ews", ewsServer}, {"gws", gwsServer}, {"gws-pull", gwsPullServer}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128} {
