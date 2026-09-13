@@ -523,6 +523,61 @@ func TestConcurrentWriters(t *testing.T) {
 	waitClient()
 }
 
+// recorder is a writer without writev that records each Write call.
+type recorder struct{ writes [][]byte }
+
+func (r *recorder) Read([]byte) (int, error) { return 0, io.EOF }
+func (r *recorder) Write(p []byte) (int, error) {
+	r.writes = append(r.writes, bytes.Clone(p))
+	return len(p), nil
+}
+
+// TestWriteCoalescing checks that transports without writev get one write
+// per small frame and two per large one, and that sockets are detected.
+func TestWriteCoalescing(t *testing.T) {
+	rec := new(recorder)
+	c, err := ws.NewConn(rec, ws.Config{Role: ws.Server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	small := bytes.Repeat([]byte("s"), 1000)
+	large := bytes.Repeat([]byte("l"), 100000)
+	if err := c.Write(codec.Binary, small); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Write(codec.Binary, large); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Ping(nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.writes) != 4 || len(rec.writes[0]) != 4+len(small) || len(rec.writes[1]) != 10 || len(rec.writes[2]) != len(large) || len(rec.writes[3]) != 2 {
+		sizes := make([]int, len(rec.writes))
+		for i, w := range rec.writes {
+			sizes[i] = len(w)
+		}
+		t.Fatalf("write sizes %v", sizes)
+	}
+	if !bytes.Equal(rec.writes[0][4:], small) {
+		t.Fatal("coalesced payload corrupted")
+	}
+
+	// Frames are unchanged on the wire: a raw peer decodes both.
+	server, peer := raw(t, ws.Config{})
+	wait := run(t, func() error {
+		for i, want := range [][]byte{small, large} {
+			h, p := readFrame(t, peer)
+			if h.Opcode() != codec.Binary || !bytes.Equal(p, want) {
+				return fmt.Errorf("frame %d: %d bytes", i, len(p))
+			}
+		}
+		return nil
+	})
+	server.Write(codec.Binary, small)
+	server.Write(codec.Binary, large)
+	wait()
+}
+
 func TestInvalidConfig(t *testing.T) {
 	sc, _ := net.Pipe()
 	defer sc.Close()

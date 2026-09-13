@@ -2,6 +2,7 @@ package ws
 
 import (
 	"net"
+	"sync"
 
 	"github.com/33TU/ews/codec"
 )
@@ -77,17 +78,40 @@ func (c *Conn) send(op codec.Opcode, payload []byte) error {
 	return c.write(header, body)
 }
 
-// write sends header and body with one writev on transports that support it.
+// coalesceLimit is the largest payload copied next to its header for one
+// write on transports without writev. It matches the TLS record size, so a
+// coalesced frame is one record; above it the copy costs more than it saves.
+const coalesceLimit = 16 << 10
+
+// write sends header and body: one writev on kernel sockets, one copied
+// write for small frames elsewhere, and two writes for large ones.
 func (c *Conn) write(header, body []byte) error {
-	if len(body) == 0 {
+	switch {
+	case len(body) == 0:
 		_, err := c.rw.Write(header)
 		return err
+	case c.vectored:
+		c.bufs = append(net.Buffers(c.bufArr[:0]), header, body)
+		_, err := c.bufs.WriteTo(c.rw)
+		c.bufArr = [2][]byte{} // Do not retain the caller's payload.
+		return err
+	case len(body) <= coalesceLimit:
+		buf := writePool.Get().(*[]byte)
+		*buf = append(append((*buf)[:0], header...), body...)
+		_, err := c.rw.Write(*buf)
+		writePool.Put(buf)
+		return err
+	default:
+		if _, err := c.rw.Write(header); err != nil {
+			return err
+		}
+		_, err := c.rw.Write(body)
+		return err
 	}
-	c.bufs = append(net.Buffers(c.bufArr[:0]), header, body)
-	_, err := c.bufs.WriteTo(c.rw)
-	c.bufArr = [2][]byte{} // Do not retain the caller's payload.
-	return err
 }
+
+// writePool holds coalescing buffers for transports without writev.
+var writePool = sync.Pool{New: func() any { b := make([]byte, 0, coalesceLimit+codec.MaxHeaderSize); return &b }}
 
 // sendClose is the best-effort close frame that accompanies a protocol failure.
 func (c *Conn) sendClose(code uint16) {

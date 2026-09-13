@@ -192,8 +192,12 @@ any goroutine, including a control handler on the read goroutine. Steps:
 1. Reject after `Close` except `Pong`. Reject control payloads over 125 bytes
    and malformed close payloads.
 2. Client role: fresh key from `crypto/rand` per frame; server role: nil key.
-3. `Encode`, then `net.Buffers{HeaderBytes(), PayloadBytes()}.WriteTo(rw)`.
-   An empty payload writes the header alone.
+3. `Encode`, then send. On a kernel socket, detected by `SyscallConn`,
+   `net.Buffers{HeaderBytes(), PayloadBytes()}.WriteTo(rw)` is one writev.
+   Elsewhere, such as `*tls.Conn` or a wrapper, a payload up to 16 KiB is
+   copied next to its header into a pooled buffer for one write, so a frame
+   is one TLS record; larger payloads take two writes, since the copy would
+   cost more than it saves. An empty payload writes the header alone.
 
 Outgoing text is not UTF-8 validated; that is the caller's job.
 
@@ -266,9 +270,6 @@ nc.Close()
 
 - A cheaper per-connection mask key source than `crypto/rand` if profiling
   shows it matters.
-- On transports without writev, such as `*tls.Conn`, header and payload go
-  out as two writes. Coalescing small frames into one buffer would save a
-  syscall and a TLS record.
 
 ## Handshake
 

@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/33TU/ews/deflate"
@@ -57,6 +58,7 @@ type Conn struct {
 	UserData any
 
 	rw          io.ReadWriter
+	vectored    bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
 	limit       int
 	compression *handshake.Compression
 
@@ -114,6 +116,9 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.buf = c.buf[:size]
 
 	c.rw = rw
+	_, c.vectored = rw.(interface {
+		SyscallConn() (syscall.RawConn, error)
+	})
 	c.ControlHandler = cfg.ControlHandler
 	c.compression = cfg.Compression
 	c.rx.Init(proto.Role(cfg.Role), cfg.Compression != nil)
