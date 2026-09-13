@@ -24,7 +24,7 @@ const (
 const (
 	DefaultReadBufferSize = 4 << 10
 	DefaultMaxMessageSize = 8 << 20
-	DefaultFragmentSize   = 128 << 10
+	DefaultFragmentSize   = 64 << 10
 	// NoStatus is the close code reported when the peer sent none.
 	NoStatus = proto.NoStatus
 )

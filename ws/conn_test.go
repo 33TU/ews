@@ -1167,15 +1167,16 @@ func TestWriteFrom(t *testing.T) {
 	}
 	wait()
 
-	// With the default fragment size the same 100000 bytes are one frame.
+	// Content within the default fragment size is a single frame.
 	server, peer = raw(t, ws.Config{})
+	fits := large[:ws.DefaultFragmentSize]
 	wait = run(t, func() error {
-		if h, p := readFrame(t, peer); !h.Final() || len(p) != len(large) {
+		if h, p := readFrame(t, peer); !h.Final() || len(p) != len(fits) {
 			return fmt.Errorf("default: final %v, %d bytes", h.Final(), len(p))
 		}
 		return nil
 	})
-	if _, err := server.WriteFrom(codec.Binary, bytes.NewReader(large)); err != nil {
+	if _, err := server.WriteFrom(codec.Binary, bytes.NewReader(fits)); err != nil {
 		t.Fatal(err)
 	}
 	wait()
