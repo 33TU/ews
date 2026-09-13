@@ -41,6 +41,10 @@ bench-simd pkg="./...":
 bench-echo benchtime="1s":
     cd bench && go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | go run ./cmd/results > RESULTS.md
 
+# The echo comparison built with GOEXPERIMENT=simd, written to bench/RESULTS-simd.md.
+bench-echo-simd benchtime="1s":
+    cd bench && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | go run ./cmd/results > RESULTS-simd.md
+
 # Fan-out benchmark: many small messages per event, batched and unbatched.
 bench-fanout:
     cd bench && go test -run '^$' -bench Fanout -benchmem
