@@ -107,4 +107,34 @@ func TestPrepared(t *testing.T) {
 		t.Fatal(err)
 	}
 	wait()
+
+	// Reference counting: the owner may release right after handing the
+	// message to a queue, which keeps its own reference until written, and
+	// over-release panics.
+	server, client = pair(t, ws.Config{}, ws.Config{})
+	q := server.NewQueue(0)
+	p2, _ := ws.Prepare(codec.Binary, payload)
+	wait = run(t, func() error {
+		if _, got, err := client.ReadMessage(); err != nil || !bytes.Equal(got, payload) {
+			return fmt.Errorf("released prepared: %v", err)
+		}
+		return nil
+	})
+	if err := q.SendPrepared(p2); err != nil {
+		t.Fatal(err)
+	}
+	p2.Release()
+	if err := q.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("double release did not panic")
+			}
+		}()
+		p2.Release()
+	}()
+	p.Release()
 }

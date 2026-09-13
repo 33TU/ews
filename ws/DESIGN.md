@@ -213,9 +213,14 @@ message, through the window generation counter. `Queue` is the one place
 `ws` runs a goroutine, and only while the queue is nonempty: `Send` encodes
 under the write lock into an arena and returns, the writer swaps arenas and
 writes everything accumulated in one writev, and a slow peer fails `Send`
-with `ErrQueueFull` at the byte limit rather than stalling the sender. Data
-writes bypassing an active queue return `ErrQueued`, since a compressed frame
-encoded at `Send` time must not be overtaken on the wire.
+with `ErrQueueFull` at the byte limit rather than stalling the sender. Once a
+queue exists, synchronous sends join it: they enqueue under the encoder lock,
+which makes enqueue order the encode order, then wait for their sequence
+number to be written. Order and compressed-stream consistency hold, `Write`
+keeps meaning written-on-return, and the encoder lock is never held while
+waiting, so `Send` stays non-blocking. `Prepared` storage is pooled behind a
+reference count: queues and batches retain while holding a message and
+release after the write, and the owner's `Release` is optional.
 
 Outgoing text is not UTF-8 validated; that is the caller's job.
 

@@ -10,10 +10,13 @@ import (
 // Queue sends messages asynchronously: Send encodes a message and returns
 // without touching the transport, and a goroutine that runs only while the
 // queue is nonempty writes what has accumulated, coalescing a burst into one
-// write. Prepared messages are
-// queued by reference. While a connection has a queue, its data frames must
-// go through it, so that compressed streams reach the wire in encoding
-// order; control frames may still be written directly. A Queue is safe for
+// write. Prepared messages are queued by reference.
+//
+// Once a connection has a queue, its other data writes join the queue too:
+// Write, WritePrepared, Batch.Flush, and fragmented sends enqueue their
+// frames in submission order and return when those frames have been written,
+// so message order and compressed-stream order are preserved and the two
+// styles mix freely. Control frames bypass the queue. A Queue is safe for
 // concurrent use.
 type Queue struct {
 	c     *Conn
@@ -26,6 +29,8 @@ type Queue struct {
 	size     int       // Bytes queued, counted against limit.
 	running  bool
 	err      error
+	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
+	written  uint64 // Frames written so far.
 
 	// Writer-side storage, reused across flushes.
 	flushArena    []byte
@@ -33,24 +38,29 @@ type Queue struct {
 	bufs          net.Buffers
 }
 
-// segment is one queued frame: a range of the arena or a shared prepared frame.
+// segment is one queued frame: a range of the arena, or external bytes that
+// may belong to a Prepared holding a reference for the segment's lifetime.
 type segment struct {
 	start, end int
 	ext        []byte
+	p          *Prepared
 }
 
-// NewQueue attaches a queue to c. limit bounds queued bytes; Send returns
-// ErrQueueFull beyond it rather than blocking, so a slow peer cannot stall
-// the sender. Zero means 1 MiB.
+// NewQueue attaches a queue to c, or returns the one it already has. limit
+// bounds bytes queued by Send; beyond it Send returns ErrQueueFull rather
+// than blocking, so a slow peer cannot stall the sender. Zero means 1 MiB.
 func (c *Conn) NewQueue(limit int) *Queue {
 	if limit <= 0 {
 		limit = 1 << 20
 	}
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if c.queue != nil {
+		return c.queue
+	}
 	q := &Queue{c: c, limit: limit}
 	q.cond.L = &q.mu
-	c.wmu.Lock()
 	c.queue = q
-	c.wmu.Unlock()
 	return q
 }
 
@@ -60,54 +70,43 @@ func (q *Queue) Send(op codec.Opcode, payload []byte) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.err != nil {
-		return q.err
-	}
-	if q.size+len(payload) > q.limit {
-		return ErrQueueFull
-	}
 	c := q.c
 	c.wmu.Lock()
-	header, body, err := c.encodeData(op, payload)
-	if err != nil {
-		c.wmu.Unlock()
+	defer c.wmu.Unlock()
+	if c.fragOp != 0 {
+		return ErrMessageOpen
+	}
+	// Check the limit before encoding: an encode advances compressor state,
+	// which must not happen for a frame that is then dropped.
+	if err := q.reserve(len(payload)); err != nil {
 		return err
 	}
-	start := len(q.arena)
-	q.arena = append(append(q.arena, header...), body...)
-	c.wmu.Unlock()
-	q.segments = append(q.segments, segment{start: start, end: len(q.arena)})
-	q.size += len(q.arena) - start
-	q.wake()
-	return nil
+	header, body, err := c.encodeData(op, payload)
+	if err != nil {
+		return err
+	}
+	_, err = q.enqueue(header, body, nil, nil, false)
+	return err
 }
 
-// SendPrepared queues a prepared message by reference, without copying.
+// SendPrepared queues a prepared message by reference, without copying,
+// holding a reference to it until it has been written.
 func (q *Queue) SendPrepared(p *Prepared) error {
 	c := q.c
 	if c.role == Client {
 		return q.Send(p.op, p.payload)
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.err != nil {
-		return q.err
-	}
-	if q.size+len(p.payload) > q.limit {
-		return ErrQueueFull
-	}
 	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if err := q.reserve(len(p.payload)); err != nil {
+		return err
+	}
 	frame, err := c.preparedFrame(p)
-	c.wmu.Unlock()
 	if err != nil {
 		return err
 	}
-	q.segments = append(q.segments, segment{ext: frame})
-	q.size += len(frame)
-	q.wake()
-	return nil
+	_, err = q.enqueue(nil, nil, p, frame, false)
+	return err
 }
 
 // Err returns the first write error, after which every Send fails with it.
@@ -117,29 +116,83 @@ func (q *Queue) Err() error {
 	return q.err
 }
 
-// Pending returns the bytes queued but not yet written.
+// Pending returns the bytes queued but not yet handed to the transport.
 func (q *Queue) Pending() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.size
 }
 
-// Wait blocks until the queue has drained or failed.
+// Wait blocks until every queued frame has been written or the queue failed.
 func (q *Queue) Wait() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for q.running {
-		q.cond.Wait()
-	}
-	return q.err
+	return q.waitLocked(q.enqueued)
 }
 
-// wake starts the writer if it is not running. Callers hold mu.
-func (q *Queue) wake() {
+// reserve fails when n more bytes would exceed the limit. Callers hold wmu.
+func (q *Queue) reserve(n int) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.err != nil {
+		return q.err
+	}
+	if q.size+n > q.limit {
+		return ErrQueueFull
+	}
+	return nil
+}
+
+// enqueue appends one frame, copied from header and body or referenced as
+// ext, and returns its sequence number. force skips the limit, for
+// synchronous callers that wait for the write anyway. Callers hold wmu, which
+// makes enqueue order the encode order.
+func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte, force bool) (uint64, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.err != nil {
+		return 0, q.err
+	}
+	n := len(header) + len(body) + len(ext)
+	if !force && q.size+n > q.limit {
+		return 0, ErrQueueFull
+	}
+	if ext != nil {
+		if p != nil {
+			p.Retain()
+		}
+		q.segments = append(q.segments, segment{ext: ext, p: p})
+	} else {
+		start := len(q.arena)
+		q.arena = append(append(q.arena, header...), body...)
+		q.segments = append(q.segments, segment{start: start, end: len(q.arena)})
+	}
+	q.size += n
+	q.enqueued++
 	if !q.running {
 		q.running = true
 		go q.run()
 	}
+	return q.enqueued, nil
+}
+
+// await completes a synchronous write: a nil queue means it was written
+// directly, otherwise wait for its sequence number.
+func await(q *Queue, seq uint64, err error) error {
+	if err != nil || q == nil {
+		return err
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.waitLocked(seq)
+}
+
+// waitLocked blocks until frame seq has been written or the queue failed. Callers hold mu.
+func (q *Queue) waitLocked(seq uint64) error {
+	for q.written < seq && q.err == nil {
+		q.cond.Wait()
+	}
+	return q.err
 }
 
 // run writes queued frames until the queue is empty, then exits, so an idle
@@ -153,7 +206,7 @@ func (q *Queue) run() {
 			q.mu.Unlock()
 			return
 		}
-		// Swap the producer's storage with the writer's, so Send continues
+		// Swap the producer's storage with the writer's, so enqueue continues
 		// while the write is in progress.
 		q.arena, q.flushArena = q.flushArena[:0], q.arena
 		q.segments, q.flushSegments = q.flushSegments[:0], q.segments
@@ -161,20 +214,35 @@ func (q *Queue) run() {
 		q.mu.Unlock()
 
 		err := q.flush()
+
+		q.mu.Lock()
+		for i := range q.flushSegments {
+			if p := q.flushSegments[i].p; p != nil {
+				p.Release()
+			}
+			q.flushSegments[i] = segment{}
+		}
+		q.written += uint64(len(q.flushSegments))
 		if err != nil {
-			q.mu.Lock()
 			q.err = err
+			for i := range q.segments {
+				if p := q.segments[i].p; p != nil {
+					p.Release()
+				}
+			}
 			q.segments, q.size = q.segments[:0], 0
 			q.running = false
-			q.cond.Broadcast()
-			q.mu.Unlock()
+		}
+		q.cond.Broadcast()
+		q.mu.Unlock()
+		if err != nil {
 			return
 		}
 	}
 }
 
-// flush writes the writer-side frames under the transport lock only, so Send
-// keeps encoding while a slow peer is being written to: one writev on a
+// flush writes the writer-side frames under the transport lock only, so
+// enqueue keeps going while a slow peer is being written to: one writev on a
 // socket, one coalesced write elsewhere.
 func (q *Queue) flush() error {
 	c := q.c

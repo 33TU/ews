@@ -34,9 +34,10 @@ func (b *Batch) Write(op codec.Opcode, payload []byte) error {
 	return nil
 }
 
-// WritePrepared queues a prepared message; on a server its shared bytes are
-// copied into the batch's single write.
+// WritePrepared queues a prepared message, holding a reference to it until
+// Flush; on a server its shared bytes are copied into the batch's single write.
 func (b *Batch) WritePrepared(p *Prepared) {
+	p.Retain()
 	b.msgs = append(b.msgs, batchMsg{prepared: p})
 }
 
@@ -51,23 +52,26 @@ func (b *Batch) Flush() error {
 		return nil
 	}
 	defer func() {
+		for _, m := range b.msgs {
+			if m.prepared != nil {
+				m.prepared.Release()
+			}
+		}
 		clear(b.msgs) // Drop payload references.
 		b.msgs = b.msgs[:0]
 		b.arena = b.arena[:0]
 	}()
 	c := b.c
 	c.wmu.Lock()
-	defer c.wmu.Unlock()
-	if c.queue != nil {
-		return ErrQueued
-	}
 	if c.fragOp != 0 {
+		c.wmu.Unlock()
 		return ErrMessageOpen
 	}
 	for _, m := range b.msgs {
 		if m.prepared != nil && c.role == Server {
 			frame, err := c.preparedFrame(m.prepared)
 			if err != nil {
+				c.wmu.Unlock()
 				return err
 			}
 			b.arena = append(b.arena, frame...)
@@ -79,13 +83,21 @@ func (b *Batch) Flush() error {
 		}
 		header, body, err := c.encodeData(op, payload)
 		if err != nil {
+			c.wmu.Unlock()
 			return err
 		}
 		b.arena = slices.Grow(b.arena, len(header)+len(body))
 		b.arena = append(append(b.arena, header...), body...)
 	}
+	if q := c.queue; q != nil {
+		// The arena is reused only after this returns, so it can be referenced.
+		seq, err := q.enqueue(nil, nil, nil, b.arena, true)
+		c.wmu.Unlock()
+		return await(q, seq, err)
+	}
 	c.iomu.Lock()
 	_, err := c.rw.Write(b.arena)
 	c.iomu.Unlock()
+	c.wmu.Unlock()
 	return err
 }

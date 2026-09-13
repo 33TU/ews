@@ -67,8 +67,47 @@ func TestQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 	wait()
-	if err := server.Write(codec.Text, nil); err != ws.ErrQueued {
-		t.Fatalf("direct data write with a queue: %v", err)
+
+	// Direct writes join the queue in submission order and return once
+	// written, so both styles mix, under compression with takeover.
+	wait = run(t, func() error {
+		for i := 0; i < 3*n; i++ {
+			_, got, err := client.ReadMessage()
+			if err != nil {
+				return fmt.Errorf("mixed %d: %v", i, err)
+			}
+			var want []byte
+			switch i % 3 {
+			case 0:
+				want = fmt.Appendf(nil, "queued %d", i)
+			case 1:
+				want = fmt.Appendf(nil, "direct %d", i)
+			default:
+				want = payload
+			}
+			if !bytes.Equal(got, want) {
+				return fmt.Errorf("mixed %d out of order: %q", i, got)
+			}
+		}
+		return nil
+	})
+	for i := 0; i < 3*n; i++ {
+		var err error
+		switch i % 3 {
+		case 0:
+			err = q.Send(codec.Text, fmt.Appendf(nil, "queued %d", i))
+		case 1:
+			err = server.Write(codec.Text, fmt.Appendf(nil, "direct %d", i))
+		default:
+			err = server.WritePrepared(p)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	wait()
+	if server.NewQueue(0) != q {
+		t.Fatal("NewQueue must return the existing queue")
 	}
 
 	// Coalescing, backpressure, and control frames, against a gated writer.
