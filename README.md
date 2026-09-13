@@ -4,7 +4,7 @@ A lightweight WebSocket frame encoder and decoder for Go, built around plain `[]
 
 **Work in progress.** The API is still taking shape.
 
-The frame API lives in `github.com/33TU/ews/codec`; message compression lives in `github.com/33TU/ews/deflate`. The root is reserved for the planned client/server API.
+The frame API lives in `github.com/33TU/ews/codec`, message compression in `github.com/33TU/ews/deflate`, connections in `github.com/33TU/ews/ws`, handshake rules in `github.com/33TU/ews/handshake`, and the `net/http` glue, `Upgrade` and `Dial`, in the root package.
 
 ## Design
 
@@ -151,6 +151,33 @@ message, err := decompressor.Decompress(compressed, 8<<20, &recv)
 
 A peer may negotiate a smaller window for this endpoint's messages; `NewCompressorWindow(bits)` builds a compressor that never reaches further back, at the encoder's fixed level. Set `Window.Bits` to the negotiated size in each direction so only that much history is kept and copied; `ws` does this from the handshake result. Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches. Streaming decompression is available through `Begin` and `Read` over a `ChunkSource`.
 
+## Connections
+
+`ws.Conn` wraps an upgraded transport and speaks messages over it. One goroutine reads at a time; writes may come from any goroutine. Three read styles share one core: `ReadMessage` returns the next complete message, borrowed until the next read; `NextMessage` then `Read(b)` streams a message into caller buffers, spanning fragments and dispatching control frames on the way, with `io.EOF` at the end of the message; both handle pings and close frames through the `ControlHandler`, whose default answers pings and echoes close codes.
+
+`ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path.
+
+A message whose size is not known up front is sent in fragments: `BeginMessage(op)`, then `WriteChunk(p)` for each piece, which goes out as one frame immediately, then `EndMessage()`. Until `EndMessage`, `Write` returns `ErrMessageOpen` while `Ping`, `Pong`, and `Close` may interleave. Compressed fragments continue one deflate stream, so a fragmented message compresses as well as a whole one. `WriteFrom(op, r)` does this for an `io.Reader`, sending content up to `Config.FragmentSize`, 64 KiB by default, as a single frame and fragmenting anything longer as it is read.
+
+Senders that emit bursts, such as fan-out to many subscribers, queue messages in a `Batch` and send them with one write: `b := c.NewBatch(); b.Write(op, p); ...; b.Flush()`. Payloads are borrowed until `Flush`, compression follows the connection's settings per message, and a batch is reusable.
+
+A message for many recipients is encoded once and written to each connection without further encoding or copying:
+
+```go
+p, err := ws.Prepare(op, payload)
+if err != nil {
+    return err
+}
+defer p.Release()
+for _, c := range conns {
+    _ = c.WritePrepared(p)
+}
+```
+
+A compressed variant is built on first use per compression configuration; a client falls back to `Write` since it must mask. `Release` returns the pooled storage once every holder has let go; queues and batches take their own reference while they hold the message, and releasing is optional.
+
+For sending without blocking on a slow peer, `q := c.NewQueue(limit)` gives an asynchronous queue: `q.Send(op, p)` encodes and returns, `q.SendPrepared(p)` queues shared bytes by reference, and a goroutine that runs only while the queue is nonempty writes the accumulated frames in one write. The limit is a high-water mark: an empty queue accepts any message, and one that would push a nonempty queue past `limit` bytes gets `ErrQueueFull` rather than blocking; the first write error is sticky in `q.Err()`. Once a connection has a queue, `Write` and the other synchronous sends join it in submission order and return when their frames have been written, so the two styles mix freely and compressed streams stay in order. A broadcast is then `Prepare` once and `SendPrepared` on every recipient's queue; `examples/broadcast` is a complete hub built this way.
+
 ## Handshake and upgrade
 
 `handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation including window sizes, and subprotocol selection. The root package connects it to `net/http`:
@@ -177,28 +204,7 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 ```
 
-Both return the raw connection; the caller keeps it for deadlines and closing.
-
-A message whose size is not known up front is sent in fragments: `BeginMessage(op)`, then `WriteChunk(p)` for each piece, which goes out as one frame immediately, then `EndMessage()`. Until `EndMessage`, `Write` returns `ErrMessageOpen` while `Ping`, `Pong`, and `Close` may interleave. Compressed fragments continue one deflate stream, so a fragmented message compresses as well as a whole one. `WriteFrom(op, r)` does this for an `io.Reader`, sending content up to `Config.FragmentSize`, 64 KiB by default, as a single frame and fragmenting anything longer as it is read.
-
-Senders that emit bursts, such as fan-out to many subscribers, queue messages in a `Batch` and send them with one write: `b := c.NewBatch(); b.Write(op, p); ...; b.Flush()`. Payloads are borrowed until `Flush`, compression follows the connection's settings per message, and a batch is reusable.
-
-A message for many recipients is encoded once and written to each connection without further encoding or copying:
-
-```go
-p, err := ws.Prepare(op, payload)
-if err != nil {
-    return err
-}
-defer p.Release()
-for _, c := range conns {
-    _ = c.WritePrepared(p)
-}
-```
-
-A compressed variant is built on first use per compression configuration; a client falls back to `Write` since it must mask. `Release` returns the pooled storage once every holder has let go; queues and batches take their own reference while they hold the message, and releasing is optional.
-
-For sending without blocking on a slow peer, `q := c.NewQueue(limit)` gives an asynchronous queue: `q.Send(op, p)` encodes and returns, `q.SendPrepared(p)` queues shared bytes by reference, and a goroutine that runs only while the queue is nonempty writes the accumulated frames in one write. The limit is a high-water mark: an empty queue accepts any message, and one that would push a nonempty queue past `limit` bytes gets `ErrQueueFull` rather than blocking; the first write error is sticky in `q.Err()`. Once a connection has a queue, `Write` and the other synchronous sends join it in submission order and return when their frames have been written, so the two styles mix freely and compressed streams stay in order. A broadcast is then `Prepare` once and `SendPrepared` on every recipient's queue; `examples/broadcast` is a complete hub built this way. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+Both return the raw connection; the caller keeps it for deadlines and closing. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
 
 ## Development
 
