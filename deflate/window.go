@@ -38,29 +38,38 @@ func (w *Window) Reset() {
 	w.gen++
 }
 
+// remember appends p, keeping at least the last size bytes. The buffer holds
+// up to twice the window and is compacted only when full, so the shift that
+// keeps history contiguous costs one byte per byte appended, amortized,
+// rather than a whole-window move per message.
 func (w *Window) remember(p []byte) {
 	if len(p) == 0 {
 		return
 	}
 	w.gen++
 	size := w.size()
-	if cap(w.buf) == 0 {
-		w.buf = make([]byte, 0, size)
-	}
 	if len(p) >= size {
 		w.buf = append(w.buf[:0], p[len(p)-size:]...)
 		return
 	}
-	if n := len(w.buf) + len(p) - size; n > 0 {
-		w.buf = w.buf[:copy(w.buf, w.buf[n:])]
+	if cap(w.buf) < 2*size {
+		w.buf = append(make([]byte, 0, 2*size), w.dict()...)
+	}
+	if len(w.buf)+len(p) > cap(w.buf) {
+		// Compact to the most recent bytes that, with p, still fill the window.
+		keep := size - len(p)
+		w.buf = w.buf[:copy(w.buf, w.buf[len(w.buf)-keep:])]
 	}
 	w.buf = append(w.buf, p...)
 }
 
-// dict returns the window content, or nil for a nil window.
+// dict returns the window's history, at most size bytes, or nil for a nil window.
 func (w *Window) dict() []byte {
 	if w == nil {
 		return nil
+	}
+	if n := len(w.buf) - w.size(); n > 0 {
+		return w.buf[n:]
 	}
 	return w.buf
 }

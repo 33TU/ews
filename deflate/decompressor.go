@@ -164,10 +164,10 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 // after it.
 func (d *Decompressor) dict(n int) []byte {
 	if d.window != nil {
-		return d.window.buf
+		return d.window.dict()
 	}
 	if d.streaming {
-		return d.scratch.buf
+		return d.scratch.dict()
 	}
 	out := d.output[:len(d.output)+n]
 	return out[max(0, len(out)-windowSize):]
