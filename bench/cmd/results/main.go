@@ -177,4 +177,5 @@ const reading = `## Reading the numbers
 - With hundreds of connections and 256 KiB messages both libraries are bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
 - gws's ` + "`ReadLoop`" + ` and ` + "`ReadMessage`" + ` share the whole frame path and measure the same within noise.
 - coder/websocket allocates on every message and, with context takeover, resets a pooled flate writer with the 32 KB history per message, which is the priming cost ews avoids by keeping a compressor attached.
+- coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
 `
