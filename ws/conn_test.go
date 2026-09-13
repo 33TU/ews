@@ -960,6 +960,29 @@ func TestCompressionIdle(t *testing.T) {
 	wait()
 }
 
+// TestCompressionShared re-primes a pooled compressor from the window on every
+// message and must stay decodable by a peer keeping its own history.
+func TestCompressionShared(t *testing.T) {
+	sc := &handshake.Compression{Level: flate.BestSpeed, SendContextTakeover: true}
+	cc := &handshake.Compression{Level: flate.BestSpeed, ReceiveContextTakeover: true}
+	server, client := pair(t, ws.Config{Compression: sc, CompressionShared: true}, ws.Config{Compression: cc})
+	payload := bytes.Repeat([]byte("shared compressor, private window "), 200)
+	wait := run(t, func() error {
+		for i := 0; i < 5; i++ {
+			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, payload) {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+		}
+		return nil
+	})
+	for i := 0; i < 5; i++ {
+		if err := server.Write(codec.Text, payload); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wait()
+}
+
 func TestNextMessageDiscardsCompressed(t *testing.T) {
 	server, client := compressionPair(t, true, true, 0)
 	wait := run(t, func() error {

@@ -13,9 +13,11 @@ import (
 // Context takeover state is a 32 KB window per direction on the connection.
 // Decompressors are always shared across connections. Compressors are shared
 // too, except that a connection with send takeover keeps one attached so its
-// messages continue one stream instead of re-priming, which costs about as
-// much as compressing 32 KB; Config.CompressionIdle bounds how long an idle
-// connection holds it.
+// messages continue one stream instead of re-priming from the window on every
+// message. Attached is faster per message; shared is far smaller per
+// connection and wins once connections outnumber what the cache can hold.
+// Config.CompressionShared picks, and Config.CompressionIdle bounds how long
+// an idle attached connection holds its compressor.
 var (
 	compressorPools  [12]sync.Pool // Indexed by flate level + 2.
 	decompressorPool sync.Pool
@@ -43,7 +45,7 @@ func (c *Conn) compressorFor() (comp *deflate.Compressor, shared bool) {
 		return c.compressor, false
 	}
 	comp = getCompressor(c.compression.Level)
-	if c.sendWindow == nil {
+	if c.sendWindow == nil || c.shared {
 		return comp, true
 	}
 	c.compressor = comp

@@ -250,7 +250,14 @@ nc.Close()
    per flate level. Priming an encoder from a window costs about as much as
    compressing 32 KB, so a connection with send takeover keeps a compressor
    attached and continues its stream, about 800 KB, and `CompressionIdle`
-   releases it after idle time with one re-priming on the next write. A
+   releases it after idle time with one re-priming on the next write.
+   `CompressionShared` never attaches: measured on a 20-thread machine with
+   a 24 MB cache, attached is 16 to 30 percent faster per message up to
+   about a thousand busy connections, and shared is 7 to 37 percent faster
+   at 2048, where cache misses on attached state outweigh the priming. No
+   automatic cap worked, since partial attachment gave no middle ground and
+   a cap needs a release path the API cannot guarantee, so the choice is
+   explicit. A
    pooled decompressor stays attached until the next read so borrowed output
    holds; its per-message dictionary copy is inherent to klauspost's reader.
    Offers asking this server for a window under 32 KB are declined and run

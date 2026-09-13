@@ -36,13 +36,18 @@ type Config struct {
 	MaxMessageSize int
 	// Compression holds negotiated permessage-deflate parameters, or nil.
 	Compression *handshake.Compression
-	// CompressionIdle releases a connection's compressor to the shared pool
-	// after this long without a compressed write. With send context takeover
-	// a compressor stays attached so consecutive messages continue its stream,
-	// which costs about 800 KB per connection; releasing it keeps only the
-	// 32 KB history window, and the next write re-primes once. Zero never
-	// releases. Ignored without send context takeover, where compressors are
-	// always shared.
+	// CompressionShared borrows a compressor from the shared pool for every
+	// compressed write instead of keeping one attached to the connection.
+	// With send context takeover an attached compressor continues one
+	// stream and is the fastest per message, but holds about 800 KB per
+	// connection; a shared one is primed from the 32 KB window on each
+	// message and costs more CPU per message but almost no memory, which
+	// wins once thousands of connections compete for cache. Without send
+	// context takeover compressors are always shared.
+	CompressionShared bool
+	// CompressionIdle releases an attached compressor to the shared pool
+	// after this long without a compressed write, keeping only the window;
+	// the next write re-primes once. Zero never releases.
 	CompressionIdle time.Duration
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler
@@ -61,6 +66,7 @@ type Conn struct {
 	vectored    bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
 	limit       int
 	compression *handshake.Compression
+	shared      bool // Never attach a compressor.
 
 	rx        proto.Receiver
 	buf       []byte  // Transport read buffer.
@@ -135,6 +141,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 		c.idleTimer.Stop()
 	}
 	c.idle = cfg.CompressionIdle
+	c.shared = cfg.CompressionShared
 	c.sendWindow = window(c.sendWindow, cfg.Compression != nil && cfg.Compression.SendContextTakeover)
 	c.wmu.Unlock()
 	return nil
