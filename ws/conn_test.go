@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/33TU/ews/codec"
@@ -1110,6 +1111,97 @@ func TestFragmentedSend(t *testing.T) {
 		if err := server.EndMessage(); err != nil {
 			t.Fatal(err)
 		}
+	}
+	wait()
+}
+
+// failingReader returns its content, then an error instead of EOF.
+type failingReader struct {
+	r   io.Reader
+	err error
+}
+
+func (f *failingReader) Read(p []byte) (int, error) {
+	n, err := f.r.Read(p)
+	if err == io.EOF {
+		return n, f.err
+	}
+	return n, err
+}
+
+func TestWriteFrom(t *testing.T) {
+	small := bytes.Repeat([]byte("s"), 1000)
+	large := bytes.Repeat([]byte("L"), 100000)
+
+	// Frame structure through a raw peer: one frame when it fits, else 32 KiB
+	// fragments and an empty final one. iotest.OneByteReader forces ReadFull
+	// to assemble chunks from tiny reads.
+	server, peer := raw(t, ws.Config{})
+	wait := run(t, func() error {
+		h, p := readFrame(t, peer)
+		if !h.Final() || h.Opcode() != codec.Text || !bytes.Equal(p, small) {
+			return fmt.Errorf("small: header %x, %d bytes", h.Bytes(), len(p))
+		}
+		var sizes []int
+		var assembled []byte
+		for {
+			h, p := readFrame(t, peer)
+			sizes = append(sizes, len(p))
+			assembled = append(assembled, p...)
+			if h.Final() {
+				break
+			}
+		}
+		want := []int{32768, 32768, 32768, 100000 - 3*32768, 0}
+		if fmt.Sprint(sizes) != fmt.Sprint(want) || !bytes.Equal(assembled, large) {
+			return fmt.Errorf("large: fragment sizes %v", sizes)
+		}
+		return nil
+	})
+	if n, err := server.WriteFrom(codec.Text, bytes.NewReader(small)); err != nil || n != int64(len(small)) {
+		t.Fatal(n, err)
+	}
+	if n, err := server.WriteFrom(codec.Binary, iotest.OneByteReader(bytes.NewReader(large))); err != nil || n != int64(len(large)) {
+		t.Fatal(n, err)
+	}
+	wait()
+
+	// Compressed, through a real peer.
+	server, client := compressionPair(t, true, true, 0)
+	wait = run(t, func() error {
+		for _, want := range [][]byte{small, large} {
+			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, want) {
+				return fmt.Errorf("compressed: %d bytes, %v", len(p), err)
+			}
+		}
+		return nil
+	})
+	for _, msg := range [][]byte{small, large} {
+		if _, err := server.WriteFrom(codec.Binary, bytes.NewReader(msg)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wait()
+
+	// A reader failure mid-message leaves the message open; the chunk being
+	// read when it failed is not sent. The peer sees one fragment, then the ping.
+	server, peer = raw(t, ws.Config{})
+	wait = run(t, func() error {
+		for i := 0; i < 2; i++ {
+			readFrame(t, peer)
+		}
+		return nil
+	})
+	boom := errors.New("boom")
+	n, err := server.WriteFrom(codec.Binary, &failingReader{bytes.NewReader(large[:50000]), boom})
+	if err != boom || n != 32768 {
+		t.Fatal(n, err)
+	}
+	if err := server.Write(codec.Binary, nil); err != ws.ErrMessageOpen {
+		t.Fatal("message not left open after reader failure")
+	}
+	if err := server.Ping(nil); err != nil {
+		t.Fatal("control frames must still work")
 	}
 	wait()
 }

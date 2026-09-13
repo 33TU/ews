@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"io"
 	"net"
 	"sync"
 
@@ -18,6 +19,59 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 		return c.sendCompressed(op, payload)
 	}
 	return c.send(op, payload)
+}
+
+// fromChunk is the fragment size WriteFrom reads and sends.
+const fromChunk = 32 << 10
+
+var fromPool = sync.Pool{New: func() any { b := make([]byte, fromChunk); return &b }}
+
+// WriteFrom sends r's content as one message and returns the bytes sent.
+// Content that fits one 32 KiB read goes out as a single frame; longer
+// content is fragmented as it is read, so nothing is held in memory beyond
+// one chunk. A read error is returned with the message still open and the
+// chunk being read unsent, since a fragmented message cannot be withdrawn;
+// close the connection in that case.
+func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
+	if op != codec.Text && op != codec.Binary {
+		return 0, ErrProtocol
+	}
+	bp := fromPool.Get().(*[]byte)
+	defer fromPool.Put(bp)
+	buf := *bp
+
+	n, err := io.ReadFull(r, buf)
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return int64(n), c.Write(op, buf[:n])
+	}
+	if err != nil {
+		return 0, err
+	}
+	if err := c.BeginMessage(op); err != nil {
+		return 0, err
+	}
+	var total int64
+	for {
+		if err := c.WriteChunk(buf[:n]); err != nil {
+			return total, err
+		}
+		total += int64(n)
+		n, err = io.ReadFull(r, buf)
+		if err == io.EOF {
+			break
+		}
+		if err == io.ErrUnexpectedEOF {
+			if err := c.WriteChunk(buf[:n]); err != nil {
+				return total, err
+			}
+			total += int64(n)
+			break
+		}
+		if err != nil {
+			return total, err
+		}
+	}
+	return total, c.EndMessage()
 }
 
 // BeginMessage starts a fragmented text or binary message. Each WriteChunk
