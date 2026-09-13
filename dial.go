@@ -81,12 +81,11 @@ func Dial(ctx context.Context, rawURL string, opts DialOptions) (net.Conn, hands
 	if err != nil {
 		return nil, handshake.Result{}, err
 	}
-	// Abort the handshake if ctx ends while it is in progress.
+	// Abort the handshake if ctx ends while it is in progress. The socket
+	// deadline is set only from here, after ctx is done, so a failure caused
+	// by ctx always reports ctx.Err rather than a bare timeout.
 	stop := context.AfterFunc(ctx, func() { conn.SetDeadline(time.Unix(1, 0)) })
 	defer stop()
-	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline)
-	}
 	fail := func(err error) (net.Conn, handshake.Result, error) {
 		conn.Close()
 		if ctx.Err() != nil {
