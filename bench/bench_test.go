@@ -140,6 +140,41 @@ func coderServer(compress bool) *httptest.Server {
 	}))
 }
 
+// coderStreamServer echoes through coder's streaming Reader and Writer with a
+// reusable buffer, its most efficient shape: no message is held whole.
+func coderStreamServer(compress bool) *httptest.Server {
+	mode := websocket.CompressionDisabled
+	if compress {
+		mode = websocket.CompressionContextTakeover
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode, CompressionThreshold: 1})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		c.SetReadLimit(64 << 20)
+		ctx := r.Context()
+		buf := make([]byte, 32<<10)
+		for {
+			typ, rd, err := c.Reader(ctx)
+			if err != nil {
+				return
+			}
+			wr, err := c.Writer(ctx, typ)
+			if err != nil {
+				return
+			}
+			if _, err := io.CopyBuffer(wr, rd, buf); err != nil {
+				return
+			}
+			if err := wr.Close(); err != nil {
+				return
+			}
+		}
+	}))
+}
+
 // ---- client (ews for all servers) -----------------------------------------
 
 func dial(tb testing.TB, url string, compress bool) *ws.Conn {
@@ -211,7 +246,7 @@ func BenchmarkEcho(b *testing.B) {
 		name         string
 		start        func(bool) *httptest.Server
 		compressOnly bool // Identical to another server without compression.
-	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-pull", gwsPullServer, false}, {"coder", coderServer, false}}
+	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-pull", gwsPullServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {
