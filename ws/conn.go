@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"cmp"
 	"io"
 	"sync"
 	"syscall"
@@ -66,7 +67,7 @@ type Conn struct {
 	// UserData holds application state. Concurrent access is the caller's responsibility.
 	UserData any
 
-	// Transport and configuration, fixed by Reset.
+	// Transport and configuration, fixed at construction.
 	rw           io.ReadWriter
 	role         Role
 	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
@@ -95,92 +96,43 @@ type Conn struct {
 
 // NewConn wraps an upgraded transport.
 func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
-	c := new(Conn)
-	if err := c.Reset(rw, cfg); err != nil {
-		return nil, err
+	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
+		return nil, ErrInvalidConfig
+	}
+	comp := cfg.Compression
+	if comp != nil && (comp.Level < -2 || comp.Level > 9 || comp.MinSize < 0 || !validBits(comp.SendWindowBits) || !validBits(comp.ReceiveWindowBits)) {
+		return nil, ErrInvalidConfig
+	}
+	c := &Conn{
+		ControlHandler: cfg.ControlHandler,
+		rw:             rw,
+		role:           cfg.Role,
+		limit:          cmp.Or(cfg.MaxMessageSize, DefaultMaxMessageSize),
+		fragmentSize:   cmp.Or(cfg.FragmentSize, DefaultFragmentSize),
+		buf:            make([]byte, cmp.Or(cfg.ReadBufferSize, DefaultReadBufferSize)),
+	}
+	_, c.vectored = rw.(interface {
+		SyscallConn() (syscall.RawConn, error)
+	})
+	c.rx.Init(proto.Role(cfg.Role), comp != nil)
+	c.tx.Init(proto.Role(cfg.Role))
+	if comp != nil {
+		c.comp.config = comp
+		c.comp.minSize = cmp.Or(comp.MinSize, DefaultMinSize)
+		c.comp.shared = cfg.CompressionShared
+		c.comp.window = window(comp.SendContextTakeover, comp.SendWindowBits)
+		c.decomp.window = window(comp.ReceiveContextTakeover, comp.ReceiveWindowBits)
 	}
 	return c, nil
 }
 
-// Reset prepares c for a new transport, retaining storage.
-// The previous transport must no longer be in use by any goroutine.
-func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
-	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
-		return ErrInvalidConfig
-	}
-	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || !validBits(c.SendWindowBits) || !validBits(c.ReceiveWindowBits)) {
-		return ErrInvalidConfig
-	}
-	size := cfg.ReadBufferSize
-	if size == 0 {
-		size = DefaultReadBufferSize
-	}
-	c.limit = cfg.MaxMessageSize
-	if c.limit == 0 {
-		c.limit = DefaultMaxMessageSize
-	}
-	c.fragmentSize = cfg.FragmentSize
-	if c.fragmentSize == 0 {
-		c.fragmentSize = DefaultFragmentSize
-	}
-	if cap(c.buf) < size {
-		c.buf = make([]byte, size)
-	}
-	c.buf = c.buf[:size]
-
-	c.rw = rw
-	c.role = cfg.Role
-	_, c.vectored = rw.(interface {
-		SyscallConn() (syscall.RawConn, error)
-	})
-	c.ControlHandler = cfg.ControlHandler
-	c.comp.config = cfg.Compression
-	if cfg.Compression != nil {
-		c.comp.minSize = cfg.Compression.MinSize
-		if c.comp.minSize == 0 {
-			c.comp.minSize = DefaultMinSize
-		}
-	}
-	c.rx.Init(proto.Role(cfg.Role), cfg.Compression != nil)
-	c.releaseMsg()
-	c.inMessage, c.decomp.streaming = false, false
-	c.readErr, c.decomp.srcErr = nil, nil
-	c.releaseDecompressor()
-	c.decomp.window = window(c.decomp.window, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover, bits(cfg.Compression, false))
-
-	c.wmu.Lock()
-	c.tx.Init(proto.Role(cfg.Role))
-	c.frag.op, c.frag.heldCompressor = 0, false
-	c.queue = nil
-	c.releaseCompressor()
-	c.comp.shared = cfg.CompressionShared
-	c.comp.window = window(c.comp.window, cfg.Compression != nil && cfg.Compression.SendContextTakeover, bits(cfg.Compression, true))
-	c.wmu.Unlock()
-	return nil
-}
-
-// window returns a cleared history window of the negotiated size when wanted,
-// reusing w, else nil.
-func window(w *deflate.Window, wanted bool, bits int) *deflate.Window {
-	if !wanted {
+// window returns a history window of the negotiated size when takeover was
+// agreed for that direction, else nil.
+func window(takeover bool, bits int) *deflate.Window {
+	if !takeover {
 		return nil
 	}
-	if w == nil {
-		w = new(deflate.Window)
-	}
-	w.Reset()
-	w.Bits = bits
-	return w
-}
-
-func bits(c *handshake.Compression, send bool) int {
-	if c == nil {
-		return 0
-	}
-	if send {
-		return c.SendWindowBits
-	}
-	return c.ReceiveWindowBits
+	return &deflate.Window{Bits: bits}
 }
 
 func validBits(b int) bool { return b == 0 || b >= 8 && b <= 15 }

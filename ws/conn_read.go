@@ -150,7 +150,7 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 }
 
 // ReadMessage returns the next complete text or binary message. The payload is
-// borrowed until the next read call or Reset. Messages larger than
+// borrowed until the next read call. Messages larger than
 // Config.MaxMessageSize, before or after decompression, fail with close code
 // 1009; text that is not valid UTF-8 and undecodable compressed data fail
 // with 1007.

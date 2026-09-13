@@ -58,7 +58,6 @@ type Conn struct {
 }
 
 func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error)
-func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error // reuse storage on a new transport
 
 // NextMessage returns the opcode of the next text or binary message.
 // Control frames are dispatched on the way. Any undrained payload of the
@@ -72,7 +71,7 @@ func (c *Conn) NextMessage() (codec.Opcode, error)
 func (c *Conn) Read(b []byte) (int, error)
 
 // ReadMessage returns the next complete message. The payload is borrowed until
-// the next read call or Reset. Messages over MaxMessageSize fail with 1009;
+// the next read call. Messages over MaxMessageSize fail with 1009;
 // text that is not valid UTF-8 fails with 1007. Read delivers text unvalidated.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error)
 
@@ -253,7 +252,7 @@ nc.Close()
 - Control handlers run on the read goroutine and may write.
 - A shared `ControlHandler` must tolerate concurrent calls from different
   connections.
-- `ReadMessage` payloads are borrowed until the next read or `Reset`; copy
+- `ReadMessage` payloads are borrowed until the next read; copy
   before handing them to another goroutine.
 
 ## Roadmap

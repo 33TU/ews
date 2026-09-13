@@ -601,52 +601,6 @@ func TestInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestReset(t *testing.T) {
-	server, client := pair(t, ws.Config{}, ws.Config{})
-	wait := run(t, func() error {
-		if err := client.Close(1000, ""); err != nil {
-			return err
-		}
-		_, _, err := client.ReadMessage()
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) {
-			return err
-		}
-		return nil
-	})
-	if _, _, err := server.ReadMessage(); err == nil {
-		t.Fatal("expected close")
-	}
-	wait()
-	sc, cc := net.Pipe()
-	defer sc.Close()
-	defer cc.Close()
-	if err := server.Reset(sc, ws.Config{Role: ws.Server}); err != nil {
-		t.Fatal(err)
-	}
-	client2, err := ws.NewConn(cc, ws.Config{Role: ws.Client})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wait = run(t, func() error {
-		if err := client2.Write(codec.Text, []byte("again")); err != nil {
-			return err
-		}
-		_, p, err := client2.ReadMessage()
-		if err != nil || len(p) != 0 {
-			return fmt.Errorf("client2 read %q, %v", p, err)
-		}
-		return nil
-	})
-	if _, p, err := server.ReadMessage(); err != nil || string(p) != "again" {
-		t.Fatal(p, err)
-	}
-	if err := server.Write(codec.Text, nil); err != nil {
-		t.Fatal("Reset did not clear close state:", err)
-	}
-	wait()
-}
-
 // replay serves the same wire bytes forever, like a socket that never idles.
 type replay struct {
 	wire []byte
