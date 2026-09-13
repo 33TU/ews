@@ -3,6 +3,7 @@ package ws
 import (
 	"io"
 	"slices"
+	"sync"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/internal/proto"
@@ -20,6 +21,7 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 		return 0, err
 	}
 	c.releaseDecompressor()
+	c.releaseMsg()
 	if err := c.nextFrame(); err != nil {
 		return 0, err
 	}
@@ -82,20 +84,54 @@ func (c *Conn) Read(b []byte) (int, error) {
 // readInto reads up to n bytes of the open frame's payload from the transport
 // into the message buffer's spare capacity, bypassing the read buffer. The
 // size budget has already admitted n. The receiver has no buffered input.
-func (c *Conn) readInto(n int) error {
-	c.msg = slices.Grow(c.msg, n)
-	spare := c.msg[len(c.msg) : len(c.msg)+n]
+func (c *Conn) readInto(msg []byte, n int) ([]byte, error) {
+	msg = c.growMsg(msg, n)
+	spare := msg[len(msg) : len(msg)+n]
 	got, err := c.read(spare)
 	if err != nil {
-		return err
+		return msg, err
 	}
 	c.rx.Feed(spare[:got])
 	chunk, _, err := c.rx.PayloadN(got) // Unmasks in place; chunk aliases spare.
 	if err != nil {
-		return c.fail(err)
+		return msg, c.fail(err)
 	}
-	c.msg = c.msg[:len(c.msg)+len(chunk)]
-	return nil
+	return msg[:len(msg)+len(chunk)], nil
+}
+
+// Message buffers are pooled across connections and held only until the next
+// read, so idle connections keep no assembly storage.
+var msgPool sync.Pool
+
+type msgBuf struct{ b []byte }
+
+func (c *Conn) growMsg(msg []byte, n int) []byte {
+	if c.msg == nil {
+		if m, ok := msgPool.Get().(*msgBuf); ok {
+			c.msg = m
+		} else {
+			c.msg = new(msgBuf)
+		}
+		msg = c.msg.b[:0]
+	}
+	msg = slices.Grow(msg, n)
+	c.msg.b = msg
+	return msg
+}
+
+func (c *Conn) appendMsg(msg, chunk []byte) []byte {
+	msg = c.growMsg(msg, len(chunk))
+	msg = append(msg, chunk...)
+	c.msg.b = msg
+	return msg
+}
+
+func (c *Conn) releaseMsg() {
+	if c.msg != nil {
+		c.msg.b = c.msg.b[:0]
+		msgPool.Put(c.msg)
+		c.msg = nil
+	}
 }
 
 // readDirect reads frame payload from the transport into b, bypassing the read
@@ -123,9 +159,9 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	c.msg = c.msg[:0]
+	msg := []byte(nil)
 	for {
-		if c.rx.Header().PayloadLen() > uint64(c.limit-len(c.msg)) {
+		if c.rx.Header().PayloadLen() > uint64(c.limit-len(msg)) {
 			return 0, nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
 		}
 		for {
@@ -133,11 +169,11 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			if err != nil {
 				return 0, nil, c.fail(err)
 			}
-			if done && len(c.msg) == 0 && !c.rx.MessageOpen() {
+			if done && len(msg) == 0 && !c.rx.MessageOpen() {
 				return c.finishMessage(op, chunk) // Single-frame message in one chunk: borrowed.
 			}
 			if len(chunk) != 0 || done {
-				c.msg = append(c.msg, chunk...)
+				msg = c.appendMsg(msg, chunk)
 				if done {
 					break
 				}
@@ -146,7 +182,8 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			// Frame open, nothing buffered. A remainder at least as large as
 			// the read buffer goes straight into the message buffer.
 			if remaining := c.rx.Remaining(); remaining >= uint64(len(c.buf)) {
-				if err := c.readInto(int(remaining)); err != nil {
+				var err error
+				if msg, err = c.readInto(msg, int(remaining)); err != nil {
 					return 0, nil, err
 				}
 				continue
@@ -156,7 +193,7 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			}
 		}
 		if !c.rx.MessageOpen() {
-			return c.finishMessage(op, c.msg)
+			return c.finishMessage(op, msg)
 		}
 		if err := c.nextFrame(); err != nil {
 			return 0, nil, err

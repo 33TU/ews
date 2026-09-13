@@ -61,11 +61,11 @@ type Conn struct {
 	compression *handshake.Compression
 
 	rx        proto.Receiver
-	buf       []byte // Transport read buffer.
-	msg       []byte // ReadMessage assembly.
-	inMessage bool   // NextMessage returned and Read has not reached io.EOF.
-	readErr   error  // Terminal read state.
-	srcErr    error  // Error raised while feeding the inflater.
+	buf       []byte  // Transport read buffer.
+	msg       *msgBuf // ReadMessage assembly, pooled; held until the next read.
+	inMessage bool    // NextMessage returned and Read has not reached io.EOF.
+	readErr   error   // Terminal read state.
+	srcErr    error   // Error raised while feeding the inflater.
 
 	decompressor *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
 	recvWindow   *deflate.Window       // Receive-direction history when takeover is negotiated.
@@ -117,7 +117,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.ControlHandler = cfg.ControlHandler
 	c.compression = cfg.Compression
 	c.rx.Init(proto.Role(cfg.Role), cfg.Compression != nil)
-	c.msg = c.msg[:0]
+	c.releaseMsg()
 	c.inMessage, c.inflating = false, false
 	c.readErr, c.srcErr = nil, nil
 	c.releaseDecompressor()

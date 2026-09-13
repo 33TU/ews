@@ -116,7 +116,11 @@ separately: server data frames leave with zero copies.
 
 ## Read path
 
-One fixed read buffer plus, for `ReadMessage`, one growable message buffer.
+One fixed read buffer per connection plus, for `ReadMessage`, a message buffer
+taken from a shared pool when assembly is needed and returned at the next
+read, so an idle connection holds only its read buffer. That keeps the
+working set small under many connections, which showed up as a measurable
+gap at 16 KiB with 512 or more connections before pooling.
 
 ```go
 func (c *Conn) fill() error {
