@@ -160,7 +160,7 @@ const setup = `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all dri
 - ` + "`gws-pull`" + `: gws's ` + "`ReadMessage`" + ` in a loop, the like-for-like shape against ews.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
 
-Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits, which ews does not implement. coder/websocket uses its fixed level and pooled flate readers and writers. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits, which ews does not implement. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
 
 Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 

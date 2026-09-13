@@ -114,7 +114,8 @@ func coderServer(compress bool) *httptest.Server {
 		mode = websocket.CompressionContextTakeover
 	}
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode})
+		// Threshold 1 compresses every message, as the other servers do.
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode, CompressionThreshold: 1})
 		if err != nil {
 			return
 		}
