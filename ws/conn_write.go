@@ -22,12 +22,11 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	comp := c.compressor
-	if comp == nil {
-		comp = getCompressor(c.compression.Level)
-		defer putCompressor(c.compression.Level, comp) // After the write: body borrows its output.
+	comp, shared := c.compressorFor()
+	if shared {
+		defer putCompressor(c.compression.Level, comp) // After the write: the body borrows its output.
 	}
-	compressed, err := comp.Compress(payload)
+	compressed, err := comp.Compress(payload, c.sendWindow)
 	if err != nil {
 		return err
 	}
@@ -35,7 +34,11 @@ func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	return c.write(header, body)
+	if err := c.write(header, body); err != nil {
+		return err
+	}
+	c.noteCompressed()
+	return nil
 }
 
 // Ping sends a ping with at most 125 payload bytes.

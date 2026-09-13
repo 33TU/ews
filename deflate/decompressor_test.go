@@ -72,7 +72,7 @@ func TestStreaming(t *testing.T) {
 		for _, read := range []int{1, 100, 64 << 10} {
 			t.Run(fmt.Sprintf("chunk=%d/read=%d", chunk, read), func(t *testing.T) {
 				var d deflate.Decompressor
-				if err := d.Begin(&chunks{wire: compressed, size: chunk}); err != nil {
+				if err := d.Begin(&chunks{wire: compressed, size: chunk}, nil); err != nil {
 					t.Fatal(err)
 				}
 				got, err := drain(t, &d, read)
@@ -83,7 +83,7 @@ func TestStreaming(t *testing.T) {
 					t.Fatal("Read outside a message must fail")
 				}
 				// The slice path still works on the same decompressor.
-				if got, err := d.Decompress(compressed, len(message)); err != nil || !bytes.Equal(got, message) {
+				if got, err := d.Decompress(compressed, len(message), nil); err != nil || !bytes.Equal(got, message) {
 					t.Fatal(err)
 				}
 			})
@@ -104,7 +104,7 @@ func TestStreamingFinalBlocks(t *testing.T) {
 	}
 	compressed.WriteByte(0)
 	var d deflate.Decompressor
-	if err := d.Begin(&chunks{wire: compressed.Bytes(), size: 100}); err != nil {
+	if err := d.Begin(&chunks{wire: compressed.Bytes(), size: 100}, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := drain(t, &d, 777)
@@ -118,20 +118,20 @@ func TestStreamingTakeover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.ContextTakeover = true
-	d := deflate.Decompressor{ContextTakeover: true}
+	var d deflate.Decompressor
+	var cw, dw deflate.Window
 	message := bytes.Repeat([]byte("history carries between streamed messages "), 100)
 	for i := range 5 {
-		compressed := bytes.Clone(compress(t, c, message))
+		compressed := bytes.Clone(compressWith(t, c, message, &cw))
 		// Alternate streaming and slice reads; history must be shared.
 		if i%2 == 0 {
-			if err := d.Begin(&chunks{wire: compressed, size: 50}); err != nil {
+			if err := d.Begin(&chunks{wire: compressed, size: 50}, &dw); err != nil {
 				t.Fatal(err)
 			}
 			if got, err := drain(t, &d, 1000); err != nil || !bytes.Equal(got, message) {
 				t.Fatalf("message %d: %v", i, err)
 			}
-		} else if got, err := d.Decompress(compressed, len(message)); err != nil || !bytes.Equal(got, message) {
+		} else if got, err := d.Decompress(compressed, len(message), &dw); err != nil || !bytes.Equal(got, message) {
 			t.Fatalf("message %d: %v", i, err)
 		}
 	}
@@ -142,18 +142,18 @@ func TestStreamingErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.ContextTakeover = true
 	message := bytes.Repeat([]byte("abc"), 1000)
-	first := bytes.Clone(compress(t, c, message))
-	second := bytes.Clone(compress(t, c, message))
+	var cw, dw deflate.Window
+	first := bytes.Clone(compressWith(t, c, message, &cw))
+	second := bytes.Clone(compressWith(t, c, message, &cw))
 
-	// A source error is returned as is and clears history.
-	d := deflate.Decompressor{ContextTakeover: true}
-	if _, err := d.Decompress(first, len(message)); err != nil {
+	// A source error is returned as is and clears the window.
+	var d deflate.Decompressor
+	if _, err := d.Decompress(first, len(message), &dw); err != nil {
 		t.Fatal(err)
 	}
 	boom := errors.New("boom")
-	if err := d.Begin(&chunks{wire: second, size: 10, err: boom, failAfter: 3}); err != nil {
+	if err := d.Begin(&chunks{wire: second, size: 10, err: boom, failAfter: 3}, &dw); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := drain(t, &d, 100); err != boom {
@@ -162,15 +162,15 @@ func TestStreamingErrors(t *testing.T) {
 	if _, err := d.Read(make([]byte, 1)); err != deflate.ErrNoMessage {
 		t.Fatal("message still active after error")
 	}
-	if _, err := d.Decompress(second, len(message)); err == nil {
-		t.Fatal("history survived a failed message")
+	if _, err := d.Decompress(second, len(message), &dw); err == nil {
+		t.Fatal("window survived a failed message")
 	}
 
 	// Corrupt data fails the same way.
 	d.Reset()
 	corrupt := bytes.Clone(first)
 	corrupt[len(corrupt)/2] ^= 0xff
-	if err := d.Begin(&chunks{wire: corrupt, size: 1 << 20}); err != nil {
+	if err := d.Begin(&chunks{wire: corrupt, size: 1 << 20}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := drain(t, &d, 100); err == nil {
@@ -179,9 +179,9 @@ func TestStreamingErrors(t *testing.T) {
 
 	// Begin during a message abandons it.
 	d.Reset()
-	d.Begin(&chunks{wire: first, size: 10})
+	d.Begin(&chunks{wire: first, size: 10}, nil)
 	d.Read(make([]byte, 10))
-	if err := d.Begin(&chunks{wire: first, size: 10}); err != nil {
+	if err := d.Begin(&chunks{wire: first, size: 10}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := drain(t, &d, 100); err != nil || !bytes.Equal(got, message) {
@@ -190,8 +190,12 @@ func TestStreamingErrors(t *testing.T) {
 }
 
 func compress(t *testing.T, c *deflate.Compressor, message []byte) []byte {
+	return compressWith(t, c, message, nil)
+}
+
+func compressWith(t *testing.T, c *deflate.Compressor, message []byte, w *deflate.Window) []byte {
 	t.Helper()
-	b, err := c.Compress(message)
+	b, err := c.Compress(message, w)
 	if err != nil {
 		t.Fatal(err)
 	}

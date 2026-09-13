@@ -113,7 +113,7 @@ compressor, err := deflate.NewCompressor(flate.BestSpeed)
 if err != nil {
     return err
 }
-compressed, err := compressor.Compress([]byte("Hello"))
+compressed, err := compressor.Compress([]byte("Hello"), nil)
 if err != nil {
     return err
 }
@@ -124,7 +124,7 @@ if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
 ```
 
-With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams. Connections without context takeover share pooled compressors and decompressors; with takeover each connection keeps its own.
+With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed; set `Config.CompressionIdle` to release it after that long without a write and keep only the 32 KB window while idle.
 
 `EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
 
@@ -132,23 +132,24 @@ On receipt, use `header.RSV1()` on the first data frame to identify a compressed
 
 ```go
 var decompressor deflate.Decompressor // Reuse across messages.
-message, err := decompressor.Decompress(compressed, 8<<20) // Maximum 8 MiB output.
+message, err := decompressor.Decompress(compressed, 8<<20, nil) // Maximum 8 MiB output.
 if err != nil {
     return err
 }
 handle(message)
 ```
 
-Both helpers return borrowed output valid until their next call or `Reset()`. Storage is reused in either mode. The frame decoder continues to expose raw payloads.
+Both helpers return borrowed output valid until their next call or `Reset()`, carry no state between messages, and can serve many connections in turn. The frame decoder continues to expose raw payloads.
 
-To retain history between compressed messages, configure each helper before use to match the negotiated mode for its direction:
+Context takeover state is a `deflate.Window`, the last 32 KB of payload in one direction. Give each direction of a connection its own window and pass it to every call for that direction; nil means no takeover:
 
 ```go
-compressor.ContextTakeover = true
-decompressor := deflate.Decompressor{ContextTakeover: true}
+var send, recv deflate.Window // One pair per connection.
+compressed, err := compressor.Compress(payload, &send)
+message, err := decompressor.Decompress(compressed, 8<<20, &recv)
 ```
 
-With takeover enabled, keep each helper dedicated to one connection direction and process compressed messages in order. Uncompressed messages bypass the helpers and don't change history. Call `Reset()` before reusing a helper for a new connection or changing its mode; this retains storage and configuration. Decode errors clear history, so the existing takeover stream cannot simply continue after an error.
+Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches. Streaming decompression is available through `Begin` and `Read` over a `ChunkSource`.
 
 ## Handshake and upgrade
 

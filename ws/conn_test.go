@@ -532,6 +532,7 @@ func TestInvalidConfig(t *testing.T) {
 		{MaxMessageSize: -1},
 		{Compression: &handshake.Compression{Level: 10}},
 		{Compression: &handshake.Compression{MinSize: -1}},
+		{CompressionIdle: -1},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
 			t.Fatalf("%+v accepted", cfg)
@@ -771,7 +772,7 @@ func TestCompressedWire(t *testing.T) {
 			return fmt.Errorf("expected compressed text frame, got %x", h.Bytes())
 		}
 		var d deflate.Decompressor
-		out, err := d.Decompress(p, len(payload))
+		out, err := d.Decompress(p, len(payload), nil)
 		if err != nil || !bytes.Equal(out, payload) {
 			return fmt.Errorf("wire payload: %v", err)
 		}
@@ -784,7 +785,7 @@ func TestCompressedWire(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		compressed, err := c.Compress(payload)
+		compressed, err := c.Compress(payload, nil)
 		if err != nil {
 			return err
 		}
@@ -874,6 +875,32 @@ func TestCompressedErrors(t *testing.T) {
 	var we *ws.Error
 	if !errors.As(err, &we) || we.Code != 1009 {
 		t.Fatal(err)
+	}
+	wait()
+}
+
+// TestCompressionIdle releases the attached compressor after idle time and
+// re-primes it from the window on the next write.
+func TestCompressionIdle(t *testing.T) {
+	sc := &handshake.Compression{Level: flate.BestSpeed, SendContextTakeover: true}
+	cc := &handshake.Compression{Level: flate.BestSpeed, ReceiveContextTakeover: true}
+	server, client := pair(t, ws.Config{Compression: sc, CompressionIdle: 20 * time.Millisecond}, ws.Config{Compression: cc})
+	payload := bytes.Repeat([]byte("idle release keeps the window "), 300)
+	wait := run(t, func() error {
+		for i := 0; i < 4; i++ {
+			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, payload) {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+		}
+		return nil
+	})
+	for i := 0; i < 4; i++ {
+		if err := server.Write(codec.Text, payload); err != nil {
+			t.Fatal(err)
+		}
+		if i == 1 {
+			time.Sleep(80 * time.Millisecond) // Past the idle release.
+		}
 	}
 	wait()
 }

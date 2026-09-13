@@ -26,16 +26,16 @@ type resetReader interface {
 	flate.Resetter
 }
 
-// Decompressor decompresses messages using reusable storage.
+// Decompressor decompresses messages using reusable storage. It carries no
+// state between messages, so one decompressor can serve many connections in
+// turn; context takeover lives in the Window passed to each call.
 // The zero value is ready to use.
 type Decompressor struct {
-	// ContextTakeover retains history between messages. Set before use or after Reset.
-	ContextTakeover bool
-
 	reader    resetReader
 	input     messageReader
-	output    []byte // Decompress result; also the reset dictionary in slice mode.
-	history   []byte // Sliding window: across messages with takeover, within one when streaming.
+	output    []byte  // Decompress result; also the reset dictionary in slice mode.
+	window    *Window // The current message's direction history, or nil.
+	scratch   Window  // Within-message history for streaming without a window.
 	streaming bool
 	active    bool
 	done      bool // Last byte delivered; the next Read returns io.EOF.
@@ -43,12 +43,14 @@ type Decompressor struct {
 
 // Decompress borrows its output until the next call. maxSize must be nonnegative.
 // It returns ErrMessageTooLarge if the decompressed size exceeds maxSize.
-// Decode errors clear history; reset both peers before continuing with takeover.
-func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
+// With a window, the message continues that direction's history and the
+// window is updated; with nil, it is decompressed on its own. Any error
+// clears the window.
+func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byte, error) {
 	if maxSize < 0 {
 		return nil, ErrInvalidLimit
 	}
-	if err := d.begin(nil, payload); err != nil {
+	if err := d.begin(nil, payload, w); err != nil {
 		return nil, err
 	}
 	d.output = d.output[:0]
@@ -74,14 +76,15 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int) ([]byte, error) {
 }
 
 // Begin starts decompressing a message streamed from src; drain it with Read.
-// A message still in progress is abandoned, which clears history.
-func (d *Decompressor) Begin(src ChunkSource) error {
-	return d.begin(src, nil)
+// The window works as for Decompress. A message still in progress is
+// abandoned, which clears its window.
+func (d *Decompressor) Begin(src ChunkSource, w *Window) error {
+	return d.begin(src, nil, w)
 }
 
 // Read decompresses into p and returns io.EOF, with no data, after the last
 // byte of the message. Output is never returned together with io.EOF.
-// Any other error ends the message and clears history.
+// Any other error ends the message and clears its window.
 func (d *Decompressor) Read(p []byte) (int, error) {
 	if !d.active {
 		return 0, ErrNoMessage
@@ -92,8 +95,12 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 	}
 	for {
 		n, err := d.reader.Read(p)
-		if n != 0 && (d.ContextTakeover || d.streaming) {
-			d.remember(p[:n])
+		if n != 0 {
+			if d.window != nil {
+				d.window.remember(p[:n])
+			} else if d.streaming {
+				d.scratch.remember(p[:n])
+			}
 		}
 		if err == io.EOF {
 			if d.input.exhausted() {
@@ -124,42 +131,45 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 	}
 }
 
-// Reset clears message history and output, retaining storage and configuration.
+// Reset abandons any message in progress and clears output, retaining storage.
 func (d *Decompressor) Reset() {
 	d.finish(false)
 	d.output = d.output[:0]
 }
 
-func (d *Decompressor) begin(src ChunkSource, payload []byte) error {
+func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 	if d.active {
 		d.finish(false)
 	}
-	if !d.ContextTakeover {
-		d.history = d.history[:0]
-	}
+	d.window = w
+	d.scratch.Reset()
 	d.input = messageReader{src: src, payload: payload, tail: inflateTail[:], eof: src == nil}
 	d.streaming = src != nil
 	d.active, d.done = true, false
 	if d.reader == nil {
-		d.reader = flate.NewReaderDict(&d.input, d.history).(resetReader)
+		d.reader = flate.NewReaderDict(&d.input, w.dict()).(resetReader)
 		return nil
 	}
-	if err := d.reader.Reset(&d.input, d.history); err != nil {
+	if err := d.reader.Reset(&d.input, w.dict()); err != nil {
 		return d.fail(err)
 	}
 	return nil
 }
 
-// dict is the dictionary for a mid-message reset: the retained history when
-// it is being maintained, otherwise the tail of the output so far. In slice
-// mode Read is only called by Decompress with the spare capacity of d.output,
-// so the n bytes just produced sit directly after it.
+// dict is the dictionary for a mid-message reset: the direction's window when
+// there is one, the within-message history when streaming, otherwise the tail
+// of the output so far. In slice mode Read is only called by Decompress with
+// the spare capacity of d.output, so the n bytes just produced sit directly
+// after it.
 func (d *Decompressor) dict(n int) []byte {
-	if d.ContextTakeover || d.streaming {
-		return d.history
+	if d.window != nil {
+		return d.window.buf
+	}
+	if d.streaming {
+		return d.scratch.buf
 	}
 	out := d.output[:len(d.output)+n]
-	return out[max(0, len(out)-(32<<10)):]
+	return out[max(0, len(out)-windowSize):]
 }
 
 func (d *Decompressor) fail(err error) error {
@@ -167,32 +177,15 @@ func (d *Decompressor) fail(err error) error {
 	return err
 }
 
-// finish ends the current message. Failure discards history, since the
+// finish ends the current message. Failure clears the window, since the
 // takeover stream cannot continue past a corrupt message.
 func (d *Decompressor) finish(ok bool) {
-	if !ok || !d.ContextTakeover {
-		d.history = d.history[:0]
+	if !ok && d.window != nil {
+		d.window.Reset()
 	}
+	d.window = nil
 	d.input = messageReader{}
 	d.active, d.done, d.streaming = false, false, false
-}
-
-func (d *Decompressor) remember(p []byte) {
-	const window = 32 << 10
-	if len(p) == 0 {
-		return
-	}
-	if cap(d.history) == 0 {
-		d.history = make([]byte, 0, window)
-	}
-	if len(p) >= window {
-		d.history = append(d.history[:0], p[len(p)-window:]...)
-		return
-	}
-	if n := len(d.history) + len(p) - window; n > 0 {
-		d.history = d.history[:copy(d.history, d.history[n:])]
-	}
-	d.history = append(d.history, p...)
 }
 
 // Restore the stripped sync-flush tail, then terminate the DEFLATE stream.

@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
@@ -34,6 +35,14 @@ type Config struct {
 	MaxMessageSize int
 	// Compression holds negotiated permessage-deflate parameters, or nil.
 	Compression *handshake.Compression
+	// CompressionIdle releases a connection's compressor to the shared pool
+	// after this long without a compressed write. With send context takeover
+	// a compressor stays attached so consecutive messages continue its stream,
+	// which costs about 800 KB per connection; releasing it keeps only the
+	// 32 KB history window, and the next write re-primes once. Zero never
+	// releases. Ignored without send context takeover, where compressors are
+	// always shared.
+	CompressionIdle time.Duration
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler
 }
@@ -58,15 +67,19 @@ type Conn struct {
 	readErr   error  // Terminal read state.
 	srcErr    error  // Error raised while feeding the inflater.
 
-	decompressor *deflate.Decompressor // Per connection with receive takeover, else pooled per message.
-	pooledDec    bool
-	inflating    bool // Read is streaming the current message through the inflater.
+	decompressor *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
+	recvWindow   *deflate.Window       // Receive-direction history when takeover is negotiated.
+	inflating    bool                  // Read is streaming the current message through the inflater.
 
-	wmu        sync.Mutex
-	tx         proto.Sender
-	compressor *deflate.Compressor // Per connection with send takeover, else pooled per message.
-	bufArr     [2][]byte           // Backing storage for bufs; WriteTo consumes the slice.
-	bufs       net.Buffers
+	wmu          sync.Mutex
+	tx           proto.Sender
+	sendWindow   *deflate.Window     // Send-direction history when takeover is negotiated.
+	compressor   *deflate.Compressor // Attached while continuing sendWindow's stream.
+	idle         time.Duration
+	idleTimer    *time.Timer
+	lastCompress time.Time
+	bufArr       [2][]byte // Backing storage for bufs; WriteTo consumes the slice.
+	bufs         net.Buffers
 }
 
 // NewConn wraps an upgraded transport.
@@ -84,7 +97,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 {
 		return ErrInvalidConfig
 	}
-	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0) {
+	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0) || cfg.CompressionIdle < 0 {
 		return ErrInvalidConfig
 	}
 	size := cfg.ReadBufferSize
@@ -108,21 +121,28 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.inMessage, c.inflating = false, false
 	c.readErr, c.srcErr = nil, nil
 	c.releaseDecompressor()
-	if cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover {
-		c.decompressor = &deflate.Decompressor{ContextTakeover: true}
-	}
+	c.recvWindow = window(c.recvWindow, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover)
 
 	c.wmu.Lock()
 	c.tx.Init(proto.Role(cfg.Role))
-	c.compressor = nil
-	if cfg.Compression != nil && cfg.Compression.SendContextTakeover {
-		var err error
-		if c.compressor, err = deflate.NewCompressor(cfg.Compression.Level); err != nil {
-			c.wmu.Unlock()
-			return err
-		}
-		c.compressor.ContextTakeover = true
+	c.releaseCompressor()
+	if c.idleTimer != nil {
+		c.idleTimer.Stop()
 	}
+	c.idle = cfg.CompressionIdle
+	c.sendWindow = window(c.sendWindow, cfg.Compression != nil && cfg.Compression.SendContextTakeover)
 	c.wmu.Unlock()
 	return nil
+}
+
+// window returns a cleared history window when wanted, reusing w, else nil.
+func window(w *deflate.Window, wanted bool) *deflate.Window {
+	if !wanted {
+		return nil
+	}
+	if w == nil {
+		return new(deflate.Window)
+	}
+	w.Reset()
+	return w
 }

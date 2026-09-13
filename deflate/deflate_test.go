@@ -50,14 +50,14 @@ func TestRoundTrip(t *testing.T) {
 			for round := 0; round < 2; round++ {
 				for _, message := range messages {
 					input := bytes.Clone(message)
-					compressed, err := c.Compress(input)
+					compressed, err := c.Compress(input, nil)
 					if err != nil {
 						t.Fatal(err)
 					}
 					if !bytes.Equal(input, message) {
 						t.Fatal("compression changed input")
 					}
-					decoded, err := d.Decompress(compressed, len(message))
+					decoded, err := d.Decompress(compressed, len(message), nil)
 					if err != nil || !bytes.Equal(decoded, message) {
 						t.Fatalf("round trip size %d: %v", len(message), err)
 					}
@@ -67,7 +67,7 @@ func TestRoundTrip(t *testing.T) {
 					if err != nil || !bytes.Equal(decoded, message) {
 						t.Fatalf("standard reader size %d: %v", len(message), err)
 					}
-					decoded, err = d.Decompress(standardCompress(t, message, nil), len(message))
+					decoded, err = d.Decompress(standardCompress(t, message, nil), len(message), nil)
 					if err != nil || !bytes.Equal(decoded, message) {
 						t.Fatalf("standard writer size %d: %v", len(message), err)
 					}
@@ -84,7 +84,7 @@ func TestRFCExamples(t *testing.T) {
 		{0xf3, 0x48, 0xcd, 0xc9, 0xc9, 0x07, 0x00, 0x00},
 		{0xf2, 0x48, 0x05, 0x00, 0x00, 0x00, 0xff, 0xff, 0xca, 0xc9, 0xc9, 0x07, 0x00},
 	} {
-		got, err := d.Decompress(payload, 5)
+		got, err := d.Decompress(payload, 5, nil)
 		if err != nil || string(got) != "Hello" {
 			t.Fatalf("payload %x: got %q, %v", payload, got, err)
 		}
@@ -97,27 +97,27 @@ func TestFreshContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	message := bytes.Repeat([]byte("history should not cross message boundaries"), 256)
-	first, err := c.Compress(message)
+	first, err := c.Compress(message, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	first = bytes.Clone(first)
-	if _, err := c.Compress([]byte("different message")); err != nil {
+	if _, err := c.Compress([]byte("different message"), nil); err != nil {
 		t.Fatal(err)
 	}
-	second, err := c.Compress(message)
+	second, err := c.Compress(message, nil)
 	if err != nil || !bytes.Equal(first, second) {
 		t.Fatal("compression retained message history")
 	}
 	var d deflate.Decompressor
-	if _, err := d.Decompress(first, len(message)); err != nil {
+	if _, err := d.Decompress(first, len(message), nil); err != nil {
 		t.Fatal(err)
 	}
 	withHistory := standardCompress(t, message, message)
-	if _, err := d.Decompress(withHistory, len(message)); err == nil {
+	if _, err := d.Decompress(withHistory, len(message), nil); err == nil {
 		t.Fatal("decompression accepted a reference to the previous message")
 	}
-	if got, err := d.Decompress(first, len(message)); err != nil || !bytes.Equal(got, message) {
+	if got, err := d.Decompress(first, len(message), nil); err != nil || !bytes.Equal(got, message) {
 		t.Fatal("decompressor did not recover after error")
 	}
 }
@@ -140,7 +140,7 @@ func TestFinalBlocksWithinMessage(t *testing.T) {
 	compressed.WriteByte(0) // Header of the stripped sync-flush block.
 	var d deflate.Decompressor
 	want := bytes.Repeat(message, 2)
-	got, err := d.Decompress(compressed.Bytes(), len(want))
+	got, err := d.Decompress(compressed.Bytes(), len(want), nil)
 	if err != nil || !bytes.Equal(got, want) {
 		t.Fatalf("final blocks lost message history: %v", err)
 	}
@@ -150,22 +150,22 @@ func TestLimitsAndInvalidInput(t *testing.T) {
 	var d deflate.Decompressor
 	compressed := standardCompress(t, []byte("Hello"), nil)
 	for _, limit := range []int{0, 4} {
-		if got, err := d.Decompress(compressed, limit); got != nil || !errors.Is(err, deflate.ErrMessageTooLarge) {
+		if got, err := d.Decompress(compressed, limit, nil); got != nil || !errors.Is(err, deflate.ErrMessageTooLarge) {
 			t.Fatalf("limit %d: got %x, %v", limit, got, err)
 		}
 	}
-	if _, err := d.Decompress(compressed, -1); !errors.Is(err, deflate.ErrInvalidLimit) {
+	if _, err := d.Decompress(compressed, -1, nil); !errors.Is(err, deflate.ErrInvalidLimit) {
 		t.Fatal("negative limit accepted")
 	}
 	for _, input := range [][]byte{nil, {0x06}, {0x00, 0x01}} {
-		if _, err := d.Decompress(input, 1024); err == nil {
+		if _, err := d.Decompress(input, 1024, nil); err == nil {
 			t.Fatalf("invalid input %x accepted", input)
 		}
 	}
-	if got, err := d.Decompress(compressed, 5); err != nil || string(got) != "Hello" {
+	if got, err := d.Decompress(compressed, 5, nil); err != nil || string(got) != "Hello" {
 		t.Fatal("decompressor did not recover")
 	}
-	if got, err := d.Decompress([]byte{0}, 0); err != nil || len(got) != 0 {
+	if got, err := d.Decompress([]byte{0}, 0, nil); err != nil || len(got) != 0 {
 		t.Fatalf("empty message: %x, %v", got, err)
 	}
 	if _, err := deflate.NewCompressor(100); err == nil {
@@ -179,7 +179,7 @@ func TestCompressedFragments(t *testing.T) {
 		t.Fatal(err)
 	}
 	message := bytes.Repeat([]byte("message split across compressed frames"), 100)
-	compressed, err := c.Compress(message)
+	compressed, err := c.Compress(message, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestCompressedFragments(t *testing.T) {
 		}
 	}
 	var d deflate.Decompressor
-	got, err := d.Decompress(assembled, len(message))
+	got, err := d.Decompress(assembled, len(message), nil)
 	if err != nil || !bytes.Equal(got, message) {
 		t.Fatalf("fragmented round trip: %v", err)
 	}
@@ -254,29 +254,29 @@ func BenchmarkCompression(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			c.ContextTakeover = takeover
-			compressed, err := c.Compress(payload)
+			var cw, dw *deflate.Window
+			if takeover {
+				cw, dw = new(deflate.Window), new(deflate.Window)
+			}
+			var d deflate.Decompressor
+			// Prime both histories with one message, then measure a second.
+			compressed, err := c.Compress(payload, cw)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if _, err := d.Decompress(bytes.Clone(compressed), len(payload), dw); err != nil {
+				b.Fatal(err)
+			}
+			compressed, err = c.Compress(payload, cw)
 			if err != nil {
 				b.Fatal(err)
 			}
 			compressed = bytes.Clone(compressed)
-			d := deflate.Decompressor{ContextTakeover: takeover}
-			if _, err := d.Decompress(compressed, len(payload)); err != nil {
-				b.Fatal(err)
-			}
-			compressed, err = c.Compress(payload)
-			if err != nil {
-				b.Fatal(err)
-			}
-			compressed = bytes.Clone(compressed)
-			if _, err := d.Decompress(compressed, len(payload)); err != nil {
-				b.Fatal(err)
-			}
 			b.Run("compress", func(b *testing.B) {
 				b.ReportAllocs()
 				b.SetBytes(int64(len(payload)))
 				for b.Loop() {
-					if _, err := c.Compress(payload); err != nil {
+					if _, err := c.Compress(payload, cw); err != nil {
 						b.Fatal(err)
 					}
 				}
@@ -285,7 +285,8 @@ func BenchmarkCompression(b *testing.B) {
 				b.ReportAllocs()
 				b.SetBytes(int64(len(payload)))
 				for b.Loop() {
-					if _, err := d.Decompress(compressed, len(payload)); err != nil {
+					// The window keeps the same content as the payload repeats.
+					if _, err := d.Decompress(compressed, len(payload), dw); err != nil {
 						b.Fatal(err)
 					}
 				}
@@ -304,9 +305,8 @@ func TestContextTakeover(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			c.ContextTakeover = true
-			d := deflate.Decompressor{ContextTakeover: true}
-			peer := deflate.Decompressor{ContextTakeover: true}
+			var d, peer deflate.Decompressor
+			var cw, dw, pw deflate.Window
 			var wire bytes.Buffer
 			w, err := stdflate.NewWriter(&wire, stdflate.DefaultCompression)
 			if err != nil {
@@ -315,17 +315,17 @@ func TestContextTakeover(t *testing.T) {
 			defer w.Close()
 			var history []byte
 			for round := 0; round < 2; round++ {
-				c.Reset()
-				d.Reset()
-				peer.Reset()
+				cw.Reset()
+				dw.Reset()
+				pw.Reset()
 				w.Reset(&wire)
 				history = history[:0]
 				for i, message := range messages {
-					compressed, err := c.Compress(message)
+					compressed, err := c.Compress(message, &cw)
 					if err != nil {
 						t.Fatal(err)
 					}
-					got, err := d.Decompress(compressed, len(message))
+					got, err := d.Decompress(compressed, len(message), &dw)
 					if err != nil || !bytes.Equal(got, message) {
 						t.Fatalf("round %d message %d: %v", round, i, err)
 					}
@@ -344,7 +344,7 @@ func TestContextTakeover(t *testing.T) {
 					if err := w.Flush(); err != nil {
 						t.Fatal(err)
 					}
-					got, err = peer.Decompress(wire.Bytes()[:wire.Len()-4], len(message))
+					got, err = peer.Decompress(wire.Bytes()[:wire.Len()-4], len(message), &pw)
 					if err != nil || !bytes.Equal(got, message) {
 						t.Fatalf("standard writer message %d: %v", i, err)
 					}
@@ -363,17 +363,17 @@ func TestTakeoverHistoryAndReset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.ContextTakeover = true
-	d := deflate.Decompressor{ContextTakeover: true}
-	first, err := c.Compress(message)
+	var d deflate.Decompressor
+	var cw, dw deflate.Window
+	first, err := c.Compress(message, &cw)
 	if err != nil {
 		t.Fatal(err)
 	}
 	first = bytes.Clone(first)
-	if _, err := d.Decompress(first, len(message)); err != nil {
+	if _, err := d.Decompress(first, len(message), &dw); err != nil {
 		t.Fatal(err)
 	}
-	second, err := c.Compress(message)
+	second, err := c.Compress(message, &cw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,15 +381,15 @@ func TestTakeoverHistoryAndReset(t *testing.T) {
 		t.Fatal("compressor did not reuse history")
 	}
 	second = bytes.Clone(second)
-	if got, err := d.Decompress(second, len(message)); err != nil || !bytes.Equal(got, message) {
+	if got, err := d.Decompress(second, len(message), &dw); err != nil || !bytes.Equal(got, message) {
 		t.Fatalf("history: %v", err)
 	}
-	d.Reset()
-	if _, err := d.Decompress(second, len(message)); err == nil {
+	dw.Reset()
+	if _, err := d.Decompress(second, len(message), &dw); err == nil {
 		t.Fatal("reset retained history")
 	}
-	c.Reset()
-	fresh, err := c.Compress(message)
+	cw.Reset()
+	fresh, err := c.Compress(message, &cw)
 	if err != nil || !bytes.Equal(fresh, first) {
 		t.Fatal("compressor reset retained history")
 	}
@@ -397,28 +397,106 @@ func TestTakeoverHistoryAndReset(t *testing.T) {
 		payload []byte
 		limit   int
 	}{{[]byte{6}, len(message)}, {second, 10}} {
-		if _, err := d.Decompress(first, len(message)); err != nil {
+		dw.Reset()
+		if _, err := d.Decompress(first, len(message), &dw); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := d.Decompress(bad.payload, bad.limit); err == nil {
+		if _, err := d.Decompress(bad.payload, bad.limit, &dw); err == nil {
 			t.Fatal("expected decode error")
 		}
-		if _, err := d.Decompress(second, len(message)); err == nil {
+		if _, err := d.Decompress(second, len(message), &dw); err == nil {
 			t.Fatal("decode error retained history")
 		}
 	}
-	// Switching modes after Reset must also discard history.
-	c.Reset()
-	d.Reset()
-	c.ContextTakeover = false
-	d.ContextTakeover = false
+	// Without a window every message stands alone, whatever came before.
 	for i := 0; i < 2; i++ {
-		compressed, err := c.Compress(message)
+		compressed, err := c.Compress(message, nil)
 		if err != nil || !bytes.Equal(compressed, first) {
-			t.Fatal("no-context mode retained history")
+			t.Fatal("nil window retained history")
 		}
-		if got, err := d.Decompress(compressed, len(message)); err != nil || !bytes.Equal(got, message) {
-			t.Fatalf("no-context mode: %v", err)
+		if got, err := d.Decompress(compressed, len(message), nil); err != nil || !bytes.Equal(got, message) {
+			t.Fatalf("nil window: %v", err)
+		}
+	}
+}
+
+// TestAttachedWindow checks stream continuation and re-priming: one
+// compressor stays on a window, then gets interrupted by another window, a
+// window reset, and a second compressor, and every message must still decode.
+func TestAttachedWindow(t *testing.T) {
+	a, err := deflate.NewCompressor(flate.BestSpeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := deflate.NewCompressor(flate.BestSpeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d deflate.Decompressor
+	var w1, w2, r1, r2 deflate.Window
+	noise := make([]byte, 8000)
+	_, _ = rand.New(rand.NewSource(5)).Read(noise)
+	step := func(c *deflate.Compressor, send, recv *deflate.Window, i int) {
+		t.Helper()
+		message := append(bytes.Clone(noise), byte(i))
+		compressed, err := c.Compress(message, send)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i > 0 && len(compressed) > len(message)/4 {
+			t.Fatalf("step %d: history unused, %d bytes", i, len(compressed))
+		}
+		got, err := d.Decompress(bytes.Clone(compressed), len(message), recv)
+		if err != nil || !bytes.Equal(got, message) {
+			t.Fatalf("step %d: %v", i, err)
+		}
+	}
+	step(a, &w1, &r1, 0)
+	step(a, &w1, &r1, 1) // Continues the stream.
+	step(a, &w1, &r1, 2)
+	step(a, &w2, &r2, 0) // Another connection: primes.
+	step(a, &w1, &r1, 3) // Back: primes from w1.
+	step(b, &w1, &r1, 4) // A different compressor on the same window: primes.
+	step(a, &w1, &r1, 5) // a's cached state is stale; the generation catches it.
+	w1.Reset()
+	r1.Reset()
+	step(a, &w1, &r1, 0) // Reset windows start over.
+	step(a, &w1, &r1, 1)
+	step(a, nil, nil, 0) // No window compresses alone.
+	step(a, &w1, &r1, 2)
+}
+
+// TestSharedHelpers interleaves two connections through one compressor and
+// one decompressor; each connection's history must stay intact.
+func TestSharedHelpers(t *testing.T) {
+	c, err := deflate.NewCompressor(flate.BestSpeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d deflate.Decompressor
+	// Random messages are incompressible on their own and tiny against a
+	// window holding the same bytes, so history use is unmistakable.
+	conns := []struct {
+		send, recv deflate.Window
+		message    []byte
+	}{{message: make([]byte, 16000)}, {message: make([]byte, 16000)}}
+	for i := range conns {
+		_, _ = rand.New(rand.NewSource(int64(10 + i))).Read(conns[i].message)
+	}
+	for round := 0; round < 3; round++ {
+		for i := range conns {
+			cn := &conns[i]
+			compressed, err := c.Compress(cn.message, &cn.send)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if round == 0 && len(compressed) < len(cn.message)/2 || round > 0 && len(compressed) > len(cn.message)/10 {
+				t.Fatalf("round %d connection %d: %d bytes", round, i, len(compressed))
+			}
+			got, err := d.Decompress(bytes.Clone(compressed), len(cn.message), &cn.recv)
+			if err != nil || !bytes.Equal(got, cn.message) {
+				t.Fatalf("round %d connection %d: %v", round, i, err)
+			}
 		}
 	}
 }
@@ -426,8 +504,9 @@ func TestTakeoverHistoryAndReset(t *testing.T) {
 func TestTakeoverFinalBlocks(t *testing.T) {
 	history := make([]byte, 16000)
 	_, _ = rand.New(rand.NewSource(4)).Read(history)
-	d := deflate.Decompressor{ContextTakeover: true}
-	if _, err := d.Decompress(standardCompress(t, history, nil), len(history)); err != nil {
+	var d deflate.Decompressor
+	var dw deflate.Window
+	if _, err := d.Decompress(standardCompress(t, history, nil), len(history), &dw); err != nil {
 		t.Fatal(err)
 	}
 	var wire bytes.Buffer
@@ -445,7 +524,7 @@ func TestTakeoverFinalBlocks(t *testing.T) {
 		}
 	}
 	wire.WriteByte(0)
-	got, err := d.Decompress(wire.Bytes(), 1000)
+	got, err := d.Decompress(wire.Bytes(), 1000, &dw)
 	if err != nil || !bytes.Equal(got, history[:1000]) {
 		t.Fatalf("final block history: %v", err)
 	}

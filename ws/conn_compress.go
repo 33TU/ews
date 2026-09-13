@@ -4,13 +4,18 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/internal/proto"
 )
 
-// Helpers without context takeover carry no state between messages, so they
-// are shared across connections. A flate writer holds hundreds of kilobytes.
+// Context takeover state is a 32 KB window per direction on the connection.
+// Decompressors are always shared across connections. Compressors are shared
+// too, except that a connection with send takeover keeps one attached so its
+// messages continue one stream instead of re-priming, which costs about as
+// much as compressing 32 KB; Config.CompressionIdle bounds how long an idle
+// connection holds it.
 var (
 	compressorPools  [12]sync.Pool // Indexed by flate level + 2.
 	decompressorPool sync.Pool
@@ -25,33 +30,84 @@ func getCompressor(level int) *deflate.Compressor {
 }
 
 func putCompressor(level int, c *deflate.Compressor) {
+	c.Reset()
 	compressorPools[level+2].Put(c)
 }
 
-// acquireDecompressor returns the connection's decompressor or a pooled one,
-// which stays attached until the next read so borrowed output remains valid.
+// compressorFor returns the compressor for the next message, attaching a
+// pooled one when the send direction has takeover. When shared is true the
+// caller returns it to the pool after the write, since the frame body borrows
+// its output. Callers hold wmu.
+func (c *Conn) compressorFor() (comp *deflate.Compressor, shared bool) {
+	if c.compressor != nil {
+		return c.compressor, false
+	}
+	comp = getCompressor(c.compression.Level)
+	if c.sendWindow == nil {
+		return comp, true
+	}
+	c.compressor = comp
+	return comp, false
+}
+
+// noteCompressed arms the idle release after a compressed write. Callers hold wmu.
+func (c *Conn) noteCompressed() {
+	if c.compressor == nil || c.idle == 0 {
+		return
+	}
+	c.lastCompress = time.Now()
+	if c.idleTimer == nil {
+		c.idleTimer = time.AfterFunc(c.idle, c.releaseIdleCompressor)
+		return
+	}
+	c.idleTimer.Reset(c.idle)
+}
+
+func (c *Conn) releaseIdleCompressor() {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if c.compressor == nil {
+		return
+	}
+	if remaining := c.idle - time.Since(c.lastCompress); remaining > 0 {
+		c.idleTimer.Reset(remaining)
+		return
+	}
+	c.releaseCompressor()
+}
+
+// releaseCompressor returns an attached compressor to the pool. Callers hold wmu.
+func (c *Conn) releaseCompressor() {
+	if c.compressor != nil {
+		putCompressor(c.compression.Level, c.compressor)
+		c.compressor = nil
+	}
+}
+
+// acquireDecompressor attaches a pooled decompressor to the connection until
+// the next read, so borrowed output remains valid.
 func (c *Conn) acquireDecompressor() *deflate.Decompressor {
 	if c.decompressor == nil {
 		d, ok := decompressorPool.Get().(*deflate.Decompressor)
 		if !ok {
 			d = new(deflate.Decompressor)
 		}
-		c.decompressor, c.pooledDec = d, true
+		c.decompressor = d
 	}
 	return c.decompressor
 }
 
 func (c *Conn) releaseDecompressor() {
-	if c.pooledDec {
+	if c.decompressor != nil {
 		c.decompressor.Reset()
 		decompressorPool.Put(c.decompressor)
-		c.decompressor, c.pooledDec = nil, false
+		c.decompressor = nil
 	}
 }
 
 // decompress inflates a complete compressed message within the size limit.
 func (c *Conn) decompress(payload []byte) ([]byte, error) {
-	out, err := c.acquireDecompressor().Decompress(payload, c.limit)
+	out, err := c.acquireDecompressor().Decompress(payload, c.limit, c.recvWindow)
 	if err != nil {
 		if errors.Is(err, deflate.ErrMessageTooLarge) {
 			return nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
@@ -66,7 +122,7 @@ func (c *Conn) decompress(payload []byte) ([]byte, error) {
 func (c *Conn) inflate(b []byte) (int, error) {
 	d := c.acquireDecompressor()
 	if !c.inflating {
-		if err := d.Begin(chunkSource{c}); err != nil {
+		if err := d.Begin(chunkSource{c}, c.recvWindow); err != nil {
 			return 0, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidData})
 		}
 		c.inflating = true
