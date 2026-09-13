@@ -7,11 +7,24 @@ package deflate
 // use. A failed message clears the window, since the peers' histories have
 // diverged.
 type Window struct {
+	// Bits is the window size as a power of two, 8 to 15; zero means 15. Set
+	// it to the negotiated size before use: for a send window the size this
+	// endpoint compresses with, for a receive window the size the peer
+	// declared. Only that much history is then kept and copied.
+	Bits int
+
 	buf []byte
 	gen uint64 // Bumped on every change so a compressor can tell whether it may continue.
 }
 
 const windowSize = 32 << 10
+
+func (w *Window) size() int {
+	if w.Bits >= 8 && w.Bits <= 15 {
+		return 1 << w.Bits
+	}
+	return windowSize
+}
 
 // Reset forgets the history, retaining storage.
 func (w *Window) Reset() {
@@ -24,14 +37,15 @@ func (w *Window) remember(p []byte) {
 		return
 	}
 	w.gen++
+	size := w.size()
 	if cap(w.buf) == 0 {
-		w.buf = make([]byte, 0, windowSize)
+		w.buf = make([]byte, 0, size)
 	}
-	if len(p) >= windowSize {
-		w.buf = append(w.buf[:0], p[len(p)-windowSize:]...)
+	if len(p) >= size {
+		w.buf = append(w.buf[:0], p[len(p)-size:]...)
 		return
 	}
-	if n := len(w.buf) + len(p) - windowSize; n > 0 {
+	if n := len(w.buf) + len(p) - size; n > 0 {
 		w.buf = w.buf[:copy(w.buf, w.buf[n:])]
 	}
 	w.buf = append(w.buf, p...)

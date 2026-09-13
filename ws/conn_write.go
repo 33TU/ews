@@ -15,7 +15,7 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
 	}
-	if c.compression != nil && len(payload) >= c.compression.MinSize {
+	if c.compression != nil && len(payload) >= c.minSize {
 		return c.sendCompressed(op, payload)
 	}
 	return c.send(op, payload)

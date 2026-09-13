@@ -43,6 +43,7 @@ func Negotiate(req Request, opts Options) (Response, Result, error) {
 				SendContextTakeover:    takeover && !p.serverNoContextTakeover,
 				ReceiveContextTakeover: takeover && !p.clientNoContextTakeover,
 				SendWindowBits:         p.serverMaxWindowBits, // Zero keeps the full window.
+				ReceiveWindowBits:      p.clientMaxWindowBits, // The client's declared window, if any.
 			}
 			resp.Extensions = formatDeflate(res.Compression)
 			break

@@ -63,6 +63,7 @@ func Confirm(req Request, resp Response, opts Options) (Result, error) {
 		SendContextTakeover:    takeover && !p.clientNoContextTakeover,
 		ReceiveContextTakeover: takeover && !p.serverNoContextTakeover,
 		SendWindowBits:         p.clientMaxWindowBits, // The server's choice; zero keeps the full window.
+		ReceiveWindowBits:      p.serverMaxWindowBits, // The server's declared window, if any.
 	}
 	return res, nil
 }

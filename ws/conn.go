@@ -25,6 +25,10 @@ const (
 	DefaultReadBufferSize = 4 << 10
 	DefaultMaxMessageSize = 8 << 20
 	DefaultFragmentSize   = 64 << 10
+	// DefaultMinSize is the payload size below which messages go uncompressed
+	// when Compression.MinSize is zero: flate encoders emit literals only for
+	// smaller flushed blocks, so compressing them costs CPU and adds bytes.
+	DefaultMinSize = 128
 	// NoStatus is the close code reported when the peer sent none.
 	NoStatus = proto.NoStatus
 )
@@ -74,6 +78,7 @@ type Conn struct {
 	limit        int
 	fragmentSize int // WriteFrom chunk size.
 	compression  *handshake.Compression
+	minSize      int  // Payloads below this go uncompressed.
 	shared       bool // Never attach a compressor.
 
 	rx        proto.Receiver
@@ -117,7 +122,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
 		return ErrInvalidConfig
 	}
-	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || c.SendWindowBits != 0 && (c.SendWindowBits < 8 || c.SendWindowBits > 15)) || cfg.CompressionIdle < 0 {
+	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || !validBits(c.SendWindowBits) || !validBits(c.ReceiveWindowBits)) || cfg.CompressionIdle < 0 {
 		return ErrInvalidConfig
 	}
 	size := cfg.ReadBufferSize
@@ -143,12 +148,18 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	})
 	c.ControlHandler = cfg.ControlHandler
 	c.compression = cfg.Compression
+	if cfg.Compression != nil {
+		c.minSize = cfg.Compression.MinSize
+		if c.minSize == 0 {
+			c.minSize = DefaultMinSize
+		}
+	}
 	c.rx.Init(proto.Role(cfg.Role), cfg.Compression != nil)
 	c.releaseMsg()
 	c.inMessage, c.inflating = false, false
 	c.readErr, c.srcErr = nil, nil
 	c.releaseDecompressor()
-	c.recvWindow = window(c.recvWindow, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover)
+	c.recvWindow = window(c.recvWindow, cfg.Compression != nil && cfg.Compression.ReceiveContextTakeover, bits(cfg.Compression, false))
 
 	c.wmu.Lock()
 	c.tx.Init(proto.Role(cfg.Role))
@@ -159,19 +170,33 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	}
 	c.idle = cfg.CompressionIdle
 	c.shared = cfg.CompressionShared
-	c.sendWindow = window(c.sendWindow, cfg.Compression != nil && cfg.Compression.SendContextTakeover)
+	c.sendWindow = window(c.sendWindow, cfg.Compression != nil && cfg.Compression.SendContextTakeover, bits(cfg.Compression, true))
 	c.wmu.Unlock()
 	return nil
 }
 
-// window returns a cleared history window when wanted, reusing w, else nil.
-func window(w *deflate.Window, wanted bool) *deflate.Window {
+// window returns a cleared history window of the negotiated size when wanted,
+// reusing w, else nil.
+func window(w *deflate.Window, wanted bool, bits int) *deflate.Window {
 	if !wanted {
 		return nil
 	}
 	if w == nil {
-		return new(deflate.Window)
+		w = new(deflate.Window)
 	}
 	w.Reset()
+	w.Bits = bits
 	return w
 }
+
+func bits(c *handshake.Compression, send bool) int {
+	if c == nil {
+		return 0
+	}
+	if send {
+		return c.SendWindowBits
+	}
+	return c.ReceiveWindowBits
+}
+
+func validBits(b int) bool { return b == 0 || b >= 8 && b <= 15 }

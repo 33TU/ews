@@ -552,6 +552,36 @@ func TestCompressChunk(t *testing.T) {
 	}
 }
 
+// TestWindowBits sizes both windows to a 9-bit negotiation: the compressor
+// reaches back at most 512 bytes and the receiver keeps and primes with only
+// that much, and every message still decodes.
+func TestWindowBits(t *testing.T) {
+	c, err := deflate.NewCompressorWindow(9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d deflate.Decompressor
+	send, recv := deflate.Window{Bits: 9}, deflate.Window{Bits: 9}
+	message := bytes.Repeat([]byte("nine-bit windows on both sides "), 300)
+	for i := 0; i < 4; i++ {
+		compressed, err := c.Compress(message, &send)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := d.Decompress(bytes.Clone(compressed), len(message), &recv)
+		if err != nil || !bytes.Equal(got, message) {
+			t.Fatalf("message %d: %v", i, err)
+		}
+	}
+	// An out-of-range Bits falls back to the full window.
+	full := deflate.Window{Bits: 3}
+	c15, _ := deflate.NewCompressor(flate.BestSpeed)
+	compressed, _ := c15.Compress(message, &full)
+	if got, err := d.Decompress(bytes.Clone(compressed), len(message), &deflate.Window{Bits: 99}); err != nil || !bytes.Equal(got, message) {
+		t.Fatalf("fallback window: %v", err)
+	}
+}
+
 // TestSharedHelpers interleaves two connections through one compressor and
 // one decompressor; each connection's history must stay intact.
 func TestSharedHelpers(t *testing.T) {

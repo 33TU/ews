@@ -59,7 +59,7 @@ func (b *Batch) Flush() error {
 	compressed := false
 	for _, m := range b.msgs {
 		payload := m.payload
-		useCompression := c.compression != nil && len(payload) >= c.compression.MinSize
+		useCompression := c.compression != nil && len(payload) >= c.minSize
 		if useCompression {
 			if comp == nil {
 				comp = c.leaseCompressor()

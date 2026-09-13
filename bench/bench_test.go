@@ -38,7 +38,7 @@ func ewsSharedServer(compress bool) *httptest.Server { return ewsServerWith(comp
 func ewsServerWith(compress, shared bool) *httptest.Server {
 	var opts handshake.Options
 	if compress {
-		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
+		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
 	}
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, res, err := ews.Upgrade(w, r, opts)
@@ -193,7 +193,7 @@ func dial(tb testing.TB, url string, compress bool) *ws.Conn {
 	tb.Helper()
 	var opts handshake.Options
 	if compress {
-		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
+		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
 	}
 	req, err := handshake.NewRequest(opts)
 	if err != nil {

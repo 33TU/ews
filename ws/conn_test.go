@@ -589,6 +589,7 @@ func TestInvalidConfig(t *testing.T) {
 		{Compression: &handshake.Compression{Level: 10}},
 		{Compression: &handshake.Compression{MinSize: -1}},
 		{Compression: &handshake.Compression{SendWindowBits: 7}},
+		{Compression: &handshake.Compression{ReceiveWindowBits: 16}},
 		{CompressionIdle: -1},
 		{FragmentSize: -1},
 	} {
@@ -758,8 +759,8 @@ func BenchmarkWrite(b *testing.B) {
 
 func compressionPair(t *testing.T, clientTakeover, serverTakeover bool, minSize int) (server, client *ws.Conn) {
 	t.Helper()
-	sc := &handshake.Compression{Level: flate.BestSpeed, MinSize: minSize, SendContextTakeover: serverTakeover, ReceiveContextTakeover: clientTakeover}
-	cc := &handshake.Compression{Level: flate.BestSpeed, MinSize: minSize, SendContextTakeover: clientTakeover, ReceiveContextTakeover: serverTakeover}
+	sc := &handshake.Compression{Level: flate.BestSpeed, MinSize: max(minSize, 1), SendContextTakeover: serverTakeover, ReceiveContextTakeover: clientTakeover}
+	cc := &handshake.Compression{Level: flate.BestSpeed, MinSize: max(minSize, 1), SendContextTakeover: clientTakeover, ReceiveContextTakeover: serverTakeover}
 	return pair(t, ws.Config{Compression: sc, ReadBufferSize: 64}, ws.Config{Compression: cc, ReadBufferSize: 64})
 }
 
@@ -878,6 +879,18 @@ func TestCompressedWire(t *testing.T) {
 	if err := server.Write(codec.Text, []byte("tiny")); err != nil {
 		t.Fatal(err)
 	}
+	// With MinSize zero the default of 128 applies: a 100-byte text stays plain.
+	def, defPeer := raw(t, ws.Config{Compression: &handshake.Compression{Level: flate.BestSpeed}})
+	waitDef := run(t, func() error {
+		if h, _ := readFrame(t, defPeer); h.RSV1() {
+			return fmt.Errorf("default MinSize compressed a 100-byte message")
+		}
+		return nil
+	})
+	if err := def.Write(codec.Text, bytes.Repeat([]byte("d"), 100)); err != nil {
+		t.Fatal(err)
+	}
+	waitDef()
 	op, err := server.NextMessage()
 	if err != nil || op != codec.Text {
 		t.Fatal(op, err)
@@ -987,11 +1000,11 @@ func TestCompressionShared(t *testing.T) {
 }
 
 // TestSmallWindow sends through reduced windows in both modes; the peer
-// decodes with its full window.
+// keeps a matching 9-bit receive window.
 func TestSmallWindow(t *testing.T) {
 	for _, shared := range []bool{false, true} {
-		sc := &handshake.Compression{Level: flate.BestSpeed, SendContextTakeover: true, SendWindowBits: 9}
-		cc := &handshake.Compression{Level: flate.BestSpeed, ReceiveContextTakeover: true}
+		sc := &handshake.Compression{Level: flate.BestSpeed, MinSize: 1, SendContextTakeover: true, SendWindowBits: 9}
+		cc := &handshake.Compression{Level: flate.BestSpeed, ReceiveContextTakeover: true, ReceiveWindowBits: 9}
 		server, client := pair(t, ws.Config{Compression: sc, CompressionShared: shared}, ws.Config{Compression: cc})
 		payload := bytes.Repeat([]byte("a 512 byte window still compresses repeats "), 400)
 		wait := run(t, func() error {

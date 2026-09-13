@@ -118,7 +118,7 @@ func TestConfirmRejects(t *testing.T) {
 	}
 	resp.Extensions = "permessage-deflate; server_max_window_bits=12; server_no_context_takeover"
 	res, err = handshake.Confirm(req, resp, opts)
-	if err != nil || res.Compression == nil || res.Compression.ReceiveContextTakeover || !res.Compression.SendContextTakeover || res.Compression.SendWindowBits != 0 {
+	if err != nil || res.Compression == nil || res.Compression.ReceiveContextTakeover || !res.Compression.SendContextTakeover || res.Compression.SendWindowBits != 0 || res.Compression.ReceiveWindowBits != 12 {
 		t.Fatalf("%+v %v", res, err)
 	}
 }

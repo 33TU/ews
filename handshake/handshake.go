@@ -36,7 +36,9 @@ type Options struct {
 type Compress struct {
 	// Level is the flate level for outgoing messages.
 	Level int
-	// MinSize leaves smaller payloads uncompressed.
+	// MinSize leaves smaller payloads uncompressed. Zero means 128 bytes,
+	// below which flate encoders emit literals only, so compression could
+	// not help; 1 compresses everything.
 	MinSize int
 	// ContextTakeover allows compression history to carry between messages
 	// when the peer agrees. Disabled, both directions run without takeover,
@@ -52,9 +54,11 @@ type Compression struct {
 	SendContextTakeover    bool
 	ReceiveContextTakeover bool
 	// SendWindowBits is the LZ77 window this endpoint compresses with, 8 to
-	// 15. Zero means the full 15. Decompression always uses a 32 KB window,
-	// which decodes any peer window.
-	SendWindowBits int
+	// 15, and ReceiveWindowBits the window the peer declared for its own
+	// messages, which bounds how much history must be kept for decoding.
+	// Zero means the full 15.
+	SendWindowBits    int
+	ReceiveWindowBits int
 }
 
 // Result is what a completed handshake agreed on.

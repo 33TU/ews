@@ -268,9 +268,13 @@ nc.Close()
    Reduced windows are honored: a server accepts `server_max_window_bits`
    and a client offers `client_max_window_bits`, and `handshake.Compression.
    SendWindowBits` selects a pooled `deflate.NewCompressorWindow` encoder,
-   which fixes the level. Decompression keeps the full window, which decodes
-   any peer window. This passes Autobahn 13.3.x and 13.5.x and negotiates
-   compression with a default gws server, whose windows are 12 bits.
+   which fixes the level. Both windows are sized to the negotiated bits, the
+   receive side from the peer's declared window, so a 12-bit peer costs 4 KB
+   of history per direction and an eighth of the per-message dictionary
+   copy. Messages under `MinSize`, 128 bytes by default, go uncompressed:
+   flate encoders emit flushed blocks that small as literals, so compressing
+   them only adds bytes. This passes Autobahn 13.3.x and 13.5.x and
+   negotiates compression with a default gws server, whose windows are 12 bits.
 3. Fragmented send, done: `BeginMessage(op)`, `WriteChunk(b)` as non-final
    frames, `EndMessage()` as the FIN frame, so the sender never needs to know
    which chunk is last. Data writes from other callers get `ErrMessageOpen`

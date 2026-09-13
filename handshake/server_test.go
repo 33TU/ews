@@ -100,6 +100,10 @@ func TestNegotiateDeflate(t *testing.T) {
 	}
 
 	req := request()
+	req.Extensions = "permessage-deflate; client_max_window_bits=10"
+	if _, res, err := handshake.Negotiate(req, handshake.Options{Compression: &handshake.Compress{}}); err != nil || res.Compression.ReceiveWindowBits != 10 {
+		t.Fatalf("client window not recorded: %+v %v", res, err)
+	}
 	req.Extensions = "permessage-deflate"
 	if resp, res, err := handshake.Negotiate(req, handshake.Options{}); err != nil || resp.Extensions != "" || res.Compression != nil {
 		t.Fatal("compression negotiated without being enabled")
