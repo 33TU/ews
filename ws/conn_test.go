@@ -1152,7 +1152,7 @@ func TestWriteFrom(t *testing.T) {
 				break
 			}
 		}
-		want := []int{32768, 32768, 32768, 100000 - 3*32768, 0}
+		want := []int{32768, 32768, 32768, 100000 - 3*32768} // The last chunk carries FIN.
 		if fmt.Sprint(sizes) != fmt.Sprint(want) || !bytes.Equal(assembled, large) {
 			return fmt.Errorf("large: fragment sizes %v", sizes)
 		}
@@ -1183,18 +1183,19 @@ func TestWriteFrom(t *testing.T) {
 	}
 	wait()
 
-	// A reader failure mid-message leaves the message open; the chunk being
-	// read when it failed is not sent. The peer sees one fragment, then the ping.
+	// A reader failure leaves the message open and reports only bytes sent.
+	// Here the lookahead read fails before the first chunk goes out, so the
+	// peer sees nothing but the ping.
 	server, peer = raw(t, ws.Config{})
 	wait = run(t, func() error {
-		for i := 0; i < 2; i++ {
-			readFrame(t, peer)
+		if h, _ := readFrame(t, peer); h.Opcode() != codec.Ping {
+			return fmt.Errorf("expected only a ping, got opcode %d", h.Opcode())
 		}
 		return nil
 	})
 	boom := errors.New("boom")
 	n, err := server.WriteFrom(codec.Binary, &failingReader{bytes.NewReader(large[:50000]), boom})
-	if err != boom || n != 32768 {
+	if err != boom || n != 0 {
 		t.Fatal(n, err)
 	}
 	if err := server.Write(codec.Binary, nil); err != ws.ErrMessageOpen {

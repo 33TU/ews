@@ -28,50 +28,59 @@ var fromPool = sync.Pool{New: func() any { b := make([]byte, fromChunk); return 
 
 // WriteFrom sends r's content as one message and returns the bytes sent.
 // Content that fits one 32 KiB read goes out as a single frame; longer
-// content is fragmented as it is read, so nothing is held in memory beyond
-// one chunk. A read error is returned with the message still open and the
-// chunk being read unsent, since a fragmented message cannot be withdrawn;
-// close the connection in that case.
+// content is fragmented as it is read, one chunk ahead so the last chunk
+// carries the FIN and nothing is held in memory beyond two chunks. A read
+// error is returned with the message still open and the chunk being read
+// unsent, since a fragmented message cannot be withdrawn; close the
+// connection in that case.
 func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 	if op != codec.Text && op != codec.Binary {
 		return 0, ErrProtocol
 	}
-	bp := fromPool.Get().(*[]byte)
-	defer fromPool.Put(bp)
-	buf := *bp
+	cur := fromPool.Get().(*[]byte)
+	defer fromPool.Put(cur)
 
-	n, err := io.ReadFull(r, buf)
+	n, err := io.ReadFull(r, *cur)
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		return int64(n), c.Write(op, buf[:n])
+		return int64(n), c.Write(op, (*cur)[:n])
 	}
 	if err != nil {
 		return 0, err
 	}
+	next := fromPool.Get().(*[]byte)
+	defer fromPool.Put(next)
 	if err := c.BeginMessage(op); err != nil {
 		return 0, err
 	}
 	var total int64
 	for {
-		if err := c.WriteChunk(buf[:n]); err != nil {
+		// Look one chunk ahead so the current one can be final.
+		m, err := io.ReadFull(r, *next)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return total, err
+		}
+		final := err == io.EOF
+		if werr := c.writeFragment((*cur)[:n], final); werr != nil {
+			return total, werr
 		}
 		total += int64(n)
-		n, err = io.ReadFull(r, buf)
-		if err == io.EOF {
-			break
+		if final {
+			return total, nil
 		}
 		if err == io.ErrUnexpectedEOF {
-			if err := c.WriteChunk(buf[:n]); err != nil {
-				return total, err
+			if werr := c.writeFragment((*next)[:m], true); werr != nil {
+				return total, werr
 			}
-			total += int64(n)
-			break
+			return total + int64(m), nil
 		}
-		if err != nil {
-			return total, err
-		}
+		cur, next, n = next, cur, m
 	}
-	return total, c.EndMessage()
+}
+
+func (c *Conn) writeFragment(payload []byte, final bool) error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	return c.fragment(payload, final)
 }
 
 // BeginMessage starts a fragmented text or binary message. Each WriteChunk
