@@ -22,6 +22,7 @@ import (
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
+	"github.com/coder/websocket"
 	"github.com/klauspost/compress/flate"
 	"github.com/lxzan/gws"
 )
@@ -107,7 +108,32 @@ func gwsUpgrader(compress bool, handler gws.Event) *gws.Upgrader {
 	})
 }
 
-// ---- client (ews for both servers) ----------------------------------------
+func coderServer(compress bool) *httptest.Server {
+	mode := websocket.CompressionDisabled
+	if compress {
+		mode = websocket.CompressionContextTakeover
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode})
+		if err != nil {
+			return
+		}
+		defer c.CloseNow()
+		c.SetReadLimit(64 << 20)
+		ctx := r.Context()
+		for {
+			typ, p, err := c.Read(ctx)
+			if err != nil {
+				return
+			}
+			if err := c.Write(ctx, typ, p); err != nil {
+				return
+			}
+		}
+	}))
+}
+
+// ---- client (ews for all servers) -----------------------------------------
 
 func dial(tb testing.TB, url string, compress bool) *ws.Conn {
 	tb.Helper()
@@ -177,7 +203,7 @@ func BenchmarkEcho(b *testing.B) {
 	servers := []struct {
 		name  string
 		start func(bool) *httptest.Server
-	}{{"ews", ewsServer}, {"gws", gwsServer}, {"gws-pull", gwsPullServer}}
+	}{{"ews", ewsServer}, {"gws", gwsServer}, {"gws-pull", gwsPullServer}, {"coder", coderServer}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {

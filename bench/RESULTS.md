@@ -1,6 +1,6 @@
 # Echo benchmark results
 
-Generated 2026-09-13 from `go test -run '^$' -bench . -benchtime=1s | go run ./cmd/results` at ews commit `88c0fdc`.
+Generated 2026-09-13 from `go test -run '^$' -bench . -benchtime=1s | go run ./cmd/results` at ews commit `a2c0bc5`.
 
 ## Setup
 
@@ -14,68 +14,69 @@ Echo servers behind `httptest` on loopback TCP, all driven by the same ews clien
 - `ews`: `ws.Conn` with `ReadMessage` and `Write`, default 4 KiB read buffer.
 - `gws`: event-driven `ReadLoop` with an `OnMessage` echo, gws's documented server shape.
 - `gws-pull`: gws's `ReadMessage` in a loop, the like-for-like shape against ews.
+- `coder`: coder/websocket with `Read` and `Write` in a loop.
 
-Compression is permessage-deflate at flate level 1 with context takeover in both directions. gws is configured for 15-bit windows to match the 32 KB window ews uses; its default is 12 bits, which ews does not implement. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits, which ews does not implement. coder/websocket uses its fixed level and pooled flate readers and writers. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
 
 Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 
 ## Uncompressed
 
-| Size | Conns | ews | gws | gws-pull | allocs/op ews / gws / gws-pull |
-|---|---|---|---|---|---|
-| 64 B | 1 | 9 MB/s | 9 MB/s | 8 MB/s | 0 / 1 / 1 |
-| 64 B | 32 | 63 MB/s | 62 MB/s | 62 MB/s | 0 / 1 / 1 |
-| 64 B | 128 | 72 MB/s | 70 MB/s | 71 MB/s | 0 / 1 / 1 |
-| 64 B | 512 | 71 MB/s | 67 MB/s | 70 MB/s | 0 / 1 / 1 |
-| 64 B | 1024 | 70 MB/s | 67 MB/s | 67 MB/s | 0 / 1 / 1 |
-| 64 B | 2048 | 53 MB/s | 49 MB/s | 60 MB/s | 0 / 1 / 1 |
-| 1 KiB | 1 | 136 MB/s | 134 MB/s | 137 MB/s | 0 / 1 / 1 |
-| 1 KiB | 32 | 945 MB/s | 938 MB/s | 888 MB/s | 0 / 1 / 1 |
-| 1 KiB | 128 | 953 MB/s | 989 MB/s | 1.0 GB/s | 0 / 1 / 1 |
-| 1 KiB | 512 | 995 MB/s | 1.1 GB/s | 985 MB/s | 0 / 1 / 1 |
-| 1 KiB | 1024 | 852 MB/s | 967 MB/s | 985 MB/s | 0 / 1 / 1 |
-| 1 KiB | 2048 | 620 MB/s | 809 MB/s | 788 MB/s | 0 / 1 / 1 |
-| 16 KiB | 1 | 1.3 GB/s | 1.3 GB/s | 1.3 GB/s | 0 / 1 / 1 |
-| 16 KiB | 32 | 9.8 GB/s | 9.3 GB/s | 9.2 GB/s | 0 / 1 / 1 |
-| 16 KiB | 128 | 9.9 GB/s | 9.5 GB/s | 9.6 GB/s | 0 / 1 / 1 |
-| 16 KiB | 512 | 8.0 GB/s | 7.4 GB/s | 7.1 GB/s | 0 / 1 / 1 |
-| 16 KiB | 1024 | 5.3 GB/s | 5.8 GB/s | 5.3 GB/s | 0 / 1 / 1 |
-| 16 KiB | 2048 | 4.9 GB/s | 4.7 GB/s | 4.4 GB/s | 0 / 1 / 1 |
-| 256 KiB | 1 | 2.9 GB/s | 399 MB/s | 700 MB/s | 0 / 6 (595 KB) / 6 (595 KB) |
-| 256 KiB | 32 | 15.8 GB/s | 4.2 GB/s | 4.5 GB/s | 0 / 5 (573 KB) / 5 (575 KB) |
-| 256 KiB | 128 | 7.8 GB/s | 5.4 GB/s | 5.9 GB/s | 0 / 5 (535 KB) / 5 (534 KB) |
-| 256 KiB | 512 | 7.6 GB/s | 4.9 GB/s | 5.2 GB/s | 0 / 5 (536 KB) / 5 (538 KB) |
-| 256 KiB | 1024 | 6.6 GB/s | 5.0 GB/s | 4.4 GB/s | 0 / 5 (541 KB) / 5 (541 KB) |
-| 256 KiB | 2048 | 6.8 GB/s | 3.7 GB/s | 4.6 GB/s | 0 / 5 (564 KB) / 5 (553 KB) |
+| Size | Conns | ews | gws | gws-pull | coder | allocs/op ews / gws / gws-pull / coder |
+|---|---|---|---|---|---|---|
+| 64 B | 1 | 8 MB/s | 9 MB/s | 9 MB/s | 6 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 32 | 67 MB/s | 66 MB/s | 66 MB/s | 45 MB/s | 0 / 1 / 1 / 13 (1 KB) |
+| 64 B | 128 | 77 MB/s | 77 MB/s | 77 MB/s | 52 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 512 | 79 MB/s | 77 MB/s | 77 MB/s | 57 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 1024 | 76 MB/s | 76 MB/s | 75 MB/s | 55 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 2048 | 67 MB/s | 65 MB/s | 66 MB/s | 49 MB/s | 0 / 1 / 1 / 13 |
+| 1 KiB | 1 | 139 MB/s | 138 MB/s | 139 MB/s | 56 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 1 KiB | 32 | 1.0 GB/s | 1.0 GB/s | 1.0 GB/s | 492 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 1 KiB | 128 | 1.1 GB/s | 996 MB/s | 1.1 GB/s | 612 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 1 KiB | 512 | 1.1 GB/s | 1.1 GB/s | 1.1 GB/s | 630 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 1 KiB | 1024 | 1.0 GB/s | 1.0 GB/s | 1.0 GB/s | 621 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 1 KiB | 2048 | 916 MB/s | 902 MB/s | 895 MB/s | 555 MB/s | 0 / 1 / 1 / 24 (2 KB) |
+| 16 KiB | 1 | 1.5 GB/s | 1.4 GB/s | 1.4 GB/s | 176 MB/s | 0 / 1 / 1 / 61 (41 KB) |
+| 16 KiB | 32 | 10.2 GB/s | 9.8 GB/s | 9.7 GB/s | 1.9 GB/s | 0 / 1 / 1 / 61 (39 KB) |
+| 16 KiB | 128 | 10.8 GB/s | 10.1 GB/s | 10.3 GB/s | 2.5 GB/s | 0 / 1 / 1 / 61 (39 KB) |
+| 16 KiB | 512 | 9.0 GB/s | 8.4 GB/s | 8.8 GB/s | 2.9 GB/s | 0 / 1 / 1 / 61 (39 KB) |
+| 16 KiB | 1024 | 7.0 GB/s | 6.6 GB/s | 6.8 GB/s | 2.9 GB/s | 0 / 1 / 1 / 61 (39 KB) |
+| 16 KiB | 2048 | 5.9 GB/s | 5.7 GB/s | 5.9 GB/s | 2.6 GB/s | 0 / 1 / 1 / 61 (39 KB) |
+| 256 KiB | 1 | 3.3 GB/s | 578 MB/s | 773 MB/s | 438 MB/s | 0 / 6 (601 KB) / 6 (597 KB) / 97 (701 KB) |
+| 256 KiB | 32 | 18.1 GB/s | 4.0 GB/s | 4.6 GB/s | 3.6 GB/s | 0 / 5 (573 KB) / 5 (573 KB) / 96 (672 KB) |
+| 256 KiB | 128 | 10.2 GB/s | 6.8 GB/s | 6.8 GB/s | 6.1 GB/s | 0 / 5 (536 KB) / 5 (534 KB) / 96 (629 KB) |
+| 256 KiB | 512 | 8.7 GB/s | 5.8 GB/s | 5.8 GB/s | 5.1 GB/s | 0 / 5 (535 KB) / 5 (536 KB) / 96 (627 KB) |
+| 256 KiB | 1024 | 8.1 GB/s | 5.3 GB/s | 5.2 GB/s | 4.9 GB/s | 0 / 5 (542 KB) / 5 (540 KB) / 96 (632 KB) |
+| 256 KiB | 2048 | 7.5 GB/s | 4.8 GB/s | 5.3 GB/s | 4.4 GB/s | 0 / 5 (551 KB) / 5 (553 KB) / 96 (648 KB) |
 
 ## Compressed
 
-| Size | Conns | ews | gws | gws-pull | allocs/op ews / gws / gws-pull |
-|---|---|---|---|---|---|
-| 64 B | 1 | 4 MB/s | 4 MB/s | 4 MB/s | 0 / 1 / 1 |
-| 64 B | 32 | 32 MB/s | 26 MB/s | 25 MB/s | 0 / 1 / 1 |
-| 64 B | 128 | 33 MB/s | 26 MB/s | 27 MB/s | 0 / 1 / 1 |
-| 64 B | 512 | 15 MB/s | 14 MB/s | 19 MB/s | 0 / 1 / 1 |
-| 64 B | 1024 | 20 MB/s | 18 MB/s | 18 MB/s | 0 / 1 / 1 |
-| 64 B | 2048 | 30 MB/s | 29 MB/s | 27 MB/s | 0 / 1 / 1 |
-| 1 KiB | 1 | 68 MB/s | 56 MB/s | 55 MB/s | 0 / 1 / 1 |
-| 1 KiB | 32 | 478 MB/s | 400 MB/s | 404 MB/s | 0 / 1 / 1 |
-| 1 KiB | 128 | 470 MB/s | 378 MB/s | 396 MB/s | 0 / 1 / 1 |
-| 1 KiB | 512 | 195 MB/s | 188 MB/s | 175 MB/s | 0 / 1 / 1 |
-| 1 KiB | 1024 | 170 MB/s | 146 MB/s | 151 MB/s | 0 / 1 / 1 |
-| 1 KiB | 2048 | 171 MB/s | 180 MB/s | 181 MB/s | 0 / 1 / 1 |
-| 16 KiB | 1 | 685 MB/s | 614 MB/s | 609 MB/s | 0 / 1 / 1 |
-| 16 KiB | 32 | 5.1 GB/s | 4.6 GB/s | 4.6 GB/s | 0 / 1 / 1 |
-| 16 KiB | 128 | 3.9 GB/s | 3.9 GB/s | 4.0 GB/s | 0 / 1 / 1 |
-| 16 KiB | 512 | 2.3 GB/s | 2.4 GB/s | 2.4 GB/s | 0 / 1 / 1 |
-| 16 KiB | 1024 | 2.1 GB/s | 2.2 GB/s | 2.2 GB/s | 0 / 1 / 1 |
-| 16 KiB | 2048 | 2.0 GB/s | 2.2 GB/s | 2.2 GB/s | 0 / 1 / 1 |
-| 256 KiB | 1 | 1.4 GB/s | 382 MB/s | 403 MB/s | 0 / 18 (1396 KB) / 17 (1380 KB) |
-| 256 KiB | 32 | 12.3 GB/s | 3.4 GB/s | 3.5 GB/s | 0 / 18 (1404 KB) / 18 (1410 KB) |
-| 256 KiB | 128 | 10.0 GB/s | 3.7 GB/s | 3.7 GB/s | 0 / 17 (1338 KB) / 17 (1338 KB) |
-| 256 KiB | 512 | 9.5 GB/s | 3.9 GB/s | 3.9 GB/s | 0 / 17 (1333 KB) / 16 (1330 KB) |
-| 256 KiB | 1024 | 9.4 GB/s | 3.7 GB/s | 3.7 GB/s | 0 / 17 (1377 KB) / 17 (1372 KB) |
-| 256 KiB | 2048 | 9.3 GB/s | 3.2 GB/s | 3.4 GB/s | 0 / 18 (1457 KB) / 18 (1438 KB) |
+| Size | Conns | ews | gws | gws-pull | coder | allocs/op ews / gws / gws-pull / coder |
+|---|---|---|---|---|---|---|
+| 64 B | 1 | 4 MB/s | 4 MB/s | 4 MB/s | 5 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 32 | 32 MB/s | 27 MB/s | 27 MB/s | 37 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 128 | 36 MB/s | 29 MB/s | 29 MB/s | 41 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 512 | 18 MB/s | 17 MB/s | 17 MB/s | 33 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 1024 | 21 MB/s | 19 MB/s | 19 MB/s | 30 MB/s | 0 / 1 / 1 / 13 |
+| 64 B | 2048 | 36 MB/s | 31 MB/s | 31 MB/s | 35 MB/s | 0 / 1 / 1 / 13 (1 KB) |
+| 1 KiB | 1 | 72 MB/s | 60 MB/s | 60 MB/s | 55 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 1 KiB | 32 | 505 MB/s | 417 MB/s | 419 MB/s | 449 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 1 KiB | 128 | 525 MB/s | 423 MB/s | 420 MB/s | 448 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 1 KiB | 512 | 216 MB/s | 207 MB/s | 206 MB/s | 244 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 1 KiB | 1024 | 184 MB/s | 182 MB/s | 183 MB/s | 207 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 1 KiB | 2048 | 163 MB/s | 181 MB/s | 171 MB/s | 203 MB/s | 0 / 1 / 1 / 16 (2 KB) |
+| 16 KiB | 1 | 684 MB/s | 615 MB/s | 614 MB/s | 202 MB/s | 0 / 1 / 1 / 25 (40 KB) |
+| 16 KiB | 32 | 5.2 GB/s | 4.8 GB/s | 4.7 GB/s | 3.1 GB/s | 0 / 1 / 1 / 25 (38 KB) |
+| 16 KiB | 128 | 4.0 GB/s | 3.7 GB/s | 3.9 GB/s | 2.7 GB/s | 0 / 1 / 1 / 25 (37 KB) |
+| 16 KiB | 512 | 2.3 GB/s | 2.4 GB/s | 2.4 GB/s | 2.0 GB/s | 0 / 1 / 1 / 25 (37 KB) |
+| 16 KiB | 1024 | 2.1 GB/s | 2.2 GB/s | 2.2 GB/s | 1.8 GB/s | 0 / 1 / 1 / 25 (38 KB) |
+| 16 KiB | 2048 | 2.1 GB/s | 2.2 GB/s | 2.2 GB/s | 1.6 GB/s | 0 / 1 / 1 / 25 (37 KB) |
+| 256 KiB | 1 | 1.5 GB/s | 361 MB/s | 416 MB/s | 307 MB/s | 0 / 18 (1443 KB) / 17 (1382 KB) / 37 (862 KB) |
+| 256 KiB | 32 | 10.5 GB/s | 3.4 GB/s | 3.4 GB/s | 5.0 GB/s | 0 / 18 (1416 KB) / 18 (1409 KB) / 33 (670 KB) |
+| 256 KiB | 128 | 10.1 GB/s | 3.7 GB/s | 3.7 GB/s | 5.3 GB/s | 0 / 17 (1335 KB) / 17 (1337 KB) / 32 (639 KB) |
+| 256 KiB | 512 | 9.5 GB/s | 4.0 GB/s | 3.9 GB/s | 5.3 GB/s | 0 / 17 (1334 KB) / 16 (1332 KB) / 32 (648 KB) |
+| 256 KiB | 1024 | 9.5 GB/s | 3.8 GB/s | 3.8 GB/s | 4.5 GB/s | 0 / 17 (1375 KB) / 17 (1368 KB) / 33 (684 KB) |
+| 256 KiB | 2048 | 9.3 GB/s | 3.3 GB/s | 2.9 GB/s | 2.3 GB/s | 0 / 18 (1439 KB) / 18 (1442 KB) / 32 (616 KB) |
 
 ## Reading the numbers
 
@@ -84,3 +85,4 @@ Single-connection small-message cells are loopback round trips of 12 to 15 µs a
 - Large messages favor ews. gws allocates a buffer above its pool threshold on every such message, over half a megabyte uncompressed and over a megabyte compressed.
 - With hundreds of connections and 256 KiB messages both libraries are bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
 - gws's `ReadLoop` and `ReadMessage` share the whole frame path and measure the same within noise.
+- coder/websocket allocates on every message and, with context takeover, resets a pooled flate writer with the 32 KB history per message, which is the priming cost ews avoids by keeping a compressor attached.

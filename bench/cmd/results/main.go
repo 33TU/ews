@@ -158,8 +158,9 @@ const setup = `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all dri
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer.
 - ` + "`gws`" + `: event-driven ` + "`ReadLoop`" + ` with an ` + "`OnMessage`" + ` echo, gws's documented server shape.
 - ` + "`gws-pull`" + `: gws's ` + "`ReadMessage`" + ` in a loop, the like-for-like shape against ews.
+- ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
 
-Compression is permessage-deflate at flate level 1 with context takeover in both directions. gws is configured for 15-bit windows to match the 32 KB window ews uses; its default is 12 bits, which ews does not implement. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits, which ews does not implement. coder/websocket uses its fixed level and pooled flate readers and writers. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
 
 Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 
@@ -172,4 +173,5 @@ const reading = `## Reading the numbers
 - Large messages favor ews. gws allocates a buffer above its pool threshold on every such message, over half a megabyte uncompressed and over a megabyte compressed.
 - With hundreds of connections and 256 KiB messages both libraries are bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
 - gws's ` + "`ReadLoop`" + ` and ` + "`ReadMessage`" + ` share the whole frame path and measure the same within noise.
+- coder/websocket allocates on every message and, with context takeover, resets a pooled flate writer with the 32 KB history per message, which is the priming cost ews avoids by keeping a compressor attached.
 `
