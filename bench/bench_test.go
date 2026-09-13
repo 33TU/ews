@@ -62,6 +62,7 @@ func ewsServerWith(compress, shared bool) *httptest.Server {
 	}))
 }
 
+// gwsEcho is the event handler for the interop test's ReadLoop server.
 type gwsEcho struct{ gws.BuiltinEventHandler }
 
 func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
@@ -69,9 +70,10 @@ func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
 	socket.WriteMessage(message.Opcode, message.Bytes())
 }
 
-// gwsPullServer echoes through gws's pull-style ReadMessage instead of the
-// event-driven ReadLoop.
-func gwsPullServer(compress bool) *httptest.Server {
+// gwsServer echoes through gws's ReadMessage and WriteMessage, the
+// like-for-like shape against ews. gws's ReadLoop shares the whole frame path
+// and measured the same within noise.
+func gwsServer(compress bool) *httptest.Server {
 	up := gwsUpgrader(compress, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
@@ -89,14 +91,24 @@ func gwsPullServer(compress bool) *httptest.Server {
 	}))
 }
 
-func gwsServer(compress bool) *httptest.Server {
-	up := gwsUpgrader(compress, gwsEcho{})
+// gwsStreamServer pipes gws's NextReader into WriteFile, its streaming shape:
+// no message is held whole.
+func gwsStreamServer(compress bool) *httptest.Server {
+	up := gwsUpgrader(compress, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
 		if err != nil {
 			return
 		}
-		socket.ReadLoop()
+		for {
+			typ, rd, err := socket.NextReader()
+			if err != nil {
+				return
+			}
+			if err := socket.WriteFile(typ, rd); err != nil {
+				return
+			}
+		}
 	}))
 }
 
@@ -246,7 +258,7 @@ func BenchmarkEcho(b *testing.B) {
 		name         string
 		start        func(bool) *httptest.Server
 		compressOnly bool // Identical to another server without compression.
-	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-pull", gwsPullServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
+	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {

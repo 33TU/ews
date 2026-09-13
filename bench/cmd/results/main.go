@@ -64,6 +64,9 @@ func main() {
 	}
 	sort.Ints(sizes)
 	sort.Ints(conns)
+	for _, l := range libs {
+		sort.SliceStable(l, func(i, j int) bool { return libRank(l[i]) < libRank(l[j]) })
+	}
 
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
@@ -103,6 +106,17 @@ func main() {
 }
 
 func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
+
+// libRank orders server columns: ews first, then each library with its
+// streaming variant beside it; unknown names go last in input order.
+func libRank(name string) int {
+	for i, known := range []string{"ews", "ews-shared", "gws", "gws-stream", "coder", "coder-stream"} {
+		if name == known {
+			return i
+		}
+	}
+	return 100
+}
 
 func throughput(mbs float64) string {
 	if mbs >= 1000 {
@@ -158,8 +172,8 @@ const setup = `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all dri
 
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
 - ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
-- ` + "`gws`" + `: event-driven ` + "`ReadLoop`" + ` with an ` + "`OnMessage`" + ` echo, gws's documented server shape.
-- ` + "`gws-pull`" + `: gws's ` + "`ReadMessage`" + ` in a loop, the like-for-like shape against ews.
+- ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
+- ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
 - ` + "`coder-stream`" + `: coder/websocket piping ` + "`Reader`" + ` into ` + "`Writer`" + ` through a reusable buffer, so no message is held whole.
 
@@ -175,7 +189,6 @@ const reading = `## Reading the numbers
 - 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
 - Large messages favor ews. gws allocates a buffer above its pool threshold on every such message, over half a megabyte uncompressed and over a megabyte compressed.
 - With hundreds of connections and 256 KiB messages both libraries are bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
-- gws's ` + "`ReadLoop`" + ` and ` + "`ReadMessage`" + ` share the whole frame path and measure the same within noise.
 - coder/websocket allocates on every message and, with context takeover, resets a pooled flate writer with the 32 KB history per message, which is the priming cost ews avoids by keeping a compressor attached.
 - coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
 `
