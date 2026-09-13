@@ -29,7 +29,13 @@ import (
 
 // ---- servers -------------------------------------------------------------
 
-func ewsServer(compress bool) *httptest.Server {
+func ewsServer(compress bool) *httptest.Server { return ewsServerWith(compress, false) }
+
+// ewsSharedServer borrows a pooled compressor per message like gws and coder
+// do, instead of keeping one attached per connection.
+func ewsSharedServer(compress bool) *httptest.Server { return ewsServerWith(compress, true) }
+
+func ewsServerWith(compress, shared bool) *httptest.Server {
 	var opts handshake.Options
 	if compress {
 		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
@@ -40,7 +46,7 @@ func ewsServer(compress bool) *httptest.Server {
 			return
 		}
 		defer conn.Close()
-		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 64 << 20, Compression: res.Compression})
+		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 64 << 20, Compression: res.Compression, CompressionShared: shared})
 		if err != nil {
 			return
 		}
@@ -202,13 +208,17 @@ func payload(size int, compressible bool) []byte {
 
 func BenchmarkEcho(b *testing.B) {
 	servers := []struct {
-		name  string
-		start func(bool) *httptest.Server
-	}{{"ews", ewsServer}, {"gws", gwsServer}, {"gws-pull", gwsPullServer}, {"coder", coderServer}}
+		name         string
+		start        func(bool) *httptest.Server
+		compressOnly bool // Identical to another server without compression.
+	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-pull", gwsPullServer, false}, {"coder", coderServer, false}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {
 				for _, s := range servers {
+					if s.compressOnly && !compress {
+						continue
+					}
 					name := fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, s.name)
 					b.Run(name, func(b *testing.B) {
 						srv := s.start(compress)

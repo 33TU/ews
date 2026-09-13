@@ -34,7 +34,7 @@ var line = regexp.MustCompile(`^BenchmarkEcho/compress=(\w+)/size=(\d+)/conns=(\
 func main() {
 	rows := map[key]result{}
 	var sizes, conns []int
-	var libs []string
+	libs := map[bool][]string{} // Servers seen per compression mode.
 	seen := map[string]bool{}
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
@@ -53,9 +53,9 @@ func main() {
 			seen["c"+m[3]] = true
 			conns = append(conns, k.conns)
 		}
-		if !seen["l"+m[4]] {
-			seen["l"+m[4]] = true
-			libs = append(libs, k.lib)
+		if !seen["l"+m[1]+m[4]] {
+			seen["l"+m[1]+m[4]] = true
+			libs[k.compress] = append(libs[k.compress], k.lib)
 		}
 	}
 	if len(rows) == 0 {
@@ -76,6 +76,7 @@ func main() {
 		if compress {
 			title = "Compressed"
 		}
+		libs := libs[compress]
 		fmt.Fprintf(w, "## %s\n\n| Size | Conns | %s | allocs/op %s |\n|---|---|%s---|\n", title, strings.Join(libs, " | "), strings.Join(libs, " / "), strings.Repeat("---|", len(libs)))
 		for _, size := range sizes {
 			for _, c := range conns {
@@ -155,7 +156,8 @@ func gwsVersion() string {
 
 const setup = `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all driven by the same ews client, one ping-pong at a time per connection. Throughput counts payload bytes in one direction per round trip. Allocations are process-wide per message; the ews client allocates nothing, so they are effectively the server's.
 
-- ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer.
+- ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
+- ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
 - ` + "`gws`" + `: event-driven ` + "`ReadLoop`" + ` with an ` + "`OnMessage`" + ` echo, gws's documented server shape.
 - ` + "`gws-pull`" + `: gws's ` + "`ReadMessage`" + ` in a loop, the like-for-like shape against ews.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
