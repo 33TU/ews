@@ -24,6 +24,7 @@ const (
 const (
 	DefaultReadBufferSize = 4 << 10
 	DefaultMaxMessageSize = 8 << 20
+	DefaultFragmentSize   = 128 << 10
 	// NoStatus is the close code reported when the peer sent none.
 	NoStatus = proto.NoStatus
 )
@@ -35,6 +36,11 @@ type Config struct {
 	ReadBufferSize int
 	// MaxMessageSize bounds ReadMessage. Zero uses DefaultMaxMessageSize.
 	MaxMessageSize int
+	// FragmentSize is the chunk WriteFrom reads and sends per frame, and so
+	// the largest content it sends as a single frame. Larger fragments mean
+	// fewer frames and syscalls; two buffers of this size are in flight per
+	// call. Zero uses DefaultFragmentSize.
+	FragmentSize int
 	// Compression holds negotiated permessage-deflate parameters, or nil.
 	Compression *handshake.Compression
 	// CompressionShared borrows a compressor from the shared pool for every
@@ -63,11 +69,12 @@ type Conn struct {
 	// UserData holds application state. Concurrent access is the caller's responsibility.
 	UserData any
 
-	rw          io.ReadWriter
-	vectored    bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
-	limit       int
-	compression *handshake.Compression
-	shared      bool // Never attach a compressor.
+	rw           io.ReadWriter
+	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
+	limit        int
+	fragmentSize int // WriteFrom chunk size.
+	compression  *handshake.Compression
+	shared       bool // Never attach a compressor.
 
 	rx        proto.Receiver
 	buf       []byte  // Transport read buffer.
@@ -107,7 +114,7 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 // Reset prepares c for a new transport, retaining storage.
 // The previous transport must no longer be in use by any goroutine.
 func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
-	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 {
+	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
 		return ErrInvalidConfig
 	}
 	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || c.SendWindowBits != 0 && (c.SendWindowBits < 8 || c.SendWindowBits > 15)) || cfg.CompressionIdle < 0 {
@@ -120,6 +127,10 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.limit = cfg.MaxMessageSize
 	if c.limit == 0 {
 		c.limit = DefaultMaxMessageSize
+	}
+	c.fragmentSize = cfg.FragmentSize
+	if c.fragmentSize == 0 {
+		c.fragmentSize = DefaultFragmentSize
 	}
 	if cap(c.buf) < size {
 		c.buf = make([]byte, size)

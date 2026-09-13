@@ -590,6 +590,7 @@ func TestInvalidConfig(t *testing.T) {
 		{Compression: &handshake.Compression{MinSize: -1}},
 		{Compression: &handshake.Compression{SendWindowBits: 7}},
 		{CompressionIdle: -1},
+		{FragmentSize: -1},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
 			t.Fatalf("%+v accepted", cfg)
@@ -1133,10 +1134,10 @@ func TestWriteFrom(t *testing.T) {
 	small := bytes.Repeat([]byte("s"), 1000)
 	large := bytes.Repeat([]byte("L"), 100000)
 
-	// Frame structure through a raw peer: one frame when it fits, else 32 KiB
-	// fragments and an empty final one. iotest.OneByteReader forces ReadFull
-	// to assemble chunks from tiny reads.
-	server, peer := raw(t, ws.Config{})
+	// Frame structure through a raw peer with 32 KiB fragments: one frame
+	// when it fits, else fragments with the last carrying FIN.
+	// iotest.OneByteReader forces ReadFull to assemble chunks from tiny reads.
+	server, peer := raw(t, ws.Config{FragmentSize: 32 << 10})
 	wait := run(t, func() error {
 		h, p := readFrame(t, peer)
 		if !h.Final() || h.Opcode() != codec.Text || !bytes.Equal(p, small) {
@@ -1166,6 +1167,19 @@ func TestWriteFrom(t *testing.T) {
 	}
 	wait()
 
+	// With the default fragment size the same 100000 bytes are one frame.
+	server, peer = raw(t, ws.Config{})
+	wait = run(t, func() error {
+		if h, p := readFrame(t, peer); !h.Final() || len(p) != len(large) {
+			return fmt.Errorf("default: final %v, %d bytes", h.Final(), len(p))
+		}
+		return nil
+	})
+	if _, err := server.WriteFrom(codec.Binary, bytes.NewReader(large)); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+
 	// Compressed, through a real peer.
 	server, client := compressionPair(t, true, true, 0)
 	wait = run(t, func() error {
@@ -1186,7 +1200,7 @@ func TestWriteFrom(t *testing.T) {
 	// A reader failure leaves the message open and reports only bytes sent.
 	// Here the lookahead read fails before the first chunk goes out, so the
 	// peer sees nothing but the ping.
-	server, peer = raw(t, ws.Config{})
+	server, peer = raw(t, ws.Config{FragmentSize: 32 << 10})
 	wait = run(t, func() error {
 		if h, _ := readFrame(t, peer); h.Opcode() != codec.Ping {
 			return fmt.Errorf("expected only a ping, got opcode %d", h.Opcode())

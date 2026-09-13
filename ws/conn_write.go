@@ -21,23 +21,34 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 	return c.send(op, payload)
 }
 
-// fromChunk is the fragment size WriteFrom reads and sends.
-const fromChunk = 32 << 10
+// fromPool holds WriteFrom chunk buffers; a buffer smaller than the
+// connection's fragment size is regrown.
+var fromPool sync.Pool
 
-var fromPool = sync.Pool{New: func() any { b := make([]byte, fromChunk); return &b }}
+func (c *Conn) getChunk() *[]byte {
+	bp, ok := fromPool.Get().(*[]byte)
+	if !ok {
+		bp = new([]byte)
+	}
+	if cap(*bp) < c.fragmentSize {
+		*bp = make([]byte, c.fragmentSize)
+	}
+	*bp = (*bp)[:c.fragmentSize]
+	return bp
+}
 
 // WriteFrom sends r's content as one message and returns the bytes sent.
-// Content that fits one 32 KiB read goes out as a single frame; longer
-// content is fragmented as it is read, one chunk ahead so the last chunk
-// carries the FIN and nothing is held in memory beyond two chunks. A read
-// error is returned with the message still open and the chunk being read
-// unsent, since a fragmented message cannot be withdrawn; close the
+// Content that fits one Config.FragmentSize read goes out as a single frame;
+// longer content is fragmented as it is read, one chunk ahead so the last
+// chunk carries the FIN and nothing is held in memory beyond two chunks. A
+// read error is returned with the message still open and the chunk being
+// read unsent, since a fragmented message cannot be withdrawn; close the
 // connection in that case.
 func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 	if op != codec.Text && op != codec.Binary {
 		return 0, ErrProtocol
 	}
-	cur := fromPool.Get().(*[]byte)
+	cur := c.getChunk()
 	defer fromPool.Put(cur)
 
 	n, err := io.ReadFull(r, *cur)
@@ -47,7 +58,7 @@ func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	next := fromPool.Get().(*[]byte)
+	next := c.getChunk()
 	defer fromPool.Put(next)
 	if err := c.BeginMessage(op); err != nil {
 		return 0, err
