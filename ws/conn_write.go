@@ -59,9 +59,6 @@ func (c *Conn) encodeData(op codec.Opcode, payload []byte) (header, body []byte,
 		c.comp.scratch = body
 		c.putCompressor(comp)
 	}
-	if err == nil {
-		c.noteCompressed()
-	}
 	return header, body, err
 }
 
@@ -215,9 +212,6 @@ func (c *Conn) endFragmented(err error) error {
 		if c.comp.shared || c.comp.window == nil {
 			c.releaseCompressor()
 		}
-	}
-	if err == nil && c.frag.compressed {
-		c.noteCompressed()
 	}
 	return err
 }

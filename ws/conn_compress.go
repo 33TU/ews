@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
@@ -19,14 +18,6 @@ type compressorContext struct {
 	window   *deflate.Window        // Send-direction history when takeover is negotiated.
 	attached *deflate.Compressor    // Continues window's stream between messages.
 	scratch  []byte                 // Holds a shared compressor's output until written.
-
-	// With Config.CompressionIdle set, the attached compressor returns to the
-	// pool after releaseAfter without a compressed write. One timer per
-	// connection, created on the first compressed write and reset on later
-	// ones; a reset costs tens of nanoseconds and no allocation.
-	releaseAfter time.Duration
-	releaseTimer *time.Timer
-	lastWrite    time.Time
 }
 
 // decompressorContext is the receive side. Used by the reading goroutine only.
@@ -43,8 +34,7 @@ type decompressorContext struct {
 // messages continue one stream instead of re-priming from the window on every
 // message. Attached is faster per message; shared is far smaller per
 // connection and wins once connections outnumber what the cache can hold.
-// Config.CompressionShared picks, and Config.CompressionIdle bounds how long
-// an idle attached connection holds its compressor.
+// Config.CompressionShared picks.
 var (
 	compressorPools  [12]sync.Pool // Full window, indexed by flate level + 2.
 	windowPools      [7]sync.Pool  // Reduced windows, indexed by window bits - 8.
@@ -96,32 +86,6 @@ func (c *Conn) compressorFor() (comp *deflate.Compressor, shared bool) {
 	}
 	c.comp.attached = comp
 	return comp, false
-}
-
-// noteCompressed arms the idle release after a compressed write. Callers hold wmu.
-func (c *Conn) noteCompressed() {
-	if c.comp.attached == nil || c.comp.releaseAfter == 0 {
-		return
-	}
-	c.comp.lastWrite = time.Now()
-	if c.comp.releaseTimer == nil {
-		c.comp.releaseTimer = time.AfterFunc(c.comp.releaseAfter, c.releaseIdleCompressor)
-		return
-	}
-	c.comp.releaseTimer.Reset(c.comp.releaseAfter)
-}
-
-func (c *Conn) releaseIdleCompressor() {
-	c.wmu.Lock()
-	defer c.wmu.Unlock()
-	if c.comp.attached == nil {
-		return
-	}
-	if remaining := c.comp.releaseAfter - time.Since(c.comp.lastWrite); remaining > 0 {
-		c.comp.releaseTimer.Reset(remaining)
-		return
-	}
-	c.releaseCompressor()
 }
 
 // releaseCompressor returns an attached compressor to the pool. Callers hold wmu.

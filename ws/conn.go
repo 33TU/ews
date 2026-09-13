@@ -4,7 +4,6 @@ import (
 	"io"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
@@ -54,10 +53,6 @@ type Config struct {
 	// wins once thousands of connections compete for cache. Without send
 	// context takeover compressors are always shared.
 	CompressionShared bool
-	// CompressionIdle releases an attached compressor to the shared pool
-	// after this long without a compressed write, keeping only the window;
-	// the next write re-primes once. Zero never releases.
-	CompressionIdle time.Duration
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler
 }
@@ -113,7 +108,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
 		return ErrInvalidConfig
 	}
-	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || !validBits(c.SendWindowBits) || !validBits(c.ReceiveWindowBits)) || cfg.CompressionIdle < 0 {
+	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || !validBits(c.SendWindowBits) || !validBits(c.ReceiveWindowBits)) {
 		return ErrInvalidConfig
 	}
 	size := cfg.ReadBufferSize
@@ -158,10 +153,6 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	c.frag.op, c.frag.heldCompressor = 0, false
 	c.queue = nil
 	c.releaseCompressor()
-	if c.comp.releaseTimer != nil {
-		c.comp.releaseTimer.Stop()
-	}
-	c.comp.releaseAfter = cfg.CompressionIdle
 	c.comp.shared = cfg.CompressionShared
 	c.comp.window = window(c.comp.window, cfg.Compression != nil && cfg.Compression.SendContextTakeover, bits(cfg.Compression, true))
 	c.wmu.Unlock()
