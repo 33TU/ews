@@ -499,6 +499,59 @@ func TestWindowed(t *testing.T) {
 	}
 }
 
+// TestCompressChunk sends messages in chunks and decodes the concatenated
+// fragments as one stream, with and without a window, then checks that a
+// following whole message still works.
+func TestCompressChunk(t *testing.T) {
+	c, err := deflate.NewCompressor(flate.BestSpeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := bytes.Repeat([]byte("chunked message fragments share one deflate stream "), 600)
+	for _, w := range []*deflate.Window{nil, new(deflate.Window)} {
+		var d deflate.Decompressor
+		var dw *deflate.Window
+		if w != nil {
+			dw = new(deflate.Window)
+		}
+		for round := 0; round < 2; round++ {
+			var wire []byte
+			for i := 0; i < len(message); i += 7000 {
+				end := min(i+7000, len(message))
+				out, err := c.CompressChunk(message[i:end], w, end == len(message))
+				if err != nil {
+					t.Fatal(err)
+				}
+				wire = append(wire, out...)
+			}
+			got, err := d.Decompress(wire, len(message), dw)
+			if err != nil || !bytes.Equal(got, message) {
+				t.Fatalf("window=%v round %d: %v", w != nil, round, err)
+			}
+			// An empty final chunk is how a sender ends a message of unknown length.
+			out, err := c.CompressChunk(message[:100], w, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wire = bytes.Clone(out)
+			if out, err = c.CompressChunk(nil, w, true); err != nil {
+				t.Fatal(err)
+			}
+			wire = append(wire, out...)
+			if got, err := d.Decompress(wire, 100, dw); err != nil || !bytes.Equal(got, message[:100]) {
+				t.Fatalf("empty final chunk: %v", err)
+			}
+		}
+		whole, err := c.Compress(message, w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := d.Decompress(bytes.Clone(whole), len(message), dw); err != nil || !bytes.Equal(got, message) {
+			t.Fatalf("whole message after chunks: %v", err)
+		}
+	}
+}
+
 // TestSharedHelpers interleaves two connections through one compressor and
 // one decompressor; each connection's history must stay intact.
 func TestSharedHelpers(t *testing.T) {

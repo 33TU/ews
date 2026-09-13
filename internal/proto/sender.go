@@ -42,6 +42,16 @@ func (s *Sender) EncodeCompressed(op codec.Opcode, payload []byte) (header, body
 	return s.encode(op, payload, true)
 }
 
+// EncodeFragment prepares one frame of a fragmented data message: the first
+// carries the message opcode, later ones Continuation, and only the last is
+// final. compressed sets RSV1 on a first frame.
+func (s *Sender) EncodeFragment(op codec.Opcode, final bool, payload []byte, compressed bool) (header, body []byte, err error) {
+	if op != codec.Text && op != codec.Binary && op != codec.Continuation {
+		return nil, nil, ErrProtocol
+	}
+	return s.encodeFrame(op, final, payload, compressed)
+}
+
 func (s *Sender) encode(op codec.Opcode, payload []byte, compressed bool) (header, body []byte, err error) {
 	if s.closeSent && op != codec.Pong {
 		return nil, nil, ErrClosing
@@ -60,15 +70,22 @@ func (s *Sender) encode(op codec.Opcode, payload []byte, compressed bool) (heade
 		return nil, nil, ErrProtocol
 	}
 
+	return s.encodeFrame(op, true, payload, compressed)
+}
+
+func (s *Sender) encodeFrame(op codec.Opcode, final bool, payload []byte, compressed bool) (header, body []byte, err error) {
+	if s.closeSent && op != codec.Pong {
+		return nil, nil, ErrClosing
+	}
 	var key *[4]byte
 	if s.role == Client {
 		rand.Read(s.key[:])
 		key = &s.key
 	}
 	if compressed {
-		err = s.enc.EncodeCompressed(true, op, payload, key)
+		err = s.enc.EncodeCompressed(final, op, payload, key)
 	} else {
-		err = s.enc.Encode(true, op, payload, key)
+		err = s.enc.Encode(final, op, payload, key)
 	}
 	if err != nil {
 		return nil, nil, err

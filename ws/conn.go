@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/internal/proto"
@@ -83,6 +84,10 @@ type Conn struct {
 	tx           proto.Sender
 	sendWindow   *deflate.Window     // Send-direction history when takeover is negotiated.
 	compressor   *deflate.Compressor // Attached while continuing sendWindow's stream.
+	fragOp       codec.Opcode        // Open fragmented message's opcode, or zero.
+	fragFirst    bool                // The next fragment carries fragOp.
+	fragCompress bool                // The open fragmented message is compressed.
+	fragHeld     bool                // The compressor was taken for the message in shared mode.
 	idle         time.Duration
 	idleTimer    *time.Timer
 	lastCompress time.Time
@@ -136,6 +141,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 
 	c.wmu.Lock()
 	c.tx.Init(proto.Role(cfg.Role))
+	c.fragOp, c.fragHeld = 0, false
 	c.releaseCompressor()
 	if c.idleTimer != nil {
 		c.idleTimer.Stop()

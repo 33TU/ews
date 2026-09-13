@@ -1009,6 +1009,111 @@ func TestSmallWindow(t *testing.T) {
 	}
 }
 
+// TestFragmentedSend streams messages in chunks, plain and compressed, in
+// attached and shared modes, with a ping between chunks, and checks the frame
+// structure through a raw peer.
+func TestFragmentedSend(t *testing.T) {
+	chunks := [][]byte{bytes.Repeat([]byte("first chunk "), 300), []byte("middle"), nil, bytes.Repeat([]byte("last chunk "), 500)}
+	var whole []byte
+	for _, ch := range chunks {
+		whole = append(whole, ch...)
+	}
+	for _, mode := range []string{"plain", "compressed", "compressed-shared", "compressed-takeover"} {
+		t.Run(mode, func(t *testing.T) {
+			var cfg ws.Config
+			if mode != "plain" {
+				cfg.Compression = &handshake.Compression{Level: flate.BestSpeed, MinSize: 1 << 20, SendContextTakeover: mode == "compressed-takeover"}
+				cfg.CompressionShared = mode == "compressed-shared"
+			}
+			server, peer := raw(t, cfg)
+			wait := run(t, func() error {
+				var assembled []byte
+				for i := 0; ; i++ {
+					h, p := readFrame(t, peer)
+					if h.Opcode() == codec.Ping {
+						continue // Nobody reads on the server side, so do not answer.
+					}
+					if i == 0 && (h.Opcode() != codec.Text || h.RSV1() != (mode != "plain")) || i > 0 && h.Opcode() != codec.Continuation || h.RSV1() && i > 0 {
+						return fmt.Errorf("frame %d header %x", i, h.Bytes())
+					}
+					assembled = append(assembled, p...)
+					if h.Final() {
+						// A compressed message's final fragment carries the
+						// header byte of the trimmed sync-flush block.
+						if len(p) > 1 || len(p) != 0 && mode == "plain" {
+							return fmt.Errorf("final frame carried %d bytes", len(p))
+						}
+						break
+					}
+				}
+				if mode != "plain" {
+					var d deflate.Decompressor
+					out, err := d.Decompress(assembled, len(whole), nil)
+					if err != nil {
+						return err
+					}
+					assembled = bytes.Clone(out)
+				}
+				if !bytes.Equal(assembled, whole) {
+					return fmt.Errorf("assembled %d bytes, want %d", len(assembled), len(whole))
+				}
+				return nil
+			})
+			if err := server.BeginMessage(codec.Text); err != nil {
+				t.Fatal(err)
+			}
+			if err := server.BeginMessage(codec.Text); err != ws.ErrMessageOpen {
+				t.Fatal("nested message accepted")
+			}
+			if err := server.Write(codec.Text, []byte("x")); err != ws.ErrMessageOpen {
+				t.Fatal("data write during fragmented message accepted")
+			}
+			for i, ch := range chunks {
+				if err := server.WriteChunk(ch); err != nil {
+					t.Fatal(err)
+				}
+				if i == 0 {
+					if err := server.Ping([]byte("mid")); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if err := server.EndMessage(); err != nil {
+				t.Fatal(err)
+			}
+			if err := server.EndMessage(); err != ws.ErrNoMessage {
+				t.Fatal("EndMessage without BeginMessage accepted")
+			}
+			wait()
+		})
+	}
+
+	// Through a real peer connection, across takeover history, as whole messages read.
+	server, client := compressionPair(t, true, true, 1<<20)
+	wait := run(t, func() error {
+		for i := 0; i < 3; i++ {
+			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, whole) {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+		}
+		return nil
+	})
+	for i := 0; i < 3; i++ {
+		if err := server.BeginMessage(codec.Binary); err != nil {
+			t.Fatal(err)
+		}
+		for _, ch := range chunks {
+			if err := server.WriteChunk(ch); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := server.EndMessage(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wait()
+}
+
 func TestNextMessageDiscardsCompressed(t *testing.T) {
 	server, client := compressionPair(t, true, true, 0)
 	wait := run(t, func() error {

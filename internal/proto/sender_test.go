@@ -27,6 +27,15 @@ func TestSender(t *testing.T) {
 	if _, _, err := s.EncodeCompressed(codec.Ping, nil); err != proto.ErrProtocol {
 		t.Fatal("compressed control frame accepted")
 	}
+	if h, _, err := s.EncodeFragment(codec.Text, false, []byte("a"), true); err != nil || h[0] != 0x41 {
+		t.Fatalf("first compressed fragment header %x, %v", h, err)
+	}
+	if h, _, err := s.EncodeFragment(codec.Continuation, true, nil, true); err != nil || h[0] != 0x80 {
+		t.Fatalf("final continuation header %x, %v", h, err)
+	}
+	if _, _, err := s.EncodeFragment(codec.Ping, false, nil, false); err != proto.ErrProtocol {
+		t.Fatal("fragmented control frame accepted")
+	}
 	for _, tt := range []struct {
 		code   uint16
 		reason string

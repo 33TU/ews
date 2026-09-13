@@ -177,7 +177,9 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 ```
 
-Both return the raw connection; the caller keeps it for deadlines and closing. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+Both return the raw connection; the caller keeps it for deadlines and closing.
+
+A message whose size is not known up front is sent in fragments: `BeginMessage(op)`, then `WriteChunk(p)` for each piece, which goes out as one frame immediately, then `EndMessage()`. Until `EndMessage`, `Write` returns `ErrMessageOpen` while `Ping`, `Pong`, and `Close` may interleave. Compressed fragments continue one deflate stream, so a fragmented message compresses as well as a whole one. `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
 
 ## Development
 

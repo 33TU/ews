@@ -18,6 +18,7 @@ type Compressor struct {
 
 	attached *Window // Window whose stream the encoder currently continues.
 	gen      uint64  // The window's generation when we last touched it.
+	mid      bool    // A chunked message is in progress; the next chunk continues it.
 }
 
 // NewCompressor creates a compressor using a flate compression level and the
@@ -52,34 +53,47 @@ func NewCompressorWindow(windowBits int) (*Compressor, error) {
 // With a window, the message continues that direction's history and the
 // window is updated; with nil, it is compressed on its own.
 func (c *Compressor) Compress(payload []byte, w *Window) ([]byte, error) {
+	return c.CompressChunk(payload, w, true)
+}
+
+// CompressChunk compresses one fragment of a message sent as it is produced.
+// The first chunk primes or continues the stream as Compress does, and later
+// chunks continue it, so the fragments decode as one message. Only the final
+// chunk drops the sync-flush tail; middle chunks keep it, since the receiver
+// only restores it once at the end. Output is borrowed until the next call.
+func (c *Compressor) CompressChunk(payload []byte, w *Window, final bool) ([]byte, error) {
 	c.output.Reset()
-	// When nothing but this compressor has touched the window since the last
-	// message, the encoder's history already is the window: keep writing.
-	// Otherwise prime from the window. Always ResetDict, never Reset: the
-	// writer's plain Reset re-primes with the previous dictionary.
-	if w == nil || w != c.attached || w.gen != c.gen {
+	// Mid-message the encoder must continue whatever the window says. Between
+	// messages, when nothing but this compressor has touched the window since
+	// the last one, the encoder's history already is the window: keep
+	// writing. Otherwise prime from the window. Always ResetDict, never
+	// Reset: the writer's plain Reset re-primes with the previous dictionary.
+	if !c.mid && (w == nil || w != c.attached || w.gen != c.gen) {
 		c.writer.ResetDict(&c.output, w.dict())
 	}
 	if _, err := c.writer.Write(payload); err != nil {
-		c.attached = nil
+		c.attached, c.mid = nil, false
 		return nil, err
 	}
 	if err := c.writer.Flush(); err != nil {
-		c.attached = nil
+		c.attached, c.mid = nil, false
 		return nil, err
 	}
-	c.attached = w
+	c.attached, c.mid = w, !final
 	if w != nil {
 		w.remember(payload)
 		c.gen = w.gen
 	}
 	output := c.output.Bytes()
-	return output[:len(output)-4], nil // Strip the permessage-deflate sync-flush tail.
+	if final {
+		output = output[:len(output)-4] // Strip the permessage-deflate sync-flush tail.
+	}
+	return output, nil
 }
 
 // Reset clears output and detaches from any window, retaining storage.
 func (c *Compressor) Reset() {
 	c.output.Reset()
 	c.writer.ResetDict(&c.output, nil)
-	c.attached = nil
+	c.attached, c.mid = nil, false
 }

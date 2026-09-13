@@ -266,10 +266,15 @@ nc.Close()
    which fixes the level. Decompression keeps the full window, which decodes
    any peer window. This passes Autobahn 13.3.x and 13.5.x and negotiates
    compression with a default gws server, whose windows are 12 bits.
-3. Fragmented send: `BeginMessage(op)`, `WriteChunk(b)` as non-final frames,
-   `EndMessage()` as an empty FIN frame, so the sender never needs to know
-   which chunk is last. Streaming compress fits, since the flate writer is
-   push-based.
+3. Fragmented send, done: `BeginMessage(op)`, `WriteChunk(b)` as non-final
+   frames, `EndMessage()` as the FIN frame, so the sender never needs to know
+   which chunk is last. Data writes from other callers get `ErrMessageOpen`
+   until the message ends; control frames interleave, as the protocol
+   allows. Compressed fragments continue one deflate stream through
+   `deflate.CompressChunk`: middle chunks keep their sync-flush tail, only
+   the last is trimmed, and the connection holds one compressor for the
+   message even in shared mode. The final compressed fragment carries the
+   one header byte of the trimmed block, which is inherent to the format.
 4. `reactor`. Reuses the push core and whole-message `deflate` unchanged.
    Streaming inflate is not offered on the reactor, decided up front: the
    klauspost and standard-library inflaters are pull-only and cannot resume

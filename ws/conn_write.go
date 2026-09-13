@@ -20,9 +20,97 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 	return c.send(op, payload)
 }
 
+// BeginMessage starts a fragmented text or binary message. Each WriteChunk
+// then sends one fragment and EndMessage finishes it. Until then Write and
+// BeginMessage return ErrMessageOpen; Ping, Pong, and Close may interleave,
+// as the protocol allows. The message is compressed whenever compression is
+// negotiated, regardless of MinSize.
+func (c *Conn) BeginMessage(op codec.Opcode) error {
+	if op != codec.Text && op != codec.Binary {
+		return ErrProtocol
+	}
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if c.fragOp != 0 {
+		return ErrMessageOpen
+	}
+	if c.tx.CloseSent() {
+		return ErrClosing
+	}
+	c.fragOp, c.fragFirst, c.fragCompress = op, true, c.compression != nil
+	if c.fragCompress && c.compressor == nil {
+		// Hold one compressor for the whole message so its chunks continue one stream.
+		c.compressor, c.fragHeld = c.getCompressor(), true
+	}
+	return nil
+}
+
+// WriteChunk sends one non-final fragment of the open message. Chunks are
+// delivered to the peer as they are written; an empty chunk sends an empty frame.
+func (c *Conn) WriteChunk(payload []byte) error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	return c.fragment(payload, false)
+}
+
+// EndMessage sends the final, empty fragment of the open message.
+func (c *Conn) EndMessage() error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	return c.fragment(nil, true)
+}
+
+// fragment sends one frame of the open message. Callers hold wmu.
+func (c *Conn) fragment(payload []byte, final bool) error {
+	if c.fragOp == 0 {
+		return ErrNoMessage
+	}
+	op := codec.Continuation
+	if c.fragFirst {
+		op = c.fragOp
+	}
+	if c.fragCompress {
+		var err error
+		if payload, err = c.compressor.CompressChunk(payload, c.sendWindow, final); err != nil {
+			return c.endFragmented(err)
+		}
+	}
+	header, body, err := c.tx.EncodeFragment(op, final, payload, c.fragCompress)
+	if err != nil {
+		return c.endFragmented(err)
+	}
+	if err := c.write(header, body); err != nil {
+		return c.endFragmented(err)
+	}
+	c.fragFirst = false
+	if final {
+		return c.endFragmented(nil)
+	}
+	return nil
+}
+
+// endFragmented closes the fragmented message state after its final frame or
+// a failure, returning any held compressor. Callers hold wmu.
+func (c *Conn) endFragmented(err error) error {
+	c.fragOp = 0
+	if c.fragHeld {
+		c.fragHeld = false
+		if c.shared || c.sendWindow == nil {
+			c.releaseCompressor()
+		}
+	}
+	if err == nil && c.fragCompress {
+		c.noteCompressed()
+	}
+	return err
+}
+
 func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
+	if c.fragOp != 0 {
+		return ErrMessageOpen
+	}
 	comp, shared := c.compressorFor()
 	if shared {
 		defer c.putCompressor(comp) // After the write: the body borrows its output.
@@ -71,6 +159,9 @@ func (c *Conn) CloseSent() bool {
 func (c *Conn) send(op codec.Opcode, payload []byte) error {
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
+	if c.fragOp != 0 && op != codec.Ping && op != codec.Pong && op != codec.Close {
+		return ErrMessageOpen
+	}
 	header, body, err := c.tx.Encode(op, payload)
 	if err != nil {
 		return err
