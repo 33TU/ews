@@ -180,7 +180,7 @@ func BenchmarkEcho(b *testing.B) {
 	}{{"ews", ewsServer}, {"gws", gwsServer}, {"gws-pull", gwsPullServer}}
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
-			for _, conns := range []int{1, 32, 128, 512, 1024} {
+			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {
 				for _, s := range servers {
 					name := fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, s.name)
 					b.Run(name, func(b *testing.B) {
