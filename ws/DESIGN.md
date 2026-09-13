@@ -260,8 +260,12 @@ nc.Close()
    explicit. A
    pooled decompressor stays attached until the next read so borrowed output
    holds; its per-message dictionary copy is inherent to klauspost's reader.
-   Offers asking this server for a window under 32 KB are declined and run
-   uncompressed, which Autobahn 13.3.x and 13.5.x report as unimplemented.
+   Reduced windows are honored: a server accepts `server_max_window_bits`
+   and a client offers `client_max_window_bits`, and `handshake.Compression.
+   SendWindowBits` selects a pooled `deflate.NewCompressorWindow` encoder,
+   which fixes the level. Decompression keeps the full window, which decodes
+   any peer window. This passes Autobahn 13.3.x and 13.5.x and negotiates
+   compression with a default gws server, whose windows are 12 bits.
 3. Fragmented send: `BeginMessage(op)`, `WriteChunk(b)` as non-final frames,
    `EndMessage()` as an empty FIN frame, so the sender never needs to know
    which chunk is last. Streaming compress fits, since the flate writer is

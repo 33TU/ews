@@ -30,7 +30,9 @@ type Options struct {
 	Protocols []string
 }
 
-// Compress configures permessage-deflate with the default 32 KB window.
+// Compress configures permessage-deflate. A peer may ask this endpoint to
+// compress with a window smaller than 32 KB; that is honored and reported in
+// Compression.SendWindowBits.
 type Compress struct {
 	// Level is the flate level for outgoing messages.
 	Level int
@@ -49,6 +51,10 @@ type Compression struct {
 	MinSize                int
 	SendContextTakeover    bool
 	ReceiveContextTakeover bool
+	// SendWindowBits is the LZ77 window this endpoint compresses with, 8 to
+	// 15. Zero means the full 15. Decompression always uses a 32 KB window,
+	// which decodes any peer window.
+	SendWindowBits int
 }
 
 // Result is what a completed handshake agreed on.

@@ -16,7 +16,9 @@ func NewRequest(opts Options) (Request, error) {
 		Protocols:  strings.Join(opts.Protocols, ", "),
 	}
 	if c := opts.Compression; c != nil {
-		req.Extensions = deflateName
+		// Offering client_max_window_bits lets the server shrink our window,
+		// which we can honor at any size.
+		req.Extensions = deflateName + "; client_max_window_bits"
 		if !c.ContextTakeover {
 			req.Extensions += "; client_no_context_takeover; server_no_context_takeover"
 		}
@@ -51,9 +53,7 @@ func Confirm(req Request, resp Response, opts Options) (Result, error) {
 		return Result{}, ErrBadExtension
 	}
 	p, ok := parseDeflate(exts[0])
-	// We did not offer client_max_window_bits, so the server may not set it.
-	// Some servers do anyway; 15 is the window we use, so it changes nothing.
-	if !ok || p.clientMaxWindowBits != 0 && p.clientMaxWindowBits != 15 {
+	if !ok {
 		return Result{}, ErrBadExtension
 	}
 	takeover := opts.Compression.ContextTakeover
@@ -62,6 +62,7 @@ func Confirm(req Request, resp Response, opts Options) (Result, error) {
 		MinSize:                opts.Compression.MinSize,
 		SendContextTakeover:    takeover && !p.clientNoContextTakeover,
 		ReceiveContextTakeover: takeover && !p.serverNoContextTakeover,
+		SendWindowBits:         p.clientMaxWindowBits, // The server's choice; zero keeps the full window.
 	}
 	return res, nil
 }

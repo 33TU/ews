@@ -587,6 +587,7 @@ func TestInvalidConfig(t *testing.T) {
 		{MaxMessageSize: -1},
 		{Compression: &handshake.Compression{Level: 10}},
 		{Compression: &handshake.Compression{MinSize: -1}},
+		{Compression: &handshake.Compression{SendWindowBits: 7}},
 		{CompressionIdle: -1},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
@@ -981,6 +982,31 @@ func TestCompressionShared(t *testing.T) {
 		}
 	}
 	wait()
+}
+
+// TestSmallWindow sends through reduced windows in both modes; the peer
+// decodes with its full window.
+func TestSmallWindow(t *testing.T) {
+	for _, shared := range []bool{false, true} {
+		sc := &handshake.Compression{Level: flate.BestSpeed, SendContextTakeover: true, SendWindowBits: 9}
+		cc := &handshake.Compression{Level: flate.BestSpeed, ReceiveContextTakeover: true}
+		server, client := pair(t, ws.Config{Compression: sc, CompressionShared: shared}, ws.Config{Compression: cc})
+		payload := bytes.Repeat([]byte("a 512 byte window still compresses repeats "), 400)
+		wait := run(t, func() error {
+			for i := 0; i < 3; i++ {
+				if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, payload) {
+					return fmt.Errorf("message %d: %v", i, err)
+				}
+			}
+			return nil
+		})
+		for i := 0; i < 3; i++ {
+			if err := server.Write(codec.Binary, payload); err != nil {
+				t.Fatal(err)
+			}
+		}
+		wait()
+	}
 }
 
 func TestNextMessageDiscardsCompressed(t *testing.T) {

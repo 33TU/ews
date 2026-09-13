@@ -33,8 +33,7 @@ func Negotiate(req Request, opts Options) (Response, Result, error) {
 				continue
 			}
 			p, ok := parseDeflate(e)
-			// The peer may ask us to use a smaller window; we only have 32 KB.
-			if !ok || p.serverMaxWindowBits != 0 && p.serverMaxWindowBits != 15 {
+			if !ok {
 				continue
 			}
 			takeover := opts.Compression.ContextTakeover
@@ -43,6 +42,7 @@ func Negotiate(req Request, opts Options) (Response, Result, error) {
 				MinSize:                opts.Compression.MinSize,
 				SendContextTakeover:    takeover && !p.serverNoContextTakeover,
 				ReceiveContextTakeover: takeover && !p.clientNoContextTakeover,
+				SendWindowBits:         p.serverMaxWindowBits, // Zero keeps the full window.
 			}
 			resp.Extensions = formatDeflate(res.Compression)
 			break

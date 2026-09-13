@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/33TU/ews/deflate"
+	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/internal/proto"
 )
 
@@ -19,21 +20,36 @@ import (
 // Config.CompressionShared picks, and Config.CompressionIdle bounds how long
 // an idle attached connection holds its compressor.
 var (
-	compressorPools  [12]sync.Pool // Indexed by flate level + 2.
+	compressorPools  [12]sync.Pool // Full window, indexed by flate level + 2.
+	windowPools      [7]sync.Pool  // Reduced windows, indexed by window bits - 8.
 	decompressorPool sync.Pool
 )
 
-func getCompressor(level int) *deflate.Compressor {
-	if c, ok := compressorPools[level+2].Get().(*deflate.Compressor); ok {
-		return c
+// compressorPool picks the pool for a negotiated configuration: a reduced
+// window fixes the encoder and ignores the level.
+func compressorPool(comp *handshake.Compression) *sync.Pool {
+	if bits := comp.SendWindowBits; bits != 0 && bits != 15 {
+		return &windowPools[bits-8]
 	}
-	c, _ := deflate.NewCompressor(level) // The level was validated by Reset.
-	return c
+	return &compressorPools[comp.Level+2]
 }
 
-func putCompressor(level int, c *deflate.Compressor) {
-	c.Reset()
-	compressorPools[level+2].Put(c)
+func (c *Conn) getCompressor() *deflate.Compressor {
+	if comp, ok := compressorPool(c.compression).Get().(*deflate.Compressor); ok {
+		return comp
+	}
+	// The configuration was validated by Reset.
+	if bits := c.compression.SendWindowBits; bits != 0 && bits != 15 {
+		comp, _ := deflate.NewCompressorWindow(bits)
+		return comp
+	}
+	comp, _ := deflate.NewCompressor(c.compression.Level)
+	return comp
+}
+
+func (c *Conn) putCompressor(comp *deflate.Compressor) {
+	comp.Reset()
+	compressorPool(c.compression).Put(comp)
 }
 
 // compressorFor returns the compressor for the next message, attaching a
@@ -44,7 +60,7 @@ func (c *Conn) compressorFor() (comp *deflate.Compressor, shared bool) {
 	if c.compressor != nil {
 		return c.compressor, false
 	}
-	comp = getCompressor(c.compression.Level)
+	comp = c.getCompressor()
 	if c.sendWindow == nil || c.shared {
 		return comp, true
 	}
@@ -81,7 +97,7 @@ func (c *Conn) releaseIdleCompressor() {
 // releaseCompressor returns an attached compressor to the pool. Callers hold wmu.
 func (c *Conn) releaseCompressor() {
 	if c.compressor != nil {
-		putCompressor(c.compression.Level, c.compressor)
+		c.putCompressor(c.compressor)
 		c.compressor = nil
 	}
 }

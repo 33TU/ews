@@ -149,11 +149,11 @@ compressed, err := compressor.Compress(payload, &send)
 message, err := decompressor.Decompress(compressed, 8<<20, &recv)
 ```
 
-Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches. Streaming decompression is available through `Begin` and `Read` over a `ChunkSource`.
+A peer may negotiate a smaller window for this endpoint's messages; `NewCompressorWindow(bits)` builds a compressor that never reaches further back, at the encoder's fixed level. Decompression always uses the full 32 KB window, which decodes any peer window. Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches. Streaming decompression is available through `Begin` and `Read` over a `ChunkSource`.
 
 ## Handshake and upgrade
 
-`handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation, and subprotocol selection. The root package connects it to `net/http`:
+`handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation including window sizes, and subprotocol selection. The root package connects it to `net/http`:
 
 ```go
 conn, res, err := ews.Upgrade(w, r, handshake.Options{Protocols: []string{"chat"}})
@@ -195,7 +195,7 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
   crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
 ```
 
-All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk. 13.3.x and 13.5.x report unimplemented, since offers asking the server for a window smaller than 32 KB are declined and those connections run uncompressed.
+All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk.
 
 `bench` is a separate module comparing echo servers end to end against other libraries over loopback TCP, driven by the same ews client. Results from a recent run are in `bench/RESULTS.md`:
 

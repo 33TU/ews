@@ -105,7 +105,7 @@ func (c *Conn) Reset(rw io.ReadWriter, cfg Config) error {
 	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 {
 		return ErrInvalidConfig
 	}
-	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0) || cfg.CompressionIdle < 0 {
+	if c := cfg.Compression; c != nil && (c.Level < -2 || c.Level > 9 || c.MinSize < 0 || c.SendWindowBits != 0 && (c.SendWindowBits < 8 || c.SendWindowBits > 15)) || cfg.CompressionIdle < 0 {
 		return ErrInvalidConfig
 	}
 	size := cfg.ReadBufferSize

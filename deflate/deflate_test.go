@@ -466,6 +466,39 @@ func TestAttachedWindow(t *testing.T) {
 	step(a, &w1, &r1, 2)
 }
 
+// TestWindowed checks compressors with reduced windows against a standard
+// decoder, with and without history, and the accepted range.
+func TestWindowed(t *testing.T) {
+	message := bytes.Repeat([]byte("windowed compression keeps matches short "), 800)
+	for _, bits := range []int{8, 9, 12, 15} {
+		c, err := deflate.NewCompressorWindow(bits)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cw deflate.Window
+		var history []byte
+		for i := 0; i < 3; i++ {
+			compressed, err := c.Compress(message, &cw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := stdflate.NewReaderDict(bytes.NewReader(append(bytes.Clone(compressed), tail...)), history)
+			got, err := io.ReadAll(r)
+			r.Close()
+			if err != nil || !bytes.Equal(got, message) {
+				t.Fatalf("bits %d message %d: %v", bits, i, err)
+			}
+			history = append(history, message...)
+			history = history[max(0, len(history)-(32<<10)):]
+		}
+	}
+	for _, bits := range []int{7, 16} {
+		if _, err := deflate.NewCompressorWindow(bits); err != deflate.ErrInvalidWindow {
+			t.Fatalf("bits %d: %v", bits, err)
+		}
+	}
+}
+
 // TestSharedHelpers interleaves two connections through one compressor and
 // one decompressor; each connection's history must stay intact.
 func TestSharedHelpers(t *testing.T) {

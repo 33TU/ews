@@ -56,20 +56,23 @@ func TestNegotiateDeflate(t *testing.T) {
 		want     string // Expected response header; empty means no compression.
 		send     bool
 		recv     bool
+		bits     int
 	}{
-		{"plain, no takeover", "permessage-deflate", false, "permessage-deflate; server_no_context_takeover; client_no_context_takeover", false, false},
-		{"plain, takeover", "permessage-deflate", true, "permessage-deflate", true, true},
-		{"client asks server no takeover", "permessage-deflate; server_no_context_takeover", true, "permessage-deflate; server_no_context_takeover", false, true},
-		{"client declares no takeover", "permessage-deflate; client_no_context_takeover", true, "permessage-deflate; client_no_context_takeover", true, false},
-		{"window bits accepted", "permessage-deflate; client_max_window_bits; server_max_window_bits=15", true, "permessage-deflate", true, true},
-		{"client window value", `permessage-deflate; client_max_window_bits="10"`, true, "permessage-deflate", true, true},
-		{"small server window skipped", "permessage-deflate; server_max_window_bits=10", true, "", false, false},
-		{"fallback offer", "permessage-deflate; server_max_window_bits=10, permessage-deflate; client_no_context_takeover", true, "permessage-deflate; client_no_context_takeover", true, false},
-		{"unknown param skipped", "permessage-deflate; foo=bar", true, "", false, false},
-		{"unknown extension ignored", "x-webkit-deflate-frame, permessage-deflate", true, "permessage-deflate", true, true},
-		{"duplicate param skipped", "permessage-deflate; client_no_context_takeover; client_no_context_takeover", true, "", false, false},
-		{"valued flag skipped", "permessage-deflate; server_no_context_takeover=1", true, "", false, false},
-		{"no offer", "", true, "", false, false},
+		{"plain, no takeover", "permessage-deflate", false, "permessage-deflate; server_no_context_takeover; client_no_context_takeover", false, false, 0},
+		{"plain, takeover", "permessage-deflate", true, "permessage-deflate", true, true, 0},
+		{"client asks server no takeover", "permessage-deflate; server_no_context_takeover", true, "permessage-deflate; server_no_context_takeover", false, true, 0},
+		{"client declares no takeover", "permessage-deflate; client_no_context_takeover", true, "permessage-deflate; client_no_context_takeover", true, false, 0},
+		{"window bits accepted", "permessage-deflate; client_max_window_bits; server_max_window_bits=15", true, "permessage-deflate", true, true, 15},
+		{"client window value", `permessage-deflate; client_max_window_bits="10"`, true, "permessage-deflate", true, true, 0},
+		{"small server window honored", "permessage-deflate; server_max_window_bits=10", true, "permessage-deflate; server_max_window_bits=10", true, true, 10},
+		{"small window with no takeover", "permessage-deflate; server_max_window_bits=8; server_no_context_takeover", true, "permessage-deflate; server_no_context_takeover; server_max_window_bits=8", false, true, 8},
+		{"fallback offer", "permessage-deflate; foo, permessage-deflate; client_no_context_takeover", true, "permessage-deflate; client_no_context_takeover", true, false, 0},
+		{"bad window bits skipped", "permessage-deflate; server_max_window_bits=7", true, "", false, false, 0},
+		{"unknown param skipped", "permessage-deflate; foo=bar", true, "", false, false, 0},
+		{"unknown extension ignored", "x-webkit-deflate-frame, permessage-deflate", true, "permessage-deflate", true, true, 0},
+		{"duplicate param skipped", "permessage-deflate; client_no_context_takeover; client_no_context_takeover", true, "", false, false, 0},
+		{"valued flag skipped", "permessage-deflate; server_no_context_takeover=1", true, "", false, false, 0},
+		{"no offer", "", true, "", false, false, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,7 +93,7 @@ func TestNegotiateDeflate(t *testing.T) {
 				return
 			}
 			c := res.Compression
-			if c == nil || c.Level != 6 || c.MinSize != 64 || c.SendContextTakeover != tt.send || c.ReceiveContextTakeover != tt.recv {
+			if c == nil || c.Level != 6 || c.MinSize != 64 || c.SendContextTakeover != tt.send || c.ReceiveContextTakeover != tt.recv || c.SendWindowBits != tt.bits {
 				t.Fatalf("compression %+v", c)
 			}
 		})

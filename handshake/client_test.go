@@ -12,11 +12,11 @@ func TestNewRequest(t *testing.T) {
 		t.Fatalf("%+v %v", req, err)
 	}
 	req, _ = handshake.NewRequest(handshake.Options{Compression: &handshake.Compress{}})
-	if req.Extensions != "permessage-deflate; client_no_context_takeover; server_no_context_takeover" {
+	if req.Extensions != "permessage-deflate; client_max_window_bits; client_no_context_takeover; server_no_context_takeover" {
 		t.Fatalf("offer %q", req.Extensions)
 	}
 	req, _ = handshake.NewRequest(handshake.Options{Compression: &handshake.Compress{ContextTakeover: true}})
-	if req.Extensions != "permessage-deflate" {
+	if req.Extensions != "permessage-deflate; client_max_window_bits" {
 		t.Fatalf("offer %q", req.Extensions)
 	}
 	if _, err := handshake.NewRequest(handshake.Options{Compression: &handshake.Compress{MinSize: -1}}); err != handshake.ErrInvalidOptions {
@@ -94,7 +94,7 @@ func TestConfirmRejects(t *testing.T) {
 		{"unrequested extension", func(r *handshake.Response) { r.Extensions = "permessage-deflate" }, handshake.Options{}, handshake.ErrBadExtension},
 		{"unknown extension", func(r *handshake.Response) { r.Extensions = "x-foo" }, opts, handshake.ErrBadExtension},
 		{"two extensions", func(r *handshake.Response) { r.Extensions = "permessage-deflate, permessage-deflate" }, opts, handshake.ErrBadExtension},
-		{"client window", func(r *handshake.Response) { r.Extensions = "permessage-deflate; client_max_window_bits=10" }, opts, handshake.ErrBadExtension},
+		{"client window out of range", func(r *handshake.Response) { r.Extensions = "permessage-deflate; client_max_window_bits=16" }, opts, handshake.ErrBadExtension},
 		{"unknown param", func(r *handshake.Response) { r.Extensions = "permessage-deflate; foo" }, opts, handshake.ErrBadExtension},
 	}
 	for _, tt := range tests {
@@ -111,13 +111,14 @@ func TestConfirmRejects(t *testing.T) {
 	if _, err := handshake.Confirm(req, resp, opts); err != handshake.ErrBadExtension {
 		t.Fatal("duplicate parameter accepted")
 	}
-	resp.Extensions = "permessage-deflate; server_max_window_bits=15; client_max_window_bits=15"
-	if _, err := handshake.Confirm(req, resp, opts); err != nil {
-		t.Fatalf("unoffered client_max_window_bits=15 must be harmless: %v", err)
+	resp.Extensions = "permessage-deflate; server_max_window_bits=12; client_max_window_bits=12" // gws's default response.
+	res, err := handshake.Confirm(req, resp, opts)
+	if err != nil || res.Compression.SendWindowBits != 12 {
+		t.Fatalf("server-chosen client window: %+v %v", res, err)
 	}
 	resp.Extensions = "permessage-deflate; server_max_window_bits=12; server_no_context_takeover"
-	res, err := handshake.Confirm(req, resp, opts)
-	if err != nil || res.Compression == nil || res.Compression.ReceiveContextTakeover || !res.Compression.SendContextTakeover {
+	res, err = handshake.Confirm(req, resp, opts)
+	if err != nil || res.Compression == nil || res.Compression.ReceiveContextTakeover || !res.Compression.SendContextTakeover || res.Compression.SendWindowBits != 0 {
 		t.Fatalf("%+v %v", res, err)
 	}
 }

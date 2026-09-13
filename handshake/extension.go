@@ -106,7 +106,7 @@ func windowBits(value string) (int, bool) {
 	return n, true
 }
 
-// formatDeflate builds the header value for a negotiated configuration.
+// formatDeflate builds the server's header value for a negotiated configuration.
 func formatDeflate(c *Compression) string {
 	s := deflateName
 	if !c.SendContextTakeover {
@@ -114,6 +114,9 @@ func formatDeflate(c *Compression) string {
 	}
 	if !c.ReceiveContextTakeover {
 		s += "; client_no_context_takeover"
+	}
+	if c.SendWindowBits != 0 && c.SendWindowBits != 15 {
+		s += "; server_max_window_bits=" + strconv.Itoa(c.SendWindowBits)
 	}
 	return s
 }

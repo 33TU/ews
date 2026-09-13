@@ -12,6 +12,7 @@ var (
 	ErrMessageTooLarge = errors.New("ews/deflate: decompressed message exceeds limit")
 	ErrInvalidLimit    = errors.New("ews/deflate: negative output limit")
 	ErrNoMessage       = errors.New("ews/deflate: no message in progress")
+	ErrInvalidWindow   = errors.New("ews/deflate: window bits must be 8 to 15")
 )
 
 // ChunkSource supplies the compressed bytes of one message in order. Chunks

@@ -20,11 +20,28 @@ type Compressor struct {
 	gen      uint64  // The window's generation when we last touched it.
 }
 
-// NewCompressor creates a compressor using a flate compression level.
+// NewCompressor creates a compressor using a flate compression level and the
+// full 32 KB window.
 func NewCompressor(level int) (*Compressor, error) {
 	c := new(Compressor)
 	var err error
 	c.writer, err = flate.NewWriter(&c.output, level)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// NewCompressorWindow creates a compressor whose matches never reach back
+// more than 1<<windowBits bytes, for peers that negotiated a smaller window.
+// windowBits is 8 to 15; the compression level is fixed by the encoder.
+func NewCompressorWindow(windowBits int) (*Compressor, error) {
+	if windowBits < 8 || windowBits > 15 {
+		return nil, ErrInvalidWindow
+	}
+	c := new(Compressor)
+	var err error
+	c.writer, err = flate.NewWriterWindow(&c.output, 1<<windowBits)
 	if err != nil {
 		return nil, err
 	}

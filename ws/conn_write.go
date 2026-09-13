@@ -25,7 +25,7 @@ func (c *Conn) sendCompressed(op codec.Opcode, payload []byte) error {
 	defer c.wmu.Unlock()
 	comp, shared := c.compressorFor()
 	if shared {
-		defer putCompressor(c.compression.Level, comp) // After the write: the body borrows its output.
+		defer c.putCompressor(comp) // After the write: the body borrows its output.
 	}
 	compressed, err := comp.Compress(payload, c.sendWindow)
 	if err != nil {
