@@ -43,11 +43,15 @@ bench-echo benchtime="500ms":
 
 # The echo comparison built with GOEXPERIMENT=simd, written to bench/echo/RESULTS-simd.md.
 bench-echo-simd benchtime="500ms":
-    cd bench/echo && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
+    cd bench/echo && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
 
 # Broadcast comparison, one message to many connections; regenerates bench/broadcast/RESULTS.md.
 bench-broadcast benchtime="1s":
     cd bench/broadcast && go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS.md
+
+# The broadcast comparison built with GOEXPERIMENT=simd, written to bench/broadcast/RESULTS-simd.md.
+bench-broadcast-simd benchtime="1s":
+    cd bench/broadcast && GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
 
 # Fan-out benchmark: bursts of small messages per event, batched and unbatched.
 bench-fanout:

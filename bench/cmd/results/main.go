@@ -153,7 +153,11 @@ func main() {
 		}
 		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime %s | go run ../cmd/results` at ews commit `%s`.\n\n",
 			f.title, time.Now().Format("2006-01-02"), fam, *benchtime, run("git", "rev-parse", "--short", "HEAD"))
-		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s\n- gws: %s\n- coder/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), modVersion("lxzan/gws"), modVersion("coder/websocket"), f.setup)
+		build := "default build: SWAR masking and the shift-based UTF-8 validator"
+		if strings.Contains(os.Getenv("GOEXPERIMENT"), "simd") {
+			build = "`GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation"
+		}
+		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- gws: %s\n- coder/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, modVersion("lxzan/gws"), modVersion("coder/websocket"), f.setup)
 		comps := []string{""}
 		if _, ok := rowLabels[fam+"/false"]; ok {
 			comps = []string{"false", "true"}
