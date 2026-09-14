@@ -3,22 +3,18 @@
 // separate module so the root module stays free of those dependencies.
 //
 //	cd bench && go test -run ^$ -bench . -benchtime=1s | go run ./cmd/results > RESULTS.md
-package bench
+package echo
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io"
-	"math/rand/v2"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/33TU/ews"
+	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
@@ -27,7 +23,7 @@ import (
 	"github.com/lxzan/gws"
 )
 
-// ---- servers -------------------------------------------------------------
+// Echo servers for each library, all driven by the same ews client.
 
 func ewsServer(compress bool) *httptest.Server { return ewsServerWith(compress, false) }
 
@@ -74,7 +70,7 @@ func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
 // like-for-like shape against ews. gws's ReadLoop shares the whole frame path
 // and measured the same within noise.
 func gwsServer(compress bool) *httptest.Server {
-	up := gwsUpgrader(compress, gws.BuiltinEventHandler{})
+	up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
 		if err != nil {
@@ -94,7 +90,7 @@ func gwsServer(compress bool) *httptest.Server {
 // gwsStreamServer pipes gws's NextReader into WriteFile, its streaming shape:
 // no message is held whole.
 func gwsStreamServer(compress bool) *httptest.Server {
-	up := gwsUpgrader(compress, gws.BuiltinEventHandler{})
+	up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
 		if err != nil {
@@ -110,20 +106,6 @@ func gwsStreamServer(compress bool) *httptest.Server {
 			}
 		}
 	}))
-}
-
-func gwsUpgrader(compress bool, handler gws.Event) *gws.Upgrader {
-	return gws.NewUpgrader(handler, &gws.ServerOption{
-		ReadMaxPayloadSize: 64 << 20,
-		PermessageDeflate: gws.PermessageDeflate{
-			Enabled:               compress,
-			ServerContextTakeover: true,
-			ClientContextTakeover: true,
-			ServerMaxWindowBits:   15, // Match the 32 KB window ews uses.
-			ClientMaxWindowBits:   15,
-			Level:                 flate.BestSpeed,
-		},
-	})
 }
 
 func coderServer(compress bool) *httptest.Server {
@@ -187,71 +169,7 @@ func coderStreamServer(compress bool) *httptest.Server {
 	}))
 }
 
-// ---- client (ews for all servers) -----------------------------------------
-
-func dial(tb testing.TB, url string, compress bool) *ws.Conn {
-	tb.Helper()
-	var opts handshake.Options
-	if compress {
-		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
-	}
-	req, err := handshake.NewRequest(opts)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	addr := strings.TrimPrefix(url, "http://")
-	nc, err := net.Dial("tcp", addr)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "GET / HTTP/1.1\r\nHost: %s\r\nUpgrade: %s\r\nConnection: %s\r\nSec-WebSocket-Version: %s\r\nSec-WebSocket-Key: %s\r\n",
-		addr, req.Upgrade, req.Connection, req.Version, req.Key)
-	if req.Extensions != "" {
-		fmt.Fprintf(&b, "Sec-WebSocket-Extensions: %s\r\n", req.Extensions)
-	}
-	b.WriteString("\r\n")
-	if _, err := nc.Write([]byte(b.String())); err != nil {
-		tb.Fatal(err)
-	}
-	br := bufio.NewReader(nc)
-	resp, err := http.ReadResponse(br, nil)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	res, err := handshake.Confirm(req, handshake.Response{
-		Status: resp.StatusCode, Upgrade: resp.Header.Get("Upgrade"), Connection: resp.Header.Get("Connection"),
-		Accept: resp.Header.Get("Sec-WebSocket-Accept"), Extensions: resp.Header.Get("Sec-WebSocket-Extensions"),
-	}, opts)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if compress && res.Compression == nil {
-		tb.Fatal("compression not negotiated")
-	}
-	c, err := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{br, nc}, ws.Config{Role: ws.Client, MaxMessageSize: 64 << 20, Compression: res.Compression})
-	if err != nil {
-		tb.Fatal(err)
-	}
-	return c
-}
-
 // ---- benchmark -------------------------------------------------------------
-
-func payload(size int, compressible bool) []byte {
-	if compressible {
-		return bytes.Repeat([]byte("{\"type\":\"update\",\"value\":42,\"text\":\"hello world\"} "), size/48+1)[:size]
-	}
-	p := make([]byte, size)
-	r := rand.New(rand.NewPCG(1, 2))
-	for i := range p {
-		p[i] = byte(r.Uint32())
-	}
-	return p
-}
 
 func BenchmarkEcho(b *testing.B) {
 	servers := []struct {
@@ -270,10 +188,10 @@ func BenchmarkEcho(b *testing.B) {
 					b.Run(name, func(b *testing.B) {
 						srv := s.start(compress)
 						defer srv.Close()
-						msg := payload(size, compress)
+						msg := harness.Payload(size, compress)
 						clients := make([]*ws.Conn, conns)
 						for i := range clients {
-							clients[i] = dial(b, srv.URL, compress)
+							clients[i] = harness.Dial(b, srv.URL, compress)
 						}
 						// Warm up pools and negotiate once before measuring.
 						for _, c := range clients {

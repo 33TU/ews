@@ -124,7 +124,7 @@ if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
 ```
 
-With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/RESULTS.md` has the measurements behind this.
+With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/echo/RESULTS.md` has the measurements behind this.
 
 `EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
 
@@ -224,10 +224,10 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
 
 All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk.
 
-`bench` is a separate module comparing echo servers end to end against other libraries over loopback TCP, driven by the same ews client. Results from a recent run are in `bench/RESULTS.md`:
+`bench` is a separate module comparing ews with other libraries end to end over loopback TCP, driven by the same ews client: `bench/echo` for request-response across message sizes and connection counts, `bench/broadcast` for one message to many connections. Each has a results file from a recent run:
 
 ```sh
-cd bench && go test -run '^$' -bench . -benchtime=1s | go run ./cmd/results > RESULTS.md
+cd bench/echo && go test -run '^$' -bench Echo -benchtime=1s | go run ../cmd/results > RESULTS.md
 ```
 
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.

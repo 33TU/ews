@@ -1,6 +1,10 @@
-// Command results turns the output of the echo benchmark into RESULTS.md.
+// Command results turns benchmark output into a Markdown results file.
 //
-//	go test -run '^$' -bench . -benchtime=1s | go run ./cmd/results > RESULTS.md
+//	go test -run '^$' -bench . -benchtime 1s | go run ../cmd/results > RESULTS.md
+//
+// It understands names of the form Benchmark<Family>/key=value/.../<server>,
+// renders one table per compression mode with servers as columns, and adds
+// the notes registered for the family.
 package main
 
 import (
@@ -17,119 +21,254 @@ import (
 )
 
 type key struct {
-	compress bool
-	size     int
-	conns    int
-	lib      string
+	family string
+	dims   string // Row dimensions joined, excluding compress.
+	comp   string // compress value, or "".
+	lib    string
 }
 
 type result struct {
-	mbs    float64
-	bytes  int
-	allocs int
+	ns, mbs, msgs float64
+	bytes, allocs int
 }
 
-var line = regexp.MustCompile(`^BenchmarkEcho/compress=(\w+)/size=(\d+)/conns=(\d+)/([\w-]+)-\d+\s+\d+\s+[\d.]+ ns/op\s+([\d.]+) MB/s\s+(\d+) B/op\s+(\d+) allocs/op`)
+type family struct {
+	title, setup, reading string
+}
+
+var families = map[string]family{
+	"Echo": {
+		title: "Echo benchmark results",
+		setup: `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all driven by the same ews client, one ping-pong at a time per connection. Throughput counts payload bytes in one direction per round trip. Allocations are process-wide per message; the ews client allocates nothing, so they are effectively the server's.
+
+- ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
+- ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
+- ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
+- ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
+- ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
+- ` + "`coder-stream`" + `: coder/websocket piping ` + "`Reader`" + ` into ` + "`Writer`" + ` through a reusable buffer, so no message is held whole.
+
+Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+
+Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
+`,
+		reading: `- Small messages are bound by loopback round trips, so all servers tie uncompressed. Compressed, ews leads because its deflate path allocates nothing and reuses pooled or per-connection helpers.
+- 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
+- Large messages favor ews and the streaming variants. gws's and coder's simple read APIs allocate a buffer above their pool thresholds on every such message.
+- With hundreds of connections and 256 KiB messages every library is bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
+- coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
+`,
+	},
+	"Broadcast": {
+		title: "Broadcast benchmark results",
+		setup: `One 256-byte message delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second; allocations are process-wide per round.
+
+- ` + "`ews`" + `: ` + "`Prepare`" + ` once, then ` + "`SendPrepared`" + ` on each connection's ` + "`Queue`" + `, returning before the writes complete.
+- ` + "`ews-sync`" + `: ` + "`Prepare`" + ` once, then ` + "`WritePrepared`" + ` on each connection in a loop, waiting for each write.
+- ` + "`gws`" + `: ` + "`NewBroadcaster`" + ` once, then ` + "`Broadcast`" + ` on each connection through its per-connection worker.
+
+Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use ` + "`CompressionShared`" + `, the mode meant for many connections. Every server reads through its own ` + "`ReadMessage`" + `.
+`,
+		reading: `- Uncompressed, a round is one write per connection and one read per client, and the kernel's cost for those dominates; the asynchronous paths tie at that floor, and only the allocation counts differ.
+- A synchronous loop serializes every write on one goroutine, so it trails the queued paths by several times as connections grow.
+- Compressed, the message is compressed once in both libraries and only the per-connection history update and the clients' decompression remain; ews's amortized window update keeps that cheap.
+`,
+	},
+}
+
+var line = regexp.MustCompile(`^Benchmark(\w+)/(\S+?)-\d+\s+\d+\s+([\d.]+) ns/op(.*)$`)
 
 func main() {
 	rows := map[key]result{}
-	var sizes, conns []int
-	libs := map[bool][]string{} // Servers seen per compression mode.
+	var famOrder []string
+	dimOrder := map[string][]string{}  // family -> row dims in first-seen order
+	libOrder := map[string][]string{}  // family+comp -> libs in first-seen order
+	rowLabels := map[string][]string{} // family+comp -> row dims joined, first-seen order
 	seen := map[string]bool{}
+
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		m := line.FindStringSubmatch(sc.Text())
 		if m == nil {
 			continue
 		}
-		k := key{m[1] == "true", atoi(m[2]), atoi(m[3]), m[4]}
-		mbs, _ := strconv.ParseFloat(m[5], 64)
-		rows[k] = result{mbs, atoi(m[6]), atoi(m[7])}
-		if !seen["s"+m[2]] {
-			seen["s"+m[2]] = true
-			sizes = append(sizes, k.size)
+		fam, name, ns, rest := m[1], m[2], m[3], m[4]
+		segs := strings.Split(name, "/")
+		if strings.Contains(segs[len(segs)-1], "=") {
+			continue // No server column; not a comparison.
 		}
-		if !seen["c"+m[3]] {
-			seen["c"+m[3]] = true
-			conns = append(conns, k.conns)
+		lib := segs[len(segs)-1]
+		comp := ""
+		var dims []string
+		for _, s := range segs[:len(segs)-1] {
+			k, v, _ := strings.Cut(s, "=")
+			if k == "compress" {
+				comp = v
+				continue
+			}
+			dims = append(dims, s)
 		}
-		if !seen["l"+m[1]+m[4]] {
-			seen["l"+m[1]+m[4]] = true
-			libs[k.compress] = append(libs[k.compress], k.lib)
+		k := key{fam, strings.Join(dims, "/"), comp, lib}
+		var r result
+		r.ns, _ = strconv.ParseFloat(ns, 64)
+		r.mbs = metric(rest, "MB/s")
+		r.msgs = metric(rest, "msgs/s")
+		r.bytes = int(metric(rest, "B/op"))
+		r.allocs = int(metric(rest, "allocs/op"))
+		rows[k] = r
+		if !seen[fam] {
+			seen[fam] = true
+			famOrder = append(famOrder, fam)
+		}
+		if dimOrder[fam] == nil {
+			for _, d := range dims {
+				kk, _, _ := strings.Cut(d, "=")
+				dimOrder[fam] = append(dimOrder[fam], kk)
+			}
+		}
+		fc := fam + "/" + comp
+		if !seen["l/"+fc+"/"+lib] {
+			seen["l/"+fc+"/"+lib] = true
+			libOrder[fc] = append(libOrder[fc], lib)
+		}
+		if !seen["r/"+fc+"/"+k.dims] {
+			seen["r/"+fc+"/"+k.dims] = true
+			rowLabels[fc] = append(rowLabels[fc], k.dims)
 		}
 	}
 	if len(rows) == 0 {
 		fmt.Fprintln(os.Stderr, "no benchmark lines found on stdin")
 		os.Exit(1)
 	}
-	sort.Ints(sizes)
-	sort.Ints(conns)
-	for _, l := range libs {
-		sort.SliceStable(l, func(i, j int) bool { return libRank(l[i]) < libRank(l[j]) })
-	}
 
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
-	fmt.Fprintf(w, "# Echo benchmark results\n\nGenerated %s from `go test -run '^$' -bench . -benchtime=1s | go run ./cmd/results` at ews commit `%s`.\n\n",
-		time.Now().Format("2006-01-02"), run("git", "rev-parse", "--short", "HEAD"))
-	fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s\n- gws: %s\n\n", cpu(), run("uname", "-r"), runtime.Version(), gwsVersion())
-	fmt.Fprint(w, setup)
-	for _, compress := range []bool{false, true} {
-		title := "Uncompressed"
-		if compress {
-			title = "Compressed"
+	for _, fam := range famOrder {
+		f := families[fam]
+		if f.title == "" {
+			f.title = fam + " benchmark results"
 		}
-		libs := libs[compress]
-		fmt.Fprintf(w, "## %s\n\n| Size | Conns | %s | allocs/op %s |\n|---|---|%s---|\n", title, strings.Join(libs, " | "), strings.Join(libs, " / "), strings.Repeat("---|", len(libs)))
-		for _, size := range sizes {
-			for _, c := range conns {
+		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime 1s | go run ../cmd/results` at ews commit `%s`.\n\n",
+			f.title, time.Now().Format("2006-01-02"), fam, run("git", "rev-parse", "--short", "HEAD"))
+		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s\n- gws: %s\n- coder/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), modVersion("lxzan/gws"), modVersion("coder/websocket"), f.setup)
+		comps := []string{""}
+		if _, ok := rowLabels[fam+"/false"]; ok {
+			comps = []string{"false", "true"}
+		}
+		for _, comp := range comps {
+			fc := fam + "/" + comp
+			libs := libOrder[fc]
+			sort.SliceStable(libs, func(i, j int) bool { return libRank(libs[i]) < libRank(libs[j]) })
+			title := "Results"
+			switch comp {
+			case "false":
+				title = "Uncompressed"
+			case "true":
+				title = "Compressed"
+			}
+			heads := make([]string, len(dimOrder[fam]))
+			for i, d := range dimOrder[fam] {
+				heads[i] = strings.ToUpper(d[:1]) + d[1:]
+			}
+			fmt.Fprintf(w, "## %s\n\n| %s | %s | allocs/op %s |\n|%s%s---|\n", title, strings.Join(heads, " | "), strings.Join(libs, " | "), strings.Join(libs, " / "), strings.Repeat("---|", len(heads)), strings.Repeat("---|", len(libs)))
+			labels := rowLabels[fc]
+			sort.SliceStable(labels, func(i, j int) bool { return dimLess(labels[i], labels[j]) })
+			for _, label := range labels {
 				var cells, allocs []string
 				for _, lib := range libs {
-					r, ok := rows[key{compress, size, c, lib}]
+					r, ok := rows[key{fam, label, comp, lib}]
 					if !ok {
 						cells, allocs = append(cells, "n/a"), append(allocs, "n/a")
 						continue
 					}
-					cells = append(cells, throughput(r.mbs))
+					cells = append(cells, throughput(r))
 					a := strconv.Itoa(r.allocs)
 					if r.bytes >= 1024 {
 						a += fmt.Sprintf(" (%d KB)", r.bytes/1024)
 					}
 					allocs = append(allocs, a)
 				}
-				fmt.Fprintf(w, "| %s | %d | %s | %s |\n", sizeLabel(size), c, strings.Join(cells, " | "), strings.Join(allocs, " / "))
+				fmt.Fprintf(w, "| %s | %s | %s |\n", rowCells(label), strings.Join(cells, " | "), strings.Join(allocs, " / "))
 			}
+			fmt.Fprintln(w)
 		}
-		fmt.Fprintln(w)
+		if f.reading != "" {
+			fmt.Fprintf(w, "## Reading the numbers\n\n%s\n", f.reading)
+		}
 	}
-	fmt.Fprint(w, reading)
 }
 
-func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
+func metric(rest, unit string) float64 {
+	m := regexp.MustCompile(`([\d.]+) ` + regexp.QuoteMeta(unit)).FindStringSubmatch(rest)
+	if m == nil {
+		return 0
+	}
+	v, _ := strconv.ParseFloat(m[1], 64)
+	return v
+}
+
+func throughput(r result) string {
+	switch {
+	case r.mbs >= 1000:
+		return fmt.Sprintf("%.1f GB/s", r.mbs/1000)
+	case r.mbs > 0:
+		return fmt.Sprintf("%.0f MB/s", r.mbs)
+	case r.msgs >= 1e6:
+		return fmt.Sprintf("%.2fM msgs/s", r.msgs/1e6)
+	case r.msgs > 0:
+		return fmt.Sprintf("%.0fk msgs/s", r.msgs/1e3)
+	default:
+		return fmt.Sprintf("%.0f µs", r.ns/1000)
+	}
+}
+
+// rowCells renders "size=16384/conns=32" as "16 KiB | 32".
+func rowCells(label string) string {
+	var out []string
+	for _, d := range strings.Split(label, "/") {
+		k, v, _ := strings.Cut(d, "=")
+		if n, err := strconv.Atoi(v); err == nil && k == "size" {
+			if n < 1024 {
+				v = fmt.Sprintf("%d B", n)
+			} else {
+				v = fmt.Sprintf("%d KiB", n/1024)
+			}
+		}
+		out = append(out, v)
+	}
+	return strings.Join(out, " | ")
+}
+
+// dimLess orders rows numerically dimension by dimension.
+func dimLess(a, b string) bool {
+	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
+	for i := range as {
+		if i >= len(bs) {
+			return false
+		}
+		_, av, _ := strings.Cut(as[i], "=")
+		_, bv, _ := strings.Cut(bs[i], "=")
+		an, aerr := strconv.Atoi(av)
+		bn, berr := strconv.Atoi(bv)
+		switch {
+		case aerr == nil && berr == nil && an != bn:
+			return an < bn
+		case av != bv:
+			return av < bv
+		}
+	}
+	return false
+}
 
 // libRank orders server columns: ews first, then each library with its
-// streaming variant beside it; unknown names go last in input order.
+// variants beside it; unknown names go last in input order.
 func libRank(name string) int {
-	for i, known := range []string{"ews", "ews-shared", "gws", "gws-stream", "coder", "coder-stream"} {
+	for i, known := range []string{"ews", "ews-shared", "ews-sync", "gws", "gws-stream", "coder", "coder-stream"} {
 		if name == known {
 			return i
 		}
 	}
 	return 100
-}
-
-func throughput(mbs float64) string {
-	if mbs >= 1000 {
-		return fmt.Sprintf("%.1f GB/s", mbs/1000)
-	}
-	return fmt.Sprintf("%.0f MB/s", mbs)
-}
-
-func sizeLabel(n int) string {
-	if n < 1024 {
-		return fmt.Sprintf("%d B", n)
-	}
-	return fmt.Sprintf("%d KiB", n/1024)
 }
 
 func run(name string, args ...string) string {
@@ -154,41 +293,20 @@ func cpu() string {
 	return runtime.GOARCH
 }
 
-func gwsVersion() string {
-	data, err := os.ReadFile("go.mod")
-	if err != nil {
-		return "unknown"
-	}
-	for _, l := range strings.Split(string(data), "\n") {
-		if strings.Contains(l, "lxzan/gws") {
-			f := strings.Fields(l)
-			return f[len(f)-1]
+// modVersion reads a dependency's version from the module's go.mod, looked
+// for in the working directory and its parent.
+func modVersion(mod string) string {
+	for _, p := range []string{"go.mod", "../go.mod"} {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		for _, l := range strings.Split(string(data), "\n") {
+			if strings.Contains(l, mod) {
+				f := strings.Fields(l)
+				return f[len(f)-1]
+			}
 		}
 	}
 	return "unknown"
 }
-
-const setup = `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all driven by the same ews client, one ping-pong at a time per connection. Throughput counts payload bytes in one direction per round trip. Allocations are process-wide per message; the ews client allocates nothing, so they are effectively the server's.
-
-- ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
-- ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
-- ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
-- ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
-- ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
-- ` + "`coder-stream`" + `: coder/websocket piping ` + "`Reader`" + ` into ` + "`Writer`" + ` through a reusable buffer, so no message is held whole.
-
-Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits, which ews does not implement. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
-
-Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
-
-`
-
-const reading = `## Reading the numbers
-
-- Small messages are bound by loopback round trips, so all three tie uncompressed. Compressed, ews leads because its deflate path allocates nothing and reuses pooled or per-connection helpers.
-- 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
-- Large messages favor ews. gws allocates a buffer above its pool threshold on every such message, over half a megabyte uncompressed and over a megabyte compressed.
-- With hundreds of connections and 256 KiB messages both libraries are bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
-- coder/websocket allocates on every message and, with context takeover, resets a pooled flate writer with the 32 KB history per message, which is the priming cost ews avoids by keeping a compressor attached.
-- coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
-`
