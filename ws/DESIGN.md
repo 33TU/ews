@@ -225,6 +225,19 @@ against 2 percent of CPU in a 2048-connection broadcast. `Prepared` storage is p
 reference count: queues and batches retain while holding a message and
 release after the write, and the owner's `Release` is optional.
 
+The queue limit is the memory bound to plan around: a server holds at most
+connections times limit of unwritten frames, plus arena growth. Measured in
+go-websocket-benchmark's rate test at fifty thousand connections, where the
+single client falls behind and stops reading echoes, heap in use climbed to
+2.1 GB with a 64 KiB limit and fell back to 45 MB the moment the window
+ended, because the faster a server drains its input the more echoes it
+holds for a peer that is not reading. The same server echoing through
+`Write` stayed flat at 345 MB of heap: its read loop blocks on the full
+socket and the backlog sits in kernel buffers instead. Choose by need:
+`Queue` decouples the sender and bounds memory per connection, `Write`
+gives free backpressure. A limit below the burst a peer can leave unread
+(16 KiB there) fails `Send` and, in an echo, closes the connection.
+
 Outgoing text is not UTF-8 validated; that is the caller's job.
 
 A protocol failure writes its close frame from the reading goroutine. A peer
