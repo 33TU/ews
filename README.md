@@ -247,7 +247,7 @@ All cases pass with `ValidateUTF8` on, which the example sets; 6.4.x report non-
 
 ![Echo, compressed](bench/echo/echo-compressed.svg)
 
-![Broadcast](bench/broadcast/broadcast.svg)
+![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
 
 ![Text echo with UTF-8 validation, one connection](bench/utf8/utf8-1conn.svg)
 

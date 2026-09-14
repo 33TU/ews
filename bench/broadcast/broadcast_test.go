@@ -26,134 +26,135 @@ import (
 // shuffled order per cell and each gets a warm-up round before timing, so
 // no server always follows the connection setup.
 func BenchmarkBroadcast(b *testing.B) {
-	const size = 256
 	rng := rand.New(rand.NewPCG(7, 11))
 	for _, compress := range []bool{false, true} {
-		for _, conns := range []int{128, 512, 2048} {
-			libs := []string{"ews", "ews-sync", "gws"}
-			rng.Shuffle(len(libs), func(i, j int) { libs[i], libs[j] = libs[j], libs[i] })
-			for _, lib := range libs {
-				b.Run(fmt.Sprintf("compress=%t/conns=%d/%s", compress, conns, lib), func(b *testing.B) {
-					var mu sync.Mutex
-					var ewsConns []*ws.Conn
-					var gwsConns []*gws.Conn
-					var srv *httptest.Server
-					if lib == "gws" {
-						up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
-						srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-							socket, err := up.Upgrade(w, r)
-							if err != nil {
-								return
-							}
-							mu.Lock()
-							gwsConns = append(gwsConns, socket)
-							mu.Unlock()
-							for {
-								msg, err := socket.ReadMessage()
+		for _, size := range []int{256, 4 << 10, 64 << 10} {
+			for _, conns := range []int{128, 512, 2048} {
+				libs := []string{"ews", "ews-sync", "gws"}
+				rng.Shuffle(len(libs), func(i, j int) { libs[i], libs[j] = libs[j], libs[i] })
+				for _, lib := range libs {
+					b.Run(fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, lib), func(b *testing.B) {
+						var mu sync.Mutex
+						var ewsConns []*ws.Conn
+						var gwsConns []*gws.Conn
+						var srv *httptest.Server
+						if lib == "gws" {
+							up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
+							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								socket, err := up.Upgrade(w, r)
 								if err != nil {
 									return
 								}
-								msg.Close()
+								mu.Lock()
+								gwsConns = append(gwsConns, socket)
+								mu.Unlock()
+								for {
+									msg, err := socket.ReadMessage()
+									if err != nil {
+										return
+									}
+									msg.Close()
+								}
+							}))
+						} else {
+							var opts handshake.Options
+							if compress {
+								opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
 							}
-						}))
-					} else {
-						var opts handshake.Options
-						if compress {
-							opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
-						}
-						srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-							conn, res, err := ews.Upgrade(w, r, opts)
-							if err != nil {
-								return
-							}
-							defer conn.Close()
-							c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
-							if lib == "ews" {
-								c.NewQueue(0)
-							}
-							mu.Lock()
-							ewsConns = append(ewsConns, c)
-							mu.Unlock()
-							for {
-								if _, _, err := c.ReadMessage(); err != nil {
+							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								conn, res, err := ews.Upgrade(w, r, opts)
+								if err != nil {
 									return
 								}
-							}
-						}))
-					}
-					defer srv.Close()
+								defer conn.Close()
+								c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
+								if lib == "ews" {
+									c.NewQueue(0)
+								}
+								mu.Lock()
+								ewsConns = append(ewsConns, c)
+								mu.Unlock()
+								for {
+									if _, _, err := c.ReadMessage(); err != nil {
+										return
+									}
+								}
+							}))
+						}
+						defer srv.Close()
 
-					received := make(chan struct{}, conns)
-					for i := 0; i < conns; i++ {
-						c := harness.Dial(b, srv.URL, compress)
-						go func() {
-							for {
-								if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
-									return
-								}
-								received <- struct{}{}
-							}
-						}()
-					}
-					for {
-						mu.Lock()
-						ready := len(ewsConns) == conns || len(gwsConns) == conns
-						mu.Unlock()
-						if ready {
-							break
-						}
-					}
-					var queues []*ws.Queue
-					if lib == "ews" {
-						for _, c := range ewsConns {
-							queues = append(queues, c.NewQueue(0)) // Returns the queue made in the handler.
-						}
-					}
-
-					msg := harness.Payload(size, compress)
-					round := func() {
-						switch lib {
-						case "ews":
-							p, _ := ws.Prepare(codec.Binary, msg)
-							for _, q := range queues {
-								if err := q.SendPrepared(p); err != nil {
-									b.Fatal(err)
-								}
-							}
-							p.Release()
-						case "ews-sync":
-							p, _ := ws.Prepare(codec.Binary, msg)
-							for _, c := range ewsConns {
-								if err := c.WritePrepared(p); err != nil {
-									b.Fatal(err)
-								}
-							}
-							p.Release()
-						case "gws":
-							bc := gws.NewBroadcaster(gws.OpcodeBinary, msg)
-							for _, c := range gwsConns {
-								if err := bc.Broadcast(c, nil); err != nil {
-									b.Fatal(err)
-								}
-							}
-							bc.Close()
-						}
+						received := make(chan struct{}, conns)
 						for i := 0; i < conns; i++ {
-							<-received
+							c := harness.Dial(b, srv.URL, compress)
+							go func() {
+								for {
+									if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
+										return
+									}
+									received <- struct{}{}
+								}
+							}()
 						}
-					}
-					for i := 0; i < 20; i++ {
-						round() // Warm up: pools, goroutines, and socket buffers settle.
-					}
-					b.ReportAllocs()
-					b.SetBytes(int64(size * conns))
-					b.ResetTimer()
-					for b.Loop() {
-						round()
-					}
-					b.StopTimer()
-					b.ReportMetric(float64(b.N)*float64(conns)/b.Elapsed().Seconds(), "msgs/s")
-				})
+						for {
+							mu.Lock()
+							ready := len(ewsConns) == conns || len(gwsConns) == conns
+							mu.Unlock()
+							if ready {
+								break
+							}
+						}
+						var queues []*ws.Queue
+						if lib == "ews" {
+							for _, c := range ewsConns {
+								queues = append(queues, c.NewQueue(0)) // Returns the queue made in the handler.
+							}
+						}
+
+						msg := harness.Payload(size, compress)
+						round := func() {
+							switch lib {
+							case "ews":
+								p, _ := ws.Prepare(codec.Binary, msg)
+								for _, q := range queues {
+									if err := q.SendPrepared(p); err != nil {
+										b.Fatal(err)
+									}
+								}
+								p.Release()
+							case "ews-sync":
+								p, _ := ws.Prepare(codec.Binary, msg)
+								for _, c := range ewsConns {
+									if err := c.WritePrepared(p); err != nil {
+										b.Fatal(err)
+									}
+								}
+								p.Release()
+							case "gws":
+								bc := gws.NewBroadcaster(gws.OpcodeBinary, msg)
+								for _, c := range gwsConns {
+									if err := bc.Broadcast(c, nil); err != nil {
+										b.Fatal(err)
+									}
+								}
+								bc.Close()
+							}
+							for i := 0; i < conns; i++ {
+								<-received
+							}
+						}
+						for i := 0; i < 20; i++ {
+							round() // Warm up: pools, goroutines, and socket buffers settle.
+						}
+						b.ReportAllocs()
+						b.SetBytes(int64(size * conns))
+						b.ResetTimer()
+						for b.Loop() {
+							round()
+						}
+						b.StopTimer()
+						b.ReportMetric(float64(b.N)*float64(conns)/b.Elapsed().Seconds(), "msgs/s")
+					})
+				}
 			}
 		}
 	}
