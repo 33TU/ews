@@ -67,7 +67,7 @@ Single-connection small-message cells are loopback round trips of 12 to 15 µs a
 - ` + "`ews-sync`" + `: ` + "`Prepare`" + ` once, then ` + "`WritePrepared`" + ` on each connection in a loop, waiting for each write.
 - ` + "`gws`" + `: ` + "`NewBroadcaster`" + ` once, then ` + "`Broadcast`" + ` on each connection through its per-connection worker.
 
-Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use ` + "`CompressionShared`" + `, the mode meant for many connections. Every server reads through its own ` + "`ReadMessage`" + `.
+Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use ` + "`CompressionShared`" + `, the mode meant for many connections. Every server reads through its own ` + "`ReadMessage`" + `. Servers run in a seeded shuffled order within each cell and get twenty warm-up rounds before timing, since a server measured right after connecting thousands of clients read 10 to 20 percent low.
 `,
 		reading: `- Uncompressed, a round is one write per connection and one read per client, and the kernel's cost for those dominates; the asynchronous paths tie at that floor, and only the allocation counts differ.
 - A synchronous loop serializes every write on one goroutine, so it trails the queued paths by several times as connections grow.

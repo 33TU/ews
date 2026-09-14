@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `900cb5b`.
+Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `3cf0f60`.
 
 ## Setup
 
@@ -16,23 +16,23 @@ One 256-byte message delivered to every connected client, timed until all client
 - `ews-sync`: `Prepare` once, then `WritePrepared` on each connection in a loop, waiting for each write.
 - `gws`: `NewBroadcaster` once, then `Broadcast` on each connection through its per-connection worker.
 
-Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use `CompressionShared`, the mode meant for many connections. Every server reads through its own `ReadMessage`.
+Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use `CompressionShared`, the mode meant for many connections. Every server reads through its own `ReadMessage`. Servers run in a seeded shuffled order within each cell and get twenty warm-up rounds before timing, since a server measured right after connecting thousands of clients read 10 to 20 percent low.
 
 ## Uncompressed
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 604k msgs/s | 174k msgs/s | 569k msgs/s | 128 (2 KB) / 0 / 259 (9 KB) |
-| 512 | 761k msgs/s | 171k msgs/s | 727k msgs/s | 513 (8 KB) / 0 / 1028 (36 KB) |
-| 2048 | 776k msgs/s | 208k msgs/s | 709k msgs/s | 2063 (34 KB) / 0 / 4120 (147 KB) |
+| 128 | 597k msgs/s | 161k msgs/s | 600k msgs/s | 127 (2 KB) / 0 / 259 (9 KB) |
+| 512 | 819k msgs/s | 202k msgs/s | 815k msgs/s | 512 (8 KB) / 0 / 1027 (36 KB) |
+| 2048 | 868k msgs/s | 227k msgs/s | 861k msgs/s | 2048 (32 KB) / 0 / 4099 (144 KB) |
 
 ## Compressed
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 464k msgs/s | 129k msgs/s | 484k msgs/s | 128 (11 KB) / 0 (11 KB) / 259 (11 KB) |
-| 512 | 641k msgs/s | 146k msgs/s | 363k msgs/s | 513 (64 KB) / 2 (165 KB) / 1030 (75 KB) |
-| 2048 | 535k msgs/s | 174k msgs/s | 399k msgs/s | 2079 (882 KB) / 39 (2545 KB) / 4139 (650 KB) |
+| 128 | 518k msgs/s | 128k msgs/s | 531k msgs/s | 128 (3 KB) / 0 (8 KB) / 259 (9 KB) |
+| 512 | 677k msgs/s | 151k msgs/s | 510k msgs/s | 512 (8 KB) / 0 / 1027 (36 KB) |
+| 2048 | 597k msgs/s | 211k msgs/s | 413k msgs/s | 2048 (32 KB) / 1 (89 KB) / 4099 (144 KB) |
 
 ## Reading the numbers
 

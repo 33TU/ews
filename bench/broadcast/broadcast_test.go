@@ -2,6 +2,7 @@ package broadcast
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -21,12 +22,17 @@ import (
 // through its own ReadMessage and broadcasts through its own once-encoded
 // frame: ews with Prepare and a Queue per connection, ews-sync with Prepare
 // and WritePrepared in a loop, gws with NewBroadcaster and its per-connection
-// worker. Throughput is in messages delivered.
+// worker. Throughput is in messages delivered. Servers run in a seeded
+// shuffled order per cell and each gets a warm-up round before timing, so
+// no server always follows the connection setup.
 func BenchmarkBroadcast(b *testing.B) {
 	const size = 256
+	rng := rand.New(rand.NewPCG(7, 11))
 	for _, compress := range []bool{false, true} {
 		for _, conns := range []int{128, 512, 2048} {
-			for _, lib := range []string{"ews", "ews-sync", "gws"} {
+			libs := []string{"ews", "ews-sync", "gws"}
+			rng.Shuffle(len(libs), func(i, j int) { libs[i], libs[j] = libs[j], libs[i] })
+			for _, lib := range libs {
 				b.Run(fmt.Sprintf("compress=%t/conns=%d/%s", compress, conns, lib), func(b *testing.B) {
 					var mu sync.Mutex
 					var ewsConns []*ws.Conn
@@ -105,10 +111,7 @@ func BenchmarkBroadcast(b *testing.B) {
 					}
 
 					msg := harness.Payload(size, compress)
-					b.ReportAllocs()
-					b.SetBytes(int64(size * conns))
-					b.ResetTimer()
-					for b.Loop() {
+					round := func() {
 						switch lib {
 						case "ews":
 							p, _ := ws.Prepare(codec.Binary, msg)
@@ -138,6 +141,15 @@ func BenchmarkBroadcast(b *testing.B) {
 						for i := 0; i < conns; i++ {
 							<-received
 						}
+					}
+					for i := 0; i < 20; i++ {
+						round() // Warm up: pools, goroutines, and socket buffers settle.
+					}
+					b.ReportAllocs()
+					b.SetBytes(int64(size * conns))
+					b.ResetTimer()
+					for b.Loop() {
+						round()
 					}
 					b.StopTimer()
 					b.ReportMetric(float64(b.N)*float64(conns)/b.Elapsed().Seconds(), "msgs/s")
