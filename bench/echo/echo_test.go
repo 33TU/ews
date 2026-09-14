@@ -26,13 +26,17 @@ import (
 
 // Echo servers for each library, all driven by the same ews client.
 
-func ewsServer(compress bool) *httptest.Server { return ewsServerWith(compress, false) }
+func ewsServer(compress bool) *httptest.Server { return ewsServerWith(compress, false, false) }
 
 // ewsSharedServer borrows a pooled compressor per message like gws and coder
 // do, instead of keeping one attached per connection.
-func ewsSharedServer(compress bool) *httptest.Server { return ewsServerWith(compress, true) }
+func ewsSharedServer(compress bool) *httptest.Server { return ewsServerWith(compress, true, false) }
 
-func ewsServerWith(compress, shared bool) *httptest.Server {
+// ewsStreamServer pipes each message from the connection's own Read into
+// WriteFrom, ews's streaming shape: no message is held whole.
+func ewsStreamServer(compress bool) *httptest.Server { return ewsServerWith(compress, false, true) }
+
+func ewsServerWith(compress, shared, stream bool) *httptest.Server {
 	var opts handshake.Options
 	if compress {
 		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
@@ -48,6 +52,16 @@ func ewsServerWith(compress, shared bool) *httptest.Server {
 			return
 		}
 		for {
+			if stream {
+				op, err := c.NextMessage()
+				if err != nil {
+					return
+				}
+				if _, err := c.WriteFrom(op, c); err != nil {
+					return
+				}
+				continue
+			}
 			op, p, err := c.ReadMessage()
 			if err != nil {
 				return
@@ -177,7 +191,7 @@ func BenchmarkEcho(b *testing.B) {
 		name         string
 		start        func(bool) *httptest.Server
 		compressOnly bool // Identical to another server without compression.
-	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
+	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"ews-stream", ewsStreamServer, false}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
 	// Servers run in a seeded shuffled order per cell, so no library always
 	// measures right after the connection setup.
 	rng := rand.New(rand.NewPCG(7, 11))

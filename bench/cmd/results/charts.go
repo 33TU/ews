@@ -49,6 +49,7 @@ var charts = map[string][]chartSpec{
 var colors = map[string]string{
 	"ews":          "#50c878",
 	"ews-shared":   "#5aa9e6",
+	"ews-stream":   "#a3e4b0",
 	"ews-sync":     "#5aa9e6",
 	"gws":          "#ef8354",
 	"gws-stream":   "#f2c14e",

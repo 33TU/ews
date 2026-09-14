@@ -44,6 +44,7 @@ var families = map[string]family{
 
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
 - ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
+- ` + "`ews-stream`" + `: ` + "`NextMessage`" + ` then ` + "`WriteFrom`" + ` reading the connection itself, so no message is held whole; ews's streaming shape, against ` + "`gws-stream`" + ` and ` + "`coder-stream`" + `.
 - ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
 - ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
@@ -317,7 +318,7 @@ func dimLess(a, b string) bool {
 // libRank orders server columns: ews first, then each library with its
 // variants beside it; unknown names go last in input order.
 func libRank(name string) int {
-	for i, known := range []string{"ews", "ews-shared", "ews-sync", "gws", "gws-stream", "coder", "coder-stream"} {
+	for i, known := range []string{"ews", "ews-shared", "ews-stream", "ews-sync", "gws", "gws-stream", "coder", "coder-stream"} {
 		if name == known {
 			return i
 		}
