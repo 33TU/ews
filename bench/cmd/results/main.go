@@ -60,6 +60,21 @@ Single-connection small-message cells are loopback round trips of 12 to 15 µs a
 - coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
 `,
 	},
+	"UTF8": {
+		title: "Text validation benchmark results",
+		setup: `Text echo across payload kinds, timed like the echo benchmark: one ping-pong at a time per connection, throughput in payload bytes one way. Servers validate UTF-8 where the library offers it, so the difference between columns is the validation pass.
+
+- ` + "`ews`" + `: ` + "`ReadMessage`" + ` and ` + "`Write`" + ` with ` + "`ValidateUTF8`" + ` on: one pass over each received text message, a shift-based DFA by default or SIMD lookups under ` + "`GOEXPERIMENT=simd`" + `, after skipping the ASCII prefix with word loads.
+- ` + "`gws`" + `: ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` with ` + "`CheckUtf8Enabled`" + `, which runs the standard library's ` + "`utf8.Valid`" + ` on received text and on outgoing text as well, so an echo validates twice.
+- ` + "`coder`" + `: ` + "`Read`" + ` and ` + "`Write`" + `; coder/websocket has no UTF-8 validation to enable, so this column is the no-validation baseline.
+
+Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese prose (multibyte), cut on rune boundaries. Clients are ews connections without validation, so the client side costs the same for every server.
+`,
+		reading: `- ASCII payloads cost almost nothing to validate in any library: the standard library and ews both skip ASCII in word-sized steps, so these cells match the plain echo results.
+- Non-ASCII payloads are where the validators differ. The standard library decodes rune by rune at 1 to 2 GB/s, the ews DFA runs at 2.5 GB/s, and the SIMD kernel at about 10 GB/s; gws also pays the pass twice per echo.
+- A validation pass matters most on large messages over few connections, where it is a visible fraction of the round trip; at many connections the syscalls dominate again.
+`,
+	},
 	"Broadcast": {
 		title: "Broadcast benchmark results",
 		setup: `One 256-byte message delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second; allocations are process-wide per round.

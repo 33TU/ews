@@ -224,7 +224,7 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
 
 All cases pass with `ValidateUTF8` on, which the example sets; 6.4.x report non-strict, since text is validated per message rather than per chunk.
 
-`bench` is a separate module comparing ews with other libraries end to end over loopback TCP, driven by the same ews client: `bench/echo` for request-response across message sizes and connection counts, `bench/broadcast` for one message to many connections. Each has a results file from a recent run, `RESULTS.md` for the default build and `RESULTS-simd.md` for `GOEXPERIMENT=simd`:
+`bench` is a separate module comparing ews with other libraries end to end over loopback TCP, driven by the same ews client: `bench/echo` for request-response across message sizes and connection counts, `bench/broadcast` for one message to many connections, and `bench/utf8` for text echo with UTF-8 validation enabled. Each has a results file from a recent run, `RESULTS.md` for the default build and `RESULTS-simd.md` for `GOEXPERIMENT=simd`:
 
 ```sh
 cd bench/echo && go test -run '^$' -bench Echo -benchtime=1s | go run ../cmd/results > RESULTS.md

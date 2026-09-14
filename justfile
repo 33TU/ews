@@ -53,6 +53,13 @@ bench-broadcast benchtime="1s":
 bench-broadcast-simd benchtime="1s":
     cd bench/broadcast && GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
 
+# Text echo with UTF-8 validation enabled; regenerates bench/utf8/RESULTS.md, or RESULTS-simd.md with the experiment.
+bench-utf8 benchtime="500ms":
+    cd bench/utf8 && go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS.md
+
+bench-utf8-simd benchtime="500ms":
+    cd bench/utf8 && GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
+
 # Fan-out benchmark: bursts of small messages per event, batched and unbatched.
 bench-fanout:
     cd bench/broadcast && go test -run '^$' -bench Fanout -benchmem
