@@ -31,6 +31,10 @@ type Queue struct {
 	err      error
 	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
 	written  uint64 // Frames written so far.
+	// start is q.run as a func value, made once here so that starting the
+	// writer allocates nothing: a go statement with a receiver or arguments
+	// heap-allocates a closure to carry them, one with none does not.
+	start func()
 
 	// Writer-side storage, reused across flushes. bufs keeps the backing
 	// array; nb is the header net.Buffers.WriteTo consumes, kept as a field
@@ -78,6 +82,7 @@ func (c *Conn) NewQueue(limit int) *Queue {
 	}
 	q := &Queue{c: c, limit: limit}
 	q.cond.L = &q.mu
+	q.start = q.run
 	c.queue = q
 	return q
 }
@@ -192,7 +197,7 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, e
 	q.enqueued++
 	if !q.running {
 		q.running = true
-		go q.run()
+		go q.start()
 	}
 	return q.enqueued, nil
 }
