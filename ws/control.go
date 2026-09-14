@@ -19,12 +19,14 @@ func (DefaultControlHandler) OnPing(c *Conn, payload []byte) error { return c.Po
 
 func (DefaultControlHandler) OnPong(*Conn, []byte) error { return nil }
 
+// OnClose echoes the peer's close code. A failed echo is not an error: the
+// peer has closed and may already have dropped the transport, and the read
+// that dispatched this frame returns the peer's code, which is what the
+// caller needs. Callers who care about the echo itself send their own.
 func (DefaultControlHandler) OnClose(c *Conn, code uint16, _ []byte) error {
 	if code == NoStatus {
 		code = 0
 	}
-	if err := c.Close(code, ""); err != nil && err != ErrClosing {
-		return err
-	}
+	_ = c.Close(code, "")
 	return nil
 }
