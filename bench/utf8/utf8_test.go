@@ -128,7 +128,7 @@ func BenchmarkUTF8(b *testing.B) {
 						msg := text(kind, size)
 						clients := make([]*ws.Conn, conns)
 						for i := range clients {
-							clients[i] = harness.Dial(b, srv.URL, false)
+							clients[i] = harness.Dial(b, srv.URL, harness.Plain)
 						}
 						for round := 0; round < 5; round++ {
 							for _, c := range clients {

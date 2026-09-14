@@ -11,7 +11,6 @@ import (
 	"github.com/33TU/ews"
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
-	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
 	gorilla "github.com/gorilla/websocket"
 	"github.com/klauspost/compress/flate"
@@ -28,20 +27,23 @@ import (
 // no server always follows the connection setup.
 func BenchmarkBroadcast(b *testing.B) {
 	rng := rand.New(rand.NewPCG(7, 11))
-	for _, compress := range []bool{false, true} {
+	for _, mode := range []harness.Mode{harness.Plain, harness.Takeover, harness.NoTakeover} {
 		for _, size := range []int{256, 4 << 10, 64 << 10} {
 			for _, conns := range []int{128, 512, 2048} {
 				libs := []string{"ews", "ews-sync", "gws", "gorilla"}
+				if mode == harness.Takeover {
+					libs = libs[:3] // gorilla supports only no_context_takeover.
+				}
 				rng.Shuffle(len(libs), func(i, j int) { libs[i], libs[j] = libs[j], libs[i] })
 				for _, lib := range libs {
-					b.Run(fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, lib), func(b *testing.B) {
+					b.Run(fmt.Sprintf("compress=%s/size=%d/conns=%d/%s", mode, size, conns, lib), func(b *testing.B) {
 						var mu sync.Mutex
 						var ewsConns []*ws.Conn
 						var gwsConns []*gws.Conn
 						var gorillaConns []*gorilla.Conn
 						var srv *httptest.Server
 						if lib == "gorilla" {
-							up := &gorilla.Upgrader{EnableCompression: compress, CheckOrigin: func(*http.Request) bool { return true }}
+							up := &gorilla.Upgrader{EnableCompression: mode.Compressed(), CheckOrigin: func(*http.Request) bool { return true }}
 							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								c, err := up.Upgrade(w, r, nil)
 								if err != nil {
@@ -58,7 +60,7 @@ func BenchmarkBroadcast(b *testing.B) {
 								}
 							}))
 						} else if lib == "gws" {
-							up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
+							up := harness.GwsUpgrader(mode, gws.BuiltinEventHandler{})
 							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								socket, err := up.Upgrade(w, r)
 								if err != nil {
@@ -76,10 +78,7 @@ func BenchmarkBroadcast(b *testing.B) {
 								}
 							}))
 						} else {
-							var opts handshake.Options
-							if compress {
-								opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
-							}
+							opts := mode.Options()
 							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								conn, res, err := ews.Upgrade(w, r, opts)
 								if err != nil {
@@ -104,7 +103,7 @@ func BenchmarkBroadcast(b *testing.B) {
 
 						received := make(chan struct{}, conns)
 						for i := 0; i < conns; i++ {
-							c := harness.Dial(b, srv.URL, compress)
+							c := harness.Dial(b, srv.URL, mode)
 							go func() {
 								for {
 									if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
@@ -129,7 +128,7 @@ func BenchmarkBroadcast(b *testing.B) {
 							}
 						}
 
-						msg := harness.Payload(size, compress)
+						msg := harness.Payload(size, mode.Compressed())
 						round := func() {
 							switch lib {
 							case "ews":

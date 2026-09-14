@@ -11,13 +11,13 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/33TU/ews"
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
-	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
 	"github.com/coder/websocket"
 	gorilla "github.com/gorilla/websocket"
@@ -27,21 +27,18 @@ import (
 
 // Echo servers for each library, all driven by the same ews client.
 
-func ewsServer(compress bool) *httptest.Server { return ewsServerWith(compress, false, false) }
+func ewsServer(mode harness.Mode) *httptest.Server { return ewsServerWith(mode, false, false) }
 
 // ewsSharedServer borrows a pooled compressor per message like gws and coder
 // do, instead of keeping one attached per connection.
-func ewsSharedServer(compress bool) *httptest.Server { return ewsServerWith(compress, true, false) }
+func ewsSharedServer(mode harness.Mode) *httptest.Server { return ewsServerWith(mode, true, false) }
 
 // ewsStreamServer pipes each message from the connection's own Read into
 // WriteFrom, ews's streaming shape: no message is held whole.
-func ewsStreamServer(compress bool) *httptest.Server { return ewsServerWith(compress, false, true) }
+func ewsStreamServer(mode harness.Mode) *httptest.Server { return ewsServerWith(mode, false, true) }
 
-func ewsServerWith(compress, shared, stream bool) *httptest.Server {
-	var opts handshake.Options
-	if compress {
-		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, MinSize: 1, ContextTakeover: true}
-	}
+func ewsServerWith(mode harness.Mode, shared, stream bool) *httptest.Server {
+	opts := mode.Options()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, res, err := ews.Upgrade(w, r, opts)
 		if err != nil {
@@ -85,8 +82,8 @@ func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
 // gwsServer echoes through gws's ReadMessage and WriteMessage, the
 // like-for-like shape against ews. gws's ReadLoop shares the whole frame path
 // and measured the same within noise.
-func gwsServer(compress bool) *httptest.Server {
-	up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
+func gwsServer(mode harness.Mode) *httptest.Server {
+	up := harness.GwsUpgrader(mode, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
 		if err != nil {
@@ -105,8 +102,8 @@ func gwsServer(compress bool) *httptest.Server {
 
 // gwsStreamServer pipes gws's NextReader into WriteFile, its streaming shape:
 // no message is held whole.
-func gwsStreamServer(compress bool) *httptest.Server {
-	up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
+func gwsStreamServer(mode harness.Mode) *httptest.Server {
+	up := harness.GwsUpgrader(mode, gws.BuiltinEventHandler{})
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		socket, err := up.Upgrade(w, r)
 		if err != nil {
@@ -124,14 +121,11 @@ func gwsStreamServer(compress bool) *httptest.Server {
 	}))
 }
 
-func coderServer(compress bool) *httptest.Server {
-	mode := websocket.CompressionDisabled
-	if compress {
-		mode = websocket.CompressionContextTakeover
-	}
+func coderServer(mode harness.Mode) *httptest.Server {
+	cmode := coderMode(mode)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Threshold 1 compresses every message, as the other servers do.
-		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode, CompressionThreshold: 1})
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: cmode, CompressionThreshold: 1})
 		if err != nil {
 			return
 		}
@@ -152,13 +146,10 @@ func coderServer(compress bool) *httptest.Server {
 
 // coderStreamServer echoes through coder's streaming Reader and Writer with a
 // reusable buffer, its most efficient shape: no message is held whole.
-func coderStreamServer(compress bool) *httptest.Server {
-	mode := websocket.CompressionDisabled
-	if compress {
-		mode = websocket.CompressionContextTakeover
-	}
+func coderStreamServer(mode harness.Mode) *httptest.Server {
+	cmode := coderMode(mode)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: mode, CompressionThreshold: 1})
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: cmode, CompressionThreshold: 1})
 		if err != nil {
 			return
 		}
@@ -185,15 +176,25 @@ func coderStreamServer(compress bool) *httptest.Server {
 	}))
 }
 
-// gorillaUpgrader negotiates compression when asked; gorilla only offers
-// no_context_takeover, so its compressed cells compress each message alone.
-func gorillaUpgrader(compress bool) *gorilla.Upgrader {
-	return &gorilla.Upgrader{EnableCompression: compress, CheckOrigin: func(*http.Request) bool { return true }}
+func coderMode(mode harness.Mode) websocket.CompressionMode {
+	switch mode {
+	case harness.Takeover:
+		return websocket.CompressionContextTakeover
+	case harness.NoTakeover:
+		return websocket.CompressionNoContextTakeover
+	}
+	return websocket.CompressionDisabled
+}
+
+// gorillaUpgrader negotiates compression when asked. gorilla offers only
+// no_context_takeover, so it runs in the plain and no-takeover modes.
+func gorillaUpgrader(mode harness.Mode) *gorilla.Upgrader {
+	return &gorilla.Upgrader{EnableCompression: mode.Compressed(), CheckOrigin: func(*http.Request) bool { return true }}
 }
 
 // gorillaServer echoes through gorilla's ReadMessage and WriteMessage.
-func gorillaServer(compress bool) *httptest.Server {
-	up := gorillaUpgrader(compress)
+func gorillaServer(mode harness.Mode) *httptest.Server {
+	up := gorillaUpgrader(mode)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := up.Upgrade(w, r, nil)
 		if err != nil {
@@ -216,8 +217,8 @@ func gorillaServer(compress bool) *httptest.Server {
 
 // gorillaStreamServer pipes NextReader into NextWriter through a reusable
 // buffer, so no message is held whole.
-func gorillaStreamServer(compress bool) *httptest.Server {
-	up := gorillaUpgrader(compress)
+func gorillaStreamServer(mode harness.Mode) *httptest.Server {
+	up := gorillaUpgrader(mode)
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := up.Upgrade(w, r, nil)
 		if err != nil {
@@ -249,15 +250,26 @@ func gorillaStreamServer(compress bool) *httptest.Server {
 // ---- benchmark -------------------------------------------------------------
 
 func BenchmarkEcho(b *testing.B) {
+	all := []harness.Mode{harness.Plain, harness.Takeover, harness.NoTakeover}
 	servers := []struct {
-		name         string
-		start        func(bool) *httptest.Server
-		compressOnly bool // Identical to another server without compression.
-	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"ews-stream", ewsStreamServer, false}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}, {"gorilla", gorillaServer, false}, {"gorilla-stream", gorillaStreamServer, false}}
+		name  string
+		start func(harness.Mode) *httptest.Server
+		modes []harness.Mode // Modes the server runs in.
+	}{
+		{"ews", ewsServer, all},
+		{"ews-shared", ewsSharedServer, []harness.Mode{harness.Takeover}}, // Identical to ews in the other modes.
+		{"ews-stream", ewsStreamServer, all},
+		{"gws", gwsServer, all},
+		{"gws-stream", gwsStreamServer, all},
+		{"coder", coderServer, all},
+		{"coder-stream", coderStreamServer, all},
+		{"gorilla", gorillaServer, []harness.Mode{harness.Plain, harness.NoTakeover}}, // No takeover support.
+		{"gorilla-stream", gorillaStreamServer, []harness.Mode{harness.Plain, harness.NoTakeover}},
+	}
 	// Servers run in a seeded shuffled order per cell, so no library always
 	// measures right after the connection setup.
 	rng := rand.New(rand.NewPCG(7, 11))
-	for _, compress := range []bool{false, true} {
+	for _, mode := range all {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {
 				order := append([]int(nil), make([]int, len(servers))...)
@@ -267,17 +279,17 @@ func BenchmarkEcho(b *testing.B) {
 				rng.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
 				for _, si := range order {
 					s := servers[si]
-					if s.compressOnly && !compress {
+					if !slices.Contains(s.modes, mode) {
 						continue
 					}
-					name := fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, s.name)
+					name := fmt.Sprintf("compress=%s/size=%d/conns=%d/%s", mode, size, conns, s.name)
 					b.Run(name, func(b *testing.B) {
-						srv := s.start(compress)
+						srv := s.start(mode)
 						defer srv.Close()
-						msg := harness.Payload(size, compress)
+						msg := harness.Payload(size, mode.Compressed())
 						clients := make([]*ws.Conn, conns)
 						for i := range clients {
-							clients[i] = harness.Dial(b, srv.URL, compress)
+							clients[i] = harness.Dial(b, srv.URL, mode)
 						}
 						// Warm up: pools, goroutines, and socket buffers settle
 						// over several round trips per connection.

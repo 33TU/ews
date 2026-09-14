@@ -43,16 +43,16 @@ var families = map[string]family{
 		setup: `Echo servers behind ` + "`httptest`" + ` on loopback TCP, all driven by the same ews client, one ping-pong at a time per connection. Throughput counts payload bytes in one direction per round trip. Allocations are process-wide per message; the ews client allocates nothing, so they are effectively the server's.
 
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
-- ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Compressed tables only; it is identical to ` + "`ews`" + ` otherwise.
+- ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Takeover table only; it is identical to ` + "`ews`" + ` otherwise.
 - ` + "`ews-stream`" + `: ` + "`NextMessage`" + ` then ` + "`WriteFrom`" + ` reading the connection itself, so no message is held whole; ews's streaming shape, against ` + "`gws-stream`" + ` and ` + "`coder-stream`" + `.
 - ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
 - ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
 - ` + "`coder-stream`" + `: coder/websocket piping ` + "`Reader`" + ` into ` + "`Writer`" + ` through a reusable buffer, so no message is held whole.
-- ` + "`gorilla`" + `: gorilla/websocket with ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop.
+- ` + "`gorilla`" + `: gorilla/websocket with ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop. Uncompressed and no-takeover tables only, since gorilla negotiates only ` + "`no_context_takeover`" + `.
 - ` + "`gorilla-stream`" + `: gorilla/websocket piping ` + "`NextReader`" + ` into ` + "`NextWriter`" + ` through a reusable buffer.
 
-Compression is permessage-deflate with context takeover in both directions. ews and gws run flate level 1; gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. gorilla/websocket supports only ` + "`no_context_takeover`" + `, so its compressed cells are a different task: each message is compressed on its own with the standard library's flate at level 1, with no 32 KB history to maintain on either side, at a worse ratio on real traffic. Measured once for scale, ews configured the same way, without takeover, echoed 550 MB/s at 1 KiB and 13.4 GB/s at 256 KiB over 128 connections, the same as gorilla-stream, so where gorilla-stream leads the takeover columns the gap is the cost of takeover, not of the library. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
+Compression is permessage-deflate at flate level 1, every message compressed, in two modes that are separate tables because they are different work. With context takeover each direction keeps a 32 KB history that every message extends, so the inflater is primed with a dictionary per message and both ends copy history; it compresses real traffic far better. Without takeover each message is compressed on its own. gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. gorilla/websocket uses the standard library's flate. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
 
 Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 `,
@@ -85,9 +85,9 @@ Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese pr
 - ` + "`ews`" + `: ` + "`Prepare`" + ` once, then ` + "`SendPrepared`" + ` on each connection's ` + "`Queue`" + `, returning before the writes complete.
 - ` + "`ews-sync`" + `: ` + "`Prepare`" + ` once, then ` + "`WritePrepared`" + ` on each connection in a loop, waiting for each write.
 - ` + "`gws`" + `: ` + "`NewBroadcaster`" + ` once, then ` + "`Broadcast`" + ` on each connection through its per-connection worker.
-- ` + "`gorilla`" + `: ` + "`NewPreparedMessage`" + ` once, then ` + "`WritePreparedMessage`" + ` on each connection in a loop, waiting for each write; gorilla has no asynchronous send, so compare it with ` + "`ews-sync`" + `. Compressed, gorilla runs without context takeover, the only mode it supports.
+- ` + "`gorilla`" + `: ` + "`NewPreparedMessage`" + ` once, then ` + "`WritePreparedMessage`" + ` on each connection in a loop, waiting for each write; gorilla has no asynchronous send, so compare it with ` + "`ews-sync`" + `. Uncompressed and no-takeover tables only, the modes gorilla supports.
 
-Compression is permessage-deflate with context takeover, flate level 1 and 15-bit windows on both libraries; ews servers use ` + "`CompressionShared`" + `, the mode meant for many connections. Every server reads through its own ` + "`ReadMessage`" + `. Servers run in a seeded shuffled order within each cell and get twenty warm-up rounds before timing, since a server measured right after connecting thousands of clients read 10 to 20 percent low.
+Compression is permessage-deflate at flate level 1 with 15-bit windows, with and without context takeover as separate tables since they are different work; ews servers use ` + "`CompressionShared`" + `, the mode meant for many connections. Every server reads through its own ` + "`ReadMessage`" + `. Servers run in a seeded shuffled order within each cell and get twenty warm-up rounds before timing, since a server measured right after connecting thousands of clients read 10 to 20 percent low.
 `,
 		reading: `- Uncompressed, a round is one write per connection and one read per client, and the kernel's cost for those dominates; the asynchronous paths tie at that floor, and only the allocation counts differ.
 - A synchronous loop serializes every write on one goroutine, so it trails the queued paths by several times as connections grow.
@@ -209,7 +209,12 @@ func main() {
 		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- gws: %s\n- coder/websocket: %s\n- gorilla/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, modVersion("lxzan/gws"), modVersion("coder/websocket"), modVersion("gorilla/websocket"), f.setup)
 		comps := []string{""}
 		if _, ok := rowLabels[fam+"/false"]; ok {
-			comps = []string{"false", "true"}
+			comps = comps[:0]
+			for _, c := range []string{"false", "true", "nocontext"} {
+				if _, ok := rowLabels[fam+"/"+c]; ok {
+					comps = append(comps, c)
+				}
+			}
 		}
 		for _, comp := range comps {
 			fc := fam + "/" + comp
@@ -220,7 +225,9 @@ func main() {
 			case "false":
 				title = "Uncompressed"
 			case "true":
-				title = "Compressed"
+				title = "Compressed with context takeover"
+			case "nocontext":
+				title = "Compressed without context takeover"
 			}
 			heads := make([]string, len(dimOrder[fam]))
 			for i, d := range dimOrder[fam] {

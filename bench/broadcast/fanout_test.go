@@ -57,7 +57,7 @@ func BenchmarkFanout(b *testing.B) {
 				defer srv.Close()
 				clients := make([]*ws.Conn, conns)
 				for i := range clients {
-					clients[i] = harness.Dial(b, srv.URL, false)
+					clients[i] = harness.Dial(b, srv.URL, harness.Plain)
 				}
 				request := []byte("go")
 				b.ReportAllocs()
