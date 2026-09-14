@@ -14,24 +14,24 @@
     <text class="group" x="45" y="27">ASCII</text>
     <text class="contract" x="45" y="53">1 KiB messages</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
-    <rect x="207" y="68" width="327.3" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="542.3" y="81">853 MB/s · 0 allocs</text>
+    <rect x="207" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="550.0" y="81">1.2 GB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">gws</text>
-    <rect x="207" y="93" width="335.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="550.0" y="106">873 MB/s · 1 alloc</text>
+    <rect x="207" y="93" width="320.2" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="535.2" y="106">1.1 GB/s · 1 alloc</text>
     <text class="series" x="195" y="131" text-anchor="end">coder</text>
-    <rect x="207" y="118" width="210.9" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="425.9" y="131">550 MB/s · 24 allocs</text>
+    <rect x="207" y="118" width="174.1" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="389.1" y="131">617 MB/s · 24 allocs</text>
     <text class="contract" x="750" y="53">16 KiB messages</text>
     <text class="series" x="900" y="81" text-anchor="end">ews</text>
     <rect x="912" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">9.7 GB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">11.2 GB/s · 0 allocs</text>
     <text class="series" x="900" y="106" text-anchor="end">gws</text>
-    <rect x="912" y="93" width="317.1" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1237.1" y="106">9.2 GB/s · 1 alloc</text>
+    <rect x="912" y="93" width="313.6" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1233.6" y="106">10.5 GB/s · 1 alloc</text>
     <text class="series" x="900" y="131" text-anchor="end">coder</text>
-    <rect x="912" y="118" width="74.5" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="994.5" y="131">2.2 GB/s · 61 allocs</text>
+    <rect x="912" y="118" width="67.5" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="987.5" y="131">2.3 GB/s · 61 allocs</text>
   </g>
   <g transform="translate(0,319)">
     <rect class="panel" x="25" y="0" width="1450" height="158" rx="10"/>
@@ -39,23 +39,23 @@
     <text class="contract" x="45" y="53">1 KiB messages</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
     <rect x="207" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="550.0" y="81">861 MB/s · 0 allocs</text>
+    <text class="value" x="550.0" y="81">1.2 GB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">gws</text>
-    <rect x="207" y="93" width="309.9" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="524.9" y="106">796 MB/s · 1 alloc</text>
+    <rect x="207" y="93" width="305.1" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="520.1" y="106">1.1 GB/s · 1 alloc</text>
     <text class="series" x="195" y="131" text-anchor="end">coder</text>
-    <rect x="207" y="118" width="206.8" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="421.8" y="131">531 MB/s · 24 allocs</text>
+    <rect x="207" y="118" width="177.8" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="392.8" y="131">616 MB/s · 24 allocs</text>
     <text class="contract" x="750" y="53">16 KiB messages</text>
     <text class="series" x="900" y="81" text-anchor="end">ews</text>
     <rect x="912" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">8.0 GB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">9.9 GB/s · 0 allocs</text>
     <text class="series" x="900" y="106" text-anchor="end">gws</text>
-    <rect x="912" y="93" width="209.9" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1129.9" y="106">5.0 GB/s · 1 alloc</text>
+    <rect x="912" y="93" width="191.8" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1111.8" y="106">5.7 GB/s · 1 alloc</text>
     <text class="series" x="900" y="131" text-anchor="end">coder</text>
-    <rect x="912" y="118" width="98.5" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1018.5" y="131">2.4 GB/s · 61 allocs</text>
+    <rect x="912" y="118" width="77.6" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="997.6" y="131">2.3 GB/s · 61 allocs</text>
   </g>
   <g transform="translate(0,493)">
     <rect class="panel" x="25" y="0" width="1450" height="158" rx="10"/>
@@ -63,22 +63,22 @@
     <text class="contract" x="45" y="53">1 KiB messages</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
     <rect x="207" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="550.0" y="81">785 MB/s · 0 allocs</text>
+    <text class="value" x="550.0" y="81">1.2 GB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">gws</text>
-    <rect x="207" y="93" width="317.6" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="532.6" y="106">744 MB/s · 1 alloc</text>
+    <rect x="207" y="93" width="296.9" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="511.9" y="106">1.0 GB/s · 1 alloc</text>
     <text class="series" x="195" y="131" text-anchor="end">coder</text>
-    <rect x="207" y="118" width="223.5" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="438.5" y="131">524 MB/s · 24 allocs</text>
+    <rect x="207" y="118" width="180.0" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="395.0" y="131">622 MB/s · 24 allocs</text>
     <text class="contract" x="750" y="53">16 KiB messages</text>
     <text class="series" x="900" y="81" text-anchor="end">ews</text>
     <rect x="912" y="68" width="335.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">7.9 GB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">10.0 GB/s · 0 allocs</text>
     <text class="series" x="900" y="106" text-anchor="end">gws</text>
-    <rect x="912" y="93" width="193.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1113.0" y="106">4.6 GB/s · 1 alloc</text>
+    <rect x="912" y="93" width="167.2" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1087.2" y="106">5.0 GB/s · 1 alloc</text>
     <text class="series" x="900" y="131" text-anchor="end">coder</text>
-    <rect x="912" y="118" width="92.4" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1012.4" y="131">2.2 GB/s · 61 allocs</text>
+    <rect x="912" y="118" width="74.4" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="994.4" y="131">2.2 GB/s · 61 allocs</text>
   </g>
 </svg>
