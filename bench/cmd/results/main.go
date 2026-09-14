@@ -96,8 +96,10 @@ var line = regexp.MustCompile(`^Benchmark(\w+)/(\S+?)-\d+\s+\d+\s+([\d.]+) ns/op
 
 func main() {
 	benchtime := flag.String("benchtime", "1s", "the -benchtime the results were produced with, for the header")
+	svgDir := flag.String("svg", "", "directory to write SVG charts into, embedded in the Markdown when set")
 	flag.Parse()
 	rows := map[key]result{}
+	var records []record
 	var famOrder []string
 	dimOrder := map[string][]string{}  // family -> row dims in first-seen order
 	libOrder := map[string][]string{}  // family+comp -> libs in first-seen order
@@ -127,6 +129,11 @@ func main() {
 			dims = append(dims, s)
 		}
 		k := key{fam, strings.Join(dims, "/"), comp, lib}
+		dimMap := map[string]string{}
+		for _, s := range segs[:len(segs)-1] {
+			dk, dv, _ := strings.Cut(s, "=")
+			dimMap[dk] = dv
+		}
 		var r result
 		r.ns, _ = strconv.ParseFloat(ns, 64)
 		r.mbs = metric(rest, "MB/s")
@@ -134,6 +141,7 @@ func main() {
 		r.bytes = int(metric(rest, "B/op"))
 		r.allocs = int(metric(rest, "allocs/op"))
 		rows[k] = r
+		records = append(records, record{fam, dimMap, lib, r})
 		if !seen[fam] {
 			seen[fam] = true
 			famOrder = append(famOrder, fam)
@@ -169,8 +177,27 @@ func main() {
 		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime %s | go run ../cmd/results` at ews commit `%s`.\n\n",
 			f.title, time.Now().Format("2006-01-02"), fam, *benchtime, run("git", "rev-parse", "--short", "HEAD"))
 		build := "default build: SWAR masking and the shift-based UTF-8 validator"
+		short := "default build"
 		if strings.Contains(os.Getenv("GOEXPERIMENT"), "simd") {
 			build = "`GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation"
+			short = "GOEXPERIMENT=simd"
+		}
+		if *svgDir != "" {
+			subtitle := fmt.Sprintf("%s · %s · %s · %s benchtime", runtime.Version(), short, shortCPU(cpu()), *benchtime)
+			var famRecords []record
+			for _, r := range records {
+				if r.family == fam {
+					famRecords = append(famRecords, r)
+				}
+			}
+			files, err := writeCharts(*svgDir, fam, subtitle, famRecords)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			for _, name := range files {
+				fmt.Fprintf(w, "![%s](%s)\n\n", strings.TrimSuffix(name, ".svg"), name)
+			}
 		}
 		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- gws: %s\n- coder/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, modVersion("lxzan/gws"), modVersion("coder/websocket"), f.setup)
 		comps := []string{""}
@@ -301,6 +328,14 @@ func run(name string, args ...string) string {
 		return "unknown"
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// shortCPU trims vendor boilerplate from a CPU model name for chart subtitles.
+func shortCPU(name string) string {
+	for _, junk := range []string{"(R)", "(TM)", "CPU", "Processor", "Core "} {
+		name = strings.ReplaceAll(name, junk, "")
+	}
+	return strings.Join(strings.Fields(name), " ")
 }
 
 func cpu() string {

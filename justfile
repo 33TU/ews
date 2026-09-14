@@ -37,28 +37,35 @@ bench pkg="./...":
 bench-simd pkg="./...":
     GOEXPERIMENT=simd go test {{pkg}} -run '^$' -bench . -benchmem
 
-# End-to-end echo comparison against other libraries; regenerates bench/echo/RESULTS.md.
+# Regenerate every RESULTS file and chart from the saved raw output, without rerunning anything.
+results:
+    for d in echo broadcast utf8; do \
+      (cd bench/$d && go run ../cmd/results -benchtime 500ms -svg . < raw.txt > RESULTS.md && \
+       GOEXPERIMENT=simd go run ../cmd/results -benchtime 500ms -svg . < raw-simd.txt > RESULTS-simd.md); \
+    done
+
+# End-to-end echo comparison against other libraries; regenerates bench/echo/RESULTS.md and its charts.
 bench-echo benchtime="500ms":
-    cd bench/echo && go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS.md
+    cd bench/echo && go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | tee raw.txt | go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS.md
 
 # The echo comparison built with GOEXPERIMENT=simd, written to bench/echo/RESULTS-simd.md.
 bench-echo-simd benchtime="500ms":
-    cd bench/echo && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
+    cd bench/echo && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{benchtime}} -timeout 3600s | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS-simd.md
 
 # Broadcast comparison, one message to many connections; regenerates bench/broadcast/RESULTS.md.
 bench-broadcast benchtime="1s":
-    cd bench/broadcast && go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS.md
+    cd bench/broadcast && go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | tee raw.txt | go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS.md
 
 # The broadcast comparison built with GOEXPERIMENT=simd, written to bench/broadcast/RESULTS-simd.md.
 bench-broadcast-simd benchtime="1s":
-    cd bench/broadcast && GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
+    cd bench/broadcast && GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{benchtime}} -timeout 3600s | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS-simd.md
 
 # Text echo with UTF-8 validation enabled; regenerates bench/utf8/RESULTS.md, or RESULTS-simd.md with the experiment.
 bench-utf8 benchtime="500ms":
-    cd bench/utf8 && go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | go run ../cmd/results -benchtime {{benchtime}} > RESULTS.md
+    cd bench/utf8 && go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | tee raw.txt | go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS.md
 
 bench-utf8-simd benchtime="500ms":
-    cd bench/utf8 && GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} > RESULTS-simd.md
+    cd bench/utf8 && GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{benchtime}} -timeout 3600s | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{benchtime}} -svg . > RESULTS-simd.md
 
 # Fan-out benchmark: bursts of small messages per event, batched and unbatched.
 bench-fanout:

@@ -1,6 +1,10 @@
 # Text validation benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench UTF8 -benchtime 500ms | go run ../cmd/results` at ews commit `11f8846`.
+Generated 2026-09-14 from `go test -run '^$' -bench UTF8 -benchtime 500ms | go run ../cmd/results` at ews commit `e220206`.
+
+![utf8-1conn](utf8-1conn.svg)
+
+![utf8-128conn](utf8-128conn.svg)
 
 ## Setup
 
@@ -22,18 +26,18 @@ Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese pr
 
 | Kind | Size | Conns | ews | gws | coder | allocs/op ews / gws / coder |
 |---|---|---|---|---|---|---|
-| ascii | 1 KiB | 1 | 124 MB/s | 126 MB/s | 58 MB/s | 0 / 1 / 24 (2 KB) |
-| ascii | 1 KiB | 128 | 867 MB/s | 843 MB/s | 542 MB/s | 0 / 1 / 24 (2 KB) |
-| ascii | 16 KiB | 1 | 1.3 GB/s | 1.3 GB/s | 188 MB/s | 0 / 1 / 61 (40 KB) |
-| ascii | 16 KiB | 128 | 9.7 GB/s | 9.4 GB/s | 2.2 GB/s | 0 / 1 / 61 (39 KB) |
-| mixed | 1 KiB | 1 | 126 MB/s | 112 MB/s | 60 MB/s | 0 / 1 / 24 (2 KB) |
-| mixed | 1 KiB | 128 | 842 MB/s | 815 MB/s | 534 MB/s | 0 / 1 / 24 (2 KB) |
-| mixed | 16 KiB | 1 | 1.0 GB/s | 603 MB/s | 181 MB/s | 0 / 1 / 61 (40 KB) |
-| mixed | 16 KiB | 128 | 8.1 GB/s | 4.8 GB/s | 2.3 GB/s | 0 / 1 / 61 (39 KB) |
-| multibyte | 1 KiB | 1 | 111 MB/s | 106 MB/s | 55 MB/s | 0 / 1 / 24 (2 KB) |
-| multibyte | 1 KiB | 128 | 825 MB/s | 792 MB/s | 536 MB/s | 0 / 1 / 24 (2 KB) |
-| multibyte | 16 KiB | 1 | 895 MB/s | 517 MB/s | 189 MB/s | 0 / 1 / 61 (41 KB) |
-| multibyte | 16 KiB | 128 | 7.4 GB/s | 4.7 GB/s | 2.3 GB/s | 0 / 1 / 61 (39 KB) |
+| ascii | 1 KiB | 1 | 124 MB/s | 123 MB/s | 66 MB/s | 0 / 1 / 24 (2 KB) |
+| ascii | 1 KiB | 128 | 830 MB/s | 870 MB/s | 558 MB/s | 0 / 1 / 24 (2 KB) |
+| ascii | 16 KiB | 1 | 1.3 GB/s | 1.3 GB/s | 169 MB/s | 0 / 1 / 61 (40 KB) |
+| ascii | 16 KiB | 128 | 9.7 GB/s | 8.8 GB/s | 2.2 GB/s | 0 / 1 / 61 (39 KB) |
+| mixed | 1 KiB | 1 | 120 MB/s | 114 MB/s | 49 MB/s | 0 / 1 / 24 (2 KB) |
+| mixed | 1 KiB | 128 | 868 MB/s | 793 MB/s | 543 MB/s | 0 / 1 / 24 (2 KB) |
+| mixed | 16 KiB | 1 | 1.0 GB/s | 597 MB/s | 194 MB/s | 0 / 1 / 61 (40 KB) |
+| mixed | 16 KiB | 128 | 7.9 GB/s | 5.4 GB/s | 2.5 GB/s | 0 / 1 / 61 (39 KB) |
+| multibyte | 1 KiB | 1 | 120 MB/s | 111 MB/s | 53 MB/s | 0 / 1 / 24 (2 KB) |
+| multibyte | 1 KiB | 128 | 857 MB/s | 789 MB/s | 529 MB/s | 0 / 1 / 24 (2 KB) |
+| multibyte | 16 KiB | 1 | 903 MB/s | 542 MB/s | 178 MB/s | 0 / 1 / 61 (41 KB) |
+| multibyte | 16 KiB | 128 | 7.5 GB/s | 4.7 GB/s | 2.3 GB/s | 0 / 1 / 61 (39 KB) |
 
 ## Reading the numbers
 
