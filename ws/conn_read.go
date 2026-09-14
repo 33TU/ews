@@ -33,9 +33,9 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
 // the end of the message and before NextMessage has been called. Transport EOF
 // mid-message is io.ErrUnexpectedEOF. Text read in chunks is never UTF-8
-// validated; only complete messages can be. Compressed messages are inflated
-// as they stream; a transport error during one ends the connection, since the
-// inflater cannot resume.
+// validated; only complete messages are. A compressed message is assembled
+// and inflated whole on the first Read, within Config.MaxMessageSize as for
+// ReadMessage, and delivered from that buffer.
 func (c *Conn) Read(b []byte) (int, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -47,7 +47,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 		return 0, nil
 	}
 	if c.rx.MessageCompressed() {
-		return c.inflate(b)
+		return c.readInflated(b)
 	}
 	for {
 		chunk, done, err := c.rx.PayloadN(len(b))
@@ -159,18 +159,30 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	payload, err := c.assemble()
+	if err != nil {
+		return 0, nil, err
+	}
+	return c.finishMessage(op, payload)
+}
+
+// assemble reads the rest of the current message through FIN, within
+// MaxMessageSize. A single-frame message that arrived in one chunk is
+// borrowed from the read buffer; anything else is gathered in the pooled
+// message buffer. Either is held until the next read call.
+func (c *Conn) assemble() ([]byte, error) {
 	msg := []byte(nil)
 	for {
 		if c.rx.Header().PayloadLen() > uint64(c.limit-len(msg)) {
-			return 0, nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
+			return nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
 		}
 		for {
 			chunk, done, err := c.rx.Payload()
 			if err != nil {
-				return 0, nil, c.fail(err)
+				return nil, c.fail(err)
 			}
 			if done && len(msg) == 0 && !c.rx.MessageOpen() {
-				return c.finishMessage(op, chunk) // Single-frame message in one chunk: borrowed.
+				return chunk, nil
 			}
 			if len(chunk) != 0 || done {
 				msg = c.appendMsg(msg, chunk)
@@ -184,19 +196,19 @@ func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 			if remaining := c.rx.Remaining(); remaining >= uint64(len(c.buf)) {
 				var err error
 				if msg, err = c.readInto(msg, int(remaining)); err != nil {
-					return 0, nil, err
+					return nil, err
 				}
 				continue
 			}
 			if err := c.fill(); err != nil {
-				return 0, nil, err
+				return nil, err
 			}
 		}
 		if !c.rx.MessageOpen() {
-			return c.finishMessage(op, msg)
+			return msg, nil
 		}
 		if err := c.nextFrame(); err != nil {
-			return 0, nil, err
+			return nil, err
 		}
 	}
 }
@@ -218,7 +230,7 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 
 // discard drains the rest of the current message.
 func (c *Conn) discard() error {
-	c.decomp.streaming = false
+	c.decomp.rest, c.decomp.inflated = nil, false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -315,7 +327,7 @@ func (c *Conn) handleControl() error {
 		}
 	}
 	if err != nil {
-		c.readErr, c.inMessage, c.decomp.streaming = err, false, false
+		c.readErr, c.inMessage = err, false
 	}
 	return err
 }
@@ -326,6 +338,6 @@ func (c *Conn) fail(err error) error {
 		c.sendClose(pe.Code)
 		err = &Error{Code: pe.Code, Err: pe.Err}
 	}
-	c.readErr, c.inMessage, c.decomp.streaming = err, false, false
+	c.readErr, c.inMessage = err, false
 	return err
 }

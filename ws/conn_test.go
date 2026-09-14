@@ -868,7 +868,7 @@ func TestCompressedWire(t *testing.T) {
 
 func TestCompressedErrors(t *testing.T) {
 	comp := &handshake.Compression{Level: flate.BestSpeed}
-	for _, streaming := range []bool{false, true} {
+	for _, chunked := range []bool{false, true} {
 		server, peer := raw(t, ws.Config{Compression: comp})
 		wait := run(t, func() error {
 			if _, err := peer.Write(frame(t, 0xc1, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff})); err != nil {
@@ -880,7 +880,7 @@ func TestCompressedErrors(t *testing.T) {
 			return nil
 		})
 		var err error
-		if streaming {
+		if chunked {
 			if _, err = server.NextMessage(); err == nil {
 				_, err = server.Read(make([]byte, 16))
 			}
@@ -889,7 +889,7 @@ func TestCompressedErrors(t *testing.T) {
 		}
 		var we *ws.Error
 		if !errors.As(err, &we) || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidData) {
-			t.Fatalf("streaming=%t: %v", streaming, err)
+			t.Fatalf("chunked=%t: %v", chunked, err)
 		}
 		wait()
 	}

@@ -178,8 +178,9 @@ loads, so pure ASCII returns without touching a validator, then checks the
 rest with a shift-based DFA by default, or with SIMD lookups ported from
 github.com/33TU/json-experiment under `GOEXPERIMENT=simd` on amd64. Against
 the standard library, the DFA is 1.4 to 2 times faster on non-ASCII text and
-the SIMD kernel 5 to 8 times. `Read` cannot validate, since it never holds the message; gws makes the
-same choice for its streaming reader.
+the SIMD kernel 5 to 8 times. `Read` does not validate: chunks of a plain
+message are delivered as they arrive, and chunked reads of compressed messages
+follow the same rule; gws makes the same choice for its streaming reader.
 
 Control frames complete: call the handler. After `OnClose` returns nil, the
 current read returns `*CloseError` and every later read returns it again. An
@@ -289,12 +290,16 @@ nc.Close()
    negotiated `handshake.Compression`. The core accepts RSV1 on a first data
    frame when negotiated. `ReadMessage` assembles the compressed bytes through
    FIN and calls `deflate.Decompress`, bounded by `MaxMessageSize`, so the
-   limit covers both wire and inflated size. `Read` streams: `deflate` gained
-   `Begin` and `Read` over a `ChunkSource`, and `ws` supplies borrowed chunks
-   straight from the core, filling from the transport and dispatching control
-   frames as it goes, while the inflater writes into the caller's buffer. A
-   transport error during a compressed message ends the connection because
-   the inflater cannot resume. `Write` compresses when `len(payload) >=
+   limit covers both wire and inflated size. `Read` on a compressed message
+   assembles and inflates it whole on the first call, then delivers chunks
+   of the result, so memory during a chunked read is bounded by
+   `MaxMessageSize` as it is for `ReadMessage`. A streaming mode that fed
+   the inflater borrowed chunks straight from the core existed and worked,
+   but the klauspost and standard-library inflaters are pull-only and cannot
+   resume after a short read, which made it the most intricate code in the
+   library for a feature gws also does without; it was removed once the
+   reactor, which would have decompressed whole anyway, left the roadmap.
+   `Write` compresses when `len(payload) >=
    MinSize`. Takeover state is a 32 KB `deflate.Window` per direction on the
    connection; compressors and decompressors are pooled, one compressor pool
    per flate level. Priming an encoder from a window costs about as much as
