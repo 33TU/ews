@@ -214,6 +214,14 @@ into the pooled message buffer in `FragmentSize` pieces, so `io.Copy` moves
 a message with no buffer of its own and an echo through the connection's
 own streaming shape is `NextMessage` then `WriteFrom(op, c)`.
 
+`NetConn` adapts a connection to `net.Conn` for tunneling, after
+coder/websocket's `NetConn`, but simpler because ews never hides the
+transport: deadlines and addresses delegate to the underlying `net.Conn`
+instead of being rebuilt from timers and contexts, and a read deadline
+leaves the connection usable since transport errors are not sticky on the
+read side. One message per `Write`, reads continue across messages, the
+wrong data type closes with 1003, a normal close reads as `io.EOF`.
+
 `Prepared` encodes a message once for many recipients; server frames carry
 no mask, so the bytes are shared, with a compressed variant per compression
 configuration built on first use. That variant is compressed against an
