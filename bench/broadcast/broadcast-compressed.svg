@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="702" viewBox="0 0 1500 702" role="img" aria-labelledby="title desc">
   <title id="title">Broadcast, one message to every connection, compressed</title>
-  <desc id="desc">go1.27.0 · default build · 13th Gen Intel i9-13900H · 1s benchtime Higher is better.</desc>
+  <desc id="desc">go1.27.0 · default build · 13th Gen Intel i9-13900H · 500ms benchtime Higher is better.</desc>
   <style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#d8dee9}.title{font-family:ui-sans-serif,system-ui,sans-serif;font-size:28px;font-weight:700}.subtitle{font-family:ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:#aab4c3}.group{font-family:ui-sans-serif,system-ui,sans-serif;font-size:18px;font-weight:650}.contract{font-family:ui-sans-serif,system-ui,sans-serif;font-size:14px;font-weight:650;fill:#9eabbc}.series{font-size:13px;fill:#c4ccd8}.value{font-size:13px;font-weight:650}.panel{fill:#151c27}</style>
   <rect width="1500" height="702" rx="14" fill="#10151d"/>
   <text class="title" x="40" y="48">Broadcast, one message to every connection, compressed</text>
-  <text class="subtitle" x="40" y="76">go1.27.0 · default build · 13th Gen Intel i9-13900H · 1s benchtime · higher is better</text>
+  <text class="subtitle" x="40" y="76">go1.27.0 · default build · 13th Gen Intel i9-13900H · 500ms benchtime · higher is better</text>
   <rect x="40" y="94" width="14" height="14" rx="3" fill="#50c878"/><text class="series" x="62" y="106">ews</text>
   <rect x="129" y="94" width="14" height="14" rx="3" fill="#5aa9e6"/><text class="series" x="151" y="106">ews-sync</text>
   <rect x="263" y="94" width="14" height="14" rx="3" fill="#ef8354"/><text class="series" x="285" y="106">gws</text>
@@ -14,34 +14,34 @@
     <text class="group" x="45" y="27">256 B messages</text>
     <text class="contract" x="45" y="53">128 connections</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
-    <rect x="207" y="68" width="99.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="314.0" y="81">649k msgs/s · 0 allocs</text>
+    <rect x="207" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="315.0" y="81">623k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-sync</text>
-    <rect x="207" y="93" width="17.9" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="232.9" y="106">117k msgs/s · 0 allocs</text>
+    <rect x="207" y="93" width="20.9" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="235.9" y="106">130k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
-    <rect x="207" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="315.0" y="131">655k msgs/s · 259 allocs</text>
+    <rect x="207" y="118" width="99.9" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="314.9" y="131">622k msgs/s · 259 allocs</text>
     <text class="contract" x="515" y="53">512 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
     <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="785.0" y="81">889k msgs/s · 0 allocs</text>
+    <text class="value" x="785.0" y="81">832k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-sync</text>
-    <rect x="677" y="93" width="20.0" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="705.0" y="106">178k msgs/s · 0 allocs</text>
+    <rect x="677" y="93" width="19.4" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="704.4" y="106">161k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="60.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="745.0" y="131">533k msgs/s · 1027 allocs</text>
+    <rect x="677" y="118" width="53.2" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="738.2" y="131">443k msgs/s · 1027 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">794k msgs/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">711k msgs/s · 1 alloc</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-sync</text>
-    <rect x="1147" y="93" width="32.0" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="1187.0" y="106">254k msgs/s · 0 allocs</text>
+    <rect x="1147" y="93" width="31.5" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="1186.5" y="106">224k msgs/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="54.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1209.0" y="131">428k msgs/s · 4100 allocs</text>
+    <rect x="1147" y="118" width="55.6" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1210.6" y="131">395k msgs/s · 4100 allocs</text>
   </g>
   <g transform="translate(0,319)">
     <rect class="panel" x="25" y="0" width="1450" height="158" rx="10"/>
@@ -49,33 +49,33 @@
     <text class="contract" x="45" y="53">128 connections</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
     <rect x="207" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="315.0" y="81">617k msgs/s · 0 allocs</text>
+    <text class="value" x="315.0" y="81">588k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-sync</text>
-    <rect x="207" y="93" width="22.6" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="237.6" y="106">139k msgs/s · 0 allocs</text>
+    <rect x="207" y="93" width="24.1" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="239.1" y="106">142k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
-    <rect x="207" y="118" width="92.7" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="307.7" y="131">571k msgs/s · 259 allocs</text>
+    <rect x="207" y="118" width="96.6" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="311.6" y="131">568k msgs/s · 259 allocs</text>
     <text class="contract" x="515" y="53">512 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
     <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="785.0" y="81">778k msgs/s · 0 allocs</text>
+    <text class="value" x="785.0" y="81">684k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-sync</text>
-    <rect x="677" y="93" width="21.8" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="706.8" y="106">170k msgs/s · 0 allocs</text>
+    <rect x="677" y="93" width="22.9" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="707.9" y="106">156k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="63.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="748.0" y="131">490k msgs/s · 1027 allocs</text>
+    <rect x="677" y="118" width="60.3" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="745.3" y="131">412k msgs/s · 1027 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">665k msgs/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">615k msgs/s · 0 allocs</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-sync</text>
-    <rect x="1147" y="93" width="37.1" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="1192.1" y="106">247k msgs/s · 0 allocs</text>
+    <rect x="1147" y="93" width="34.5" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="1189.5" y="106">213k msgs/s · 1 alloc</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="52.6" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1207.6" y="131">349k msgs/s · 4100 allocs</text>
+    <rect x="1147" y="118" width="57.6" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1212.6" y="131">354k msgs/s · 4100 allocs</text>
   </g>
   <g transform="translate(0,493)">
     <rect class="panel" x="25" y="0" width="1450" height="158" rx="10"/>
@@ -83,32 +83,32 @@
     <text class="contract" x="45" y="53">128 connections</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
     <rect x="207" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="315.0" y="81">400k msgs/s · 0 allocs</text>
+    <text class="value" x="315.0" y="81">366k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-sync</text>
-    <rect x="207" y="93" width="38.5" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="253.5" y="106">154k msgs/s · 0 allocs</text>
+    <rect x="207" y="93" width="41.9" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="256.9" y="106">154k msgs/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
-    <rect x="207" y="118" width="94.1" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="309.1" y="131">376k msgs/s · 259 allocs</text>
+    <rect x="207" y="118" width="98.1" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="313.1" y="131">359k msgs/s · 259 allocs</text>
     <text class="contract" x="515" y="53">512 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
     <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="785.0" y="81">478k msgs/s · 0 allocs</text>
+    <text class="value" x="785.0" y="81">453k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-sync</text>
-    <rect x="677" y="93" width="34.5" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="719.5" y="106">165k msgs/s · 0 allocs</text>
+    <rect x="677" y="93" width="35.0" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="720.0" y="106">158k msgs/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="82.8" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="767.8" y="131">396k msgs/s · 1027 allocs</text>
+    <rect x="677" y="118" width="83.8" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="768.8" y="131">380k msgs/s · 1027 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">442k msgs/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">417k msgs/s · 1 alloc</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-sync</text>
-    <rect x="1147" y="93" width="36.7" height="17" rx="4" fill="#5aa9e6"/>
-    <text class="value" x="1191.7" y="106">162k msgs/s · 0 allocs</text>
+    <rect x="1147" y="93" width="37.5" height="17" rx="4" fill="#5aa9e6"/>
+    <text class="value" x="1192.5" y="106">156k msgs/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="78.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1233.0" y="131">344k msgs/s · 4099 allocs</text>
+    <rect x="1147" y="118" width="75.8" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1230.8" y="131">316k msgs/s · 4099 allocs</text>
   </g>
 </svg>

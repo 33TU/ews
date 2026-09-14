@@ -56,7 +56,8 @@ Compression is permessage-deflate at flate level 1, every message compressed, in
 
 Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 `,
-		reading: `- Small messages are bound by loopback round trips, so all servers tie uncompressed. Compressed, ews leads because its deflate path allocates nothing and reuses pooled or per-connection helpers.
+		reading: `- Small messages are bound by loopback round trips, so all servers tie uncompressed. Compressed with takeover, ews leads because its deflate path allocates nothing and reuses pooled or per-connection helpers.
+- Without takeover the small-message cells tie across ews, gws and gorilla-stream, coder and gorilla's simple API trail on allocations, and at 256 KiB ews reaches 14 GB/s against 13 for gorilla-stream and coder-stream and 3 to 5 for the simple APIs. Comparing the two compressed tables gives each library's cost of takeover: a 32 KB dictionary primed per message and history copied on both ends. For ews that is 5 to 10 percent at 1 KiB and a third at 256 KiB, and the same or more for the others; takeover buys ratio, not speed, on traffic that repeats.
 - 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
 - Large messages favor ews and the streaming variants. gws's and coder's simple read APIs allocate a buffer above their pool thresholds on every such message.
 - With hundreds of connections and 256 KiB messages every library is bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
@@ -91,7 +92,8 @@ Compression is permessage-deflate at flate level 1 with 15-bit windows, with and
 `,
 		reading: `- Uncompressed, a round is one write per connection and one read per client, and the kernel's cost for those dominates; the asynchronous paths tie at that floor, and only the allocation counts differ.
 - A synchronous loop serializes every write on one goroutine, so it trails the queued paths by several times as connections grow.
-- Compressed, the message is compressed once in both libraries and only the per-connection history update and the clients' decompression remain. gws copies the payload into each connection's window in its worker; ews defers that copy until the connection next compresses a message of its own, which a broadcast-only recipient never does, so the sender's loop stays short at every payload size.
+- Compressed with takeover, the message is compressed once in both libraries and only the per-connection history update and the clients' decompression remain. gws copies the payload into each connection's window in its worker; ews defers that copy until the connection next compresses a message of its own, which a broadcast-only recipient never does, so the sender's loop stays short at every payload size.
+- Without takeover there is no history to update, and ews and gws tie at the write floor again; gorilla's synchronous prepared write sits with ews-sync, a little behind it on allocations.
 `,
 	},
 }

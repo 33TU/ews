@@ -1,6 +1,6 @@
 # Text validation benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench UTF8 -benchtime 500ms | go run ../cmd/results` at ews commit `32e2917`.
+Generated 2026-09-15 from `go test -run '^$' -bench UTF8 -benchtime 500ms | go run ../cmd/results` at ews commit `8db424c`.
 
 ![utf8-1conn](utf8-1conn.svg)
 
@@ -13,6 +13,7 @@ Generated 2026-09-14 from `go test -run '^$' -bench UTF8 -benchtime 500ms | go r
 - Go: go1.27.0, default build: SWAR masking and the shift-based UTF-8 validator
 - gws: v1.10.2
 - coder/websocket: v1.8.15
+- gorilla/websocket: v1.5.3
 
 Text echo across payload kinds, timed like the echo benchmark: one ping-pong at a time per connection, throughput in payload bytes one way. Servers validate UTF-8 where the library offers it, so the difference between columns is the validation pass.
 
