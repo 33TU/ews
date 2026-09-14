@@ -47,7 +47,8 @@ type Config struct {
 	// UTF-8 and fail the connection with close code 1007 when they are not,
 	// as RFC 6455 requires. Off by default: it costs one pass over each text
 	// message, and applications that decode text themselves catch invalid
-	// input anyway. Read delivers chunks unvalidated either way.
+	// input anyway. Read delivers chunks unvalidated either way, and outgoing
+	// text is never checked: the sender knows its own data.
 	ValidateUTF8 bool
 	// Compression holds negotiated permessage-deflate parameters, or nil.
 	Compression *handshake.Compression
