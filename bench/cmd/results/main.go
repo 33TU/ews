@@ -130,9 +130,11 @@ func main() {
 		}
 		k := key{fam, strings.Join(dims, "/"), comp, lib}
 		dimMap := map[string]string{}
+		var dimKeys []string
 		for _, s := range segs[:len(segs)-1] {
 			dk, dv, _ := strings.Cut(s, "=")
 			dimMap[dk] = dv
+			dimKeys = append(dimKeys, dk)
 		}
 		var r result
 		r.ns, _ = strconv.ParseFloat(ns, 64)
@@ -141,7 +143,7 @@ func main() {
 		r.bytes = int(metric(rest, "B/op"))
 		r.allocs = int(metric(rest, "allocs/op"))
 		rows[k] = r
-		records = append(records, record{fam, dimMap, lib, r})
+		records = append(records, record{fam, dimMap, dimKeys, lib, r})
 		if !seen[fam] {
 			seen[fam] = true
 			famOrder = append(famOrder, fam)
@@ -166,6 +168,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "no benchmark lines found on stdin")
 		os.Exit(1)
 	}
+	checkBaseline(records)
 
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()

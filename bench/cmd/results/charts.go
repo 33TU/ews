@@ -12,10 +12,11 @@ import (
 
 // record is one benchmark line with its dimensions parsed.
 type record struct {
-	family string
-	dims   map[string]string // Includes "compress" when present.
-	lib    string
-	result result
+	family  string
+	dims    map[string]string // Includes "compress" when present.
+	dimKeys []string          // Dimension names in the benchmark name's order.
+	lib     string
+	result  result
 }
 
 // chartSpec describes one SVG: a panel per value of one dimension, a column
