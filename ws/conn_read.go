@@ -81,6 +81,81 @@ func (c *Conn) Read(b []byte) (int, error) {
 	}
 }
 
+// WriteTo writes the rest of the current message to w, so io.Copy(w, c) moves
+// a message without a buffer of its own. Plain frames go to w as they arrive:
+// what the read buffer holds is borrowed, and a longer remainder is read from
+// the transport into the pooled message buffer in pieces of up to
+// Config.FragmentSize. A compressed message is inflated whole and written in
+// one call. It returns nil at the end of the message and writes nothing when
+// no message is open. An error from w is returned as is and leaves the rest
+// of the message unread; NextMessage discards it.
+func (c *Conn) WriteTo(w io.Writer) (int64, error) {
+	if c.readErr != nil {
+		return 0, c.readErr
+	}
+	if !c.inMessage {
+		return 0, nil
+	}
+	if c.rx.MessageCompressed() {
+		if err := c.inflateWhole(); err != nil {
+			return 0, err
+		}
+		rest := c.decomp.rest
+		c.decomp.rest, c.decomp.inflated, c.inMessage = nil, false, false
+		if len(rest) == 0 {
+			return 0, nil
+		}
+		n, err := w.Write(rest)
+		return int64(n), err
+	}
+	var total int64
+	for {
+		chunk, done, err := c.rx.Payload()
+		if err != nil {
+			return total, c.fail(err)
+		}
+		if len(chunk) == 0 && !done {
+			// Frame open, nothing buffered. A remainder at least as large as
+			// the read buffer is read into the message buffer instead.
+			remaining := c.rx.Remaining()
+			if remaining < uint64(len(c.buf)) {
+				if err := c.fill(); err != nil {
+					return total, err
+				}
+				continue
+			}
+			var staging []byte
+			if c.msg != nil {
+				staging = c.msg.b[:0]
+			}
+			if chunk, err = c.readInto(staging, int(min(remaining, uint64(c.fragmentSize)))); err != nil {
+				return total, err
+			}
+			done = c.rx.Remaining() == 0
+		}
+		if len(chunk) != 0 {
+			n, err := w.Write(chunk)
+			total += int64(n)
+			if err != nil {
+				return total, err
+			}
+			if n != len(chunk) {
+				return total, io.ErrShortWrite
+			}
+		}
+		if !done {
+			continue
+		}
+		if !c.rx.MessageOpen() {
+			c.inMessage = false
+			return total, nil
+		}
+		if err := c.nextFrame(); err != nil {
+			return total, err
+		}
+	}
+}
+
 // readInto reads up to n bytes of the open frame's payload from the transport
 // into the message buffer's spare capacity, bypassing the read buffer. The
 // size budget has already admitted n. The receiver has no buffered input.

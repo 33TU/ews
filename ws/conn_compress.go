@@ -197,21 +197,31 @@ func (c *Conn) decompress(payload []byte) ([]byte, error) {
 	return out, nil
 }
 
+// inflateWhole assembles and inflates the current compressed message on the
+// first call for it, leaving the result in decomp.rest.
+func (c *Conn) inflateWhole() error {
+	if c.decomp.inflated {
+		return nil
+	}
+	payload, err := c.assemble()
+	if err != nil {
+		return err
+	}
+	out, err := c.decompress(payload)
+	if err != nil {
+		return err
+	}
+	c.decomp.rest, c.decomp.inflated = out, true
+	return nil
+}
+
 // readInflated serves Read for a compressed message. The inflater is
 // pull-only and cannot resume after a short read, so the first call assembles
 // and inflates the message whole, within MaxMessageSize as ReadMessage does,
 // and later calls deliver chunks of the result.
 func (c *Conn) readInflated(b []byte) (int, error) {
-	if !c.decomp.inflated {
-		payload, err := c.assemble()
-		if err != nil {
-			return 0, err
-		}
-		out, err := c.decompress(payload)
-		if err != nil {
-			return 0, err
-		}
-		c.decomp.rest, c.decomp.inflated = out, true
+	if err := c.inflateWhole(); err != nil {
+		return 0, err
 	}
 	if len(c.decomp.rest) == 0 {
 		c.decomp.rest, c.decomp.inflated, c.inMessage = nil, false, false

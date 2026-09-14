@@ -207,7 +207,12 @@ any goroutine, including a control handler on the read goroutine. Steps:
 `Batch` queues messages, borrowing payloads, and `Flush` encodes them all
 under one lock into one contiguous buffer for a single write, so a fan-out
 burst costs one syscall instead of one per message. `WriteFrom` streams an
-`io.Reader` in `FragmentSize` chunks through the fragmented-send path.
+`io.Reader` in `FragmentSize` chunks through the fragmented-send path, and
+`WriteTo` is its mirror on the read side: the rest of the current message
+goes to an `io.Writer` frame by frame, borrowed from the read buffer or read
+into the pooled message buffer in `FragmentSize` pieces, so `io.Copy` moves
+a message with no buffer of its own and an echo through the connection's
+own streaming shape is `NextMessage` then `WriteFrom(op, c)`.
 
 `Prepared` encodes a message once for many recipients; server frames carry
 no mask, so the bytes are shared, with a compressed variant per compression

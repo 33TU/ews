@@ -437,6 +437,121 @@ func TestNextMessageDiscards(t *testing.T) {
 	wait()
 }
 
+// failingWriter accepts limit bytes, then fails.
+type failingWriter struct {
+	bytes.Buffer
+	limit int
+}
+
+func (w *failingWriter) Write(p []byte) (int, error) {
+	if w.Len()+len(p) > w.limit {
+		return 0, errors.New("writer full")
+	}
+	return w.Buffer.Write(p)
+}
+
+func TestWriteTo(t *testing.T) {
+	// A small read buffer exercises both the borrowed path and the direct
+	// read of long remainders; a small fragment size makes those pieces many.
+	// Pings go unanswered: over net.Pipe a pong written while the client is
+	// still writing would deadlock both ends.
+	server, client := pair(t, ws.Config{ReadBufferSize: 8, FragmentSize: 1000, ControlHandler: pingFails{}}, ws.Config{})
+	wait := run(t, func() error {
+		for _, m := range messages() {
+			if err := client.Write(m.op, m.payload); err != nil {
+				return err
+			}
+		}
+		// A fragmented message with a ping in the middle.
+		if err := client.BeginMessage(codec.Binary); err != nil {
+			return err
+		}
+		for i := 0; i < 3; i++ {
+			if err := client.WriteChunk(bytes.Repeat([]byte{byte('a' + i)}, 5000)); err != nil {
+				return err
+			}
+			if i == 1 {
+				if err := client.Ping([]byte("mid")); err != nil {
+					return err
+				}
+			}
+		}
+		if err := client.EndMessage(); err != nil {
+			return err
+		}
+		if err := client.Write(codec.Binary, bytes.Repeat([]byte("z"), 3000)); err != nil {
+			return err
+		}
+		if err := client.Write(codec.Text, []byte("after")); err != nil {
+			return err
+		}
+		if _, p, err := client.ReadMessage(); err != nil || string(p) != "done" {
+			return fmt.Errorf("final message: %q %v", p, err)
+		}
+		return nil
+	})
+	// Nothing open: nothing written.
+	if n, err := server.WriteTo(io.Discard); n != 0 || err != nil {
+		t.Fatal(n, err)
+	}
+	var buf bytes.Buffer
+	for i, m := range messages() {
+		op, err := server.NextMessage()
+		if err != nil || op != m.op {
+			t.Fatalf("message %d: %d %v", i, op, err)
+		}
+		buf.Reset()
+		// io.Copy picks WriteTo up through io.WriterTo.
+		n, err := io.Copy(&buf, server)
+		if err != nil || n != int64(len(m.payload)) || !bytes.Equal(buf.Bytes(), m.payload) {
+			t.Fatalf("message %d: %d bytes, %v", i, n, err)
+		}
+		if n, err := server.WriteTo(&buf); n != 0 || err != nil {
+			t.Fatalf("message %d: WriteTo after the end wrote %d, %v", i, n, err)
+		}
+	}
+	if _, err := server.NextMessage(); err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	if n, err := server.WriteTo(&buf); err != nil || n != 15000 {
+		t.Fatal(n, err)
+	}
+	for i := 0; i < 3; i++ {
+		if !bytes.Equal(buf.Bytes()[i*5000:(i+1)*5000], bytes.Repeat([]byte{byte('a' + i)}, 5000)) {
+			t.Fatalf("fragment %d corrupted", i)
+		}
+	}
+	// A failing writer stops the message; NextMessage discards the rest.
+	if _, err := server.NextMessage(); err != nil {
+		t.Fatal(err)
+	}
+	fw := &failingWriter{limit: 1500}
+	if _, err := server.WriteTo(fw); err == nil || err.Error() != "writer full" {
+		t.Fatalf("writer error not returned: %v", err)
+	}
+	if op, p, err := server.ReadMessage(); err != nil || op != codec.Text || string(p) != "after" {
+		t.Fatalf("%d %q %v", op, p, err)
+	}
+	if err := server.Write(codec.Text, []byte("done")); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+
+	// Compressed messages are inflated whole and written in one call.
+	cserver, cclient := compressionPair(t, true, true, 1)
+	payload := bytes.Repeat([]byte("compressed stream payload "), 4000)
+	cwait := run(t, func() error { return cclient.Write(codec.Text, payload) })
+	if _, err := cserver.NextMessage(); err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	if n, err := cserver.WriteTo(&buf); err != nil || n != int64(len(payload)) || !bytes.Equal(buf.Bytes(), payload) {
+		t.Fatal(n, err)
+	}
+	cwait()
+}
+
 func TestTransportEOF(t *testing.T) {
 	server, peer := raw(t, ws.Config{})
 	wait := run(t, func() error { return peer.Close() })
@@ -665,6 +780,22 @@ func BenchmarkRead(b *testing.B) {
 				for b.Loop() {
 					if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
 						b.Fatal(len(p), err)
+					}
+				}
+			})
+			b.Run("WriteTo/"+name, func(b *testing.B) {
+				c, err := ws.NewConn(&replay{wire: wire}, ws.Config{Role: role})
+				if err != nil {
+					b.Fatal(err)
+				}
+				b.ReportAllocs()
+				b.SetBytes(int64(size))
+				for b.Loop() {
+					if _, err := c.NextMessage(); err != nil {
+						b.Fatal(err)
+					}
+					if n, err := c.WriteTo(io.Discard); err != nil || n != int64(size) {
+						b.Fatal(n, err)
 					}
 				}
 			})
