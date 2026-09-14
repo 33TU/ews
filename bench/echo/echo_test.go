@@ -8,6 +8,7 @@ package echo
 import (
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -177,10 +178,19 @@ func BenchmarkEcho(b *testing.B) {
 		start        func(bool) *httptest.Server
 		compressOnly bool // Identical to another server without compression.
 	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
+	// Servers run in a seeded shuffled order per cell, so no library always
+	// measures right after the connection setup.
+	rng := rand.New(rand.NewPCG(7, 11))
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{64, 1024, 16 << 10, 256 << 10} {
 			for _, conns := range []int{1, 32, 128, 512, 1024, 2048} {
-				for _, s := range servers {
+				order := append([]int(nil), make([]int, len(servers))...)
+				for i := range order {
+					order[i] = i
+				}
+				rng.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
+				for _, si := range order {
+					s := servers[si]
 					if s.compressOnly && !compress {
 						continue
 					}
@@ -193,10 +203,13 @@ func BenchmarkEcho(b *testing.B) {
 						for i := range clients {
 							clients[i] = harness.Dial(b, srv.URL, compress)
 						}
-						// Warm up pools and negotiate once before measuring.
-						for _, c := range clients {
-							c.Write(codec.Binary, msg)
-							c.ReadMessage()
+						// Warm up: pools, goroutines, and socket buffers settle
+						// over several round trips per connection.
+						for round := 0; round < 5; round++ {
+							for _, c := range clients {
+								c.Write(codec.Binary, msg)
+								c.ReadMessage()
+							}
 						}
 						b.ReportAllocs()
 						b.SetBytes(int64(size))

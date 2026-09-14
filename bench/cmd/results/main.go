@@ -9,6 +9,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -79,6 +80,8 @@ Compression is permessage-deflate with context takeover, flate level 1 and 15-bi
 var line = regexp.MustCompile(`^Benchmark(\w+)/(\S+?)-\d+\s+\d+\s+([\d.]+) ns/op(.*)$`)
 
 func main() {
+	benchtime := flag.String("benchtime", "1s", "the -benchtime the results were produced with, for the header")
+	flag.Parse()
 	rows := map[key]result{}
 	var famOrder []string
 	dimOrder := map[string][]string{}  // family -> row dims in first-seen order
@@ -148,8 +151,8 @@ func main() {
 		if f.title == "" {
 			f.title = fam + " benchmark results"
 		}
-		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime 1s | go run ../cmd/results` at ews commit `%s`.\n\n",
-			f.title, time.Now().Format("2006-01-02"), fam, run("git", "rev-parse", "--short", "HEAD"))
+		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime %s | go run ../cmd/results` at ews commit `%s`.\n\n",
+			f.title, time.Now().Format("2006-01-02"), fam, *benchtime, run("git", "rev-parse", "--short", "HEAD"))
 		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s\n- gws: %s\n- coder/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), modVersion("lxzan/gws"), modVersion("coder/websocket"), f.setup)
 		comps := []string{""}
 		if _, ok := rowLabels[fam+"/false"]; ok {
