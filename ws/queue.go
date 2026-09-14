@@ -298,6 +298,17 @@ func (q *Queue) flush() error {
 	c := q.c
 	c.iomu.Lock()
 	defer c.iomu.Unlock()
+	if len(q.flushSegments) == 1 {
+		// One frame, the common case: a plain write costs less than a
+		// one-element writev.
+		s := q.flushSegments[0]
+		frame := s.ext
+		if frame == nil {
+			frame = q.flushArena[s.start:s.end]
+		}
+		_, err := c.rw.Write(frame)
+		return err
+	}
 	if c.vectored {
 		q.bufs = q.bufs[:0]
 		for _, s := range q.flushSegments {
