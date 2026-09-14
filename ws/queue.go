@@ -2,7 +2,6 @@ package ws
 
 import (
 	"net"
-	"slices"
 	"sync"
 
 	"github.com/33TU/ews/codec"
@@ -25,7 +24,7 @@ type Queue struct {
 
 	mu       sync.Mutex
 	cond     sync.Cond
-	arena    []byte    // Encoded frames of queued messages.
+	cur      *arena    // Encoded frames of queued messages; nil when none are copied in.
 	segments []segment // Queued frames in order.
 	size     int       // Bytes queued, counted against limit.
 	running  bool
@@ -35,11 +34,9 @@ type Queue struct {
 
 	// Writer-side storage, reused across flushes. bufs keeps the backing
 	// array; nb is the header net.Buffers.WriteTo consumes, kept as a field
-	// so it does not escape to the heap on every flush. spare is a private
-	// arena displaced by a pooled one, restored when that is released.
-	flushArena    []byte
+	// so it does not escape to the heap on every flush.
+	flushing      *arena
 	flushSegments []segment
-	spare         []byte
 	bufs          [][]byte
 	nb            net.Buffers
 }
@@ -52,60 +49,18 @@ type segment struct {
 	p          *Prepared
 }
 
-// queueRetain bounds the arena capacity a queue keeps for itself. Bursts
-// beyond it use arenas from a shared pool, returned after the flush, so
-// memory scales with the connections flushing at once rather than with every
-// connection that ever saw a burst: ten thousand connections that each once
-// queued 100 KB would otherwise hold a gigabyte.
-const queueRetain = 4 << 10
+// arena is a frame buffer shared through a pool. A queue holds one while it
+// has frames waiting and one while the writer is flushing, and none while
+// idle, so memory scales with connections that are busy at the same moment
+// rather than with every connection. The handle is reused, so a burst costs
+// no allocation.
+type arena struct{ b []byte }
 
-var arenaPool sync.Pool // *[]byte with capacity above queueRetain.
+var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<10)} }}
 
-// grow makes room for n more bytes in the arena. A queue owns a private
-// arena of queueRetain bytes, allocated once; a burst that outgrows it
-// continues in a pooled arena, and the private one is set aside to come
-// back after the flush, so steady traffic allocates nothing.
-func (q *Queue) grow(n int) {
-	need := len(q.arena) + n
-	if need <= cap(q.arena) {
-		return
-	}
-	if cap(q.arena) == 0 && need <= queueRetain {
-		q.arena = make([]byte, 0, queueRetain)
-		return
-	}
-	if cap(q.arena) > queueRetain {
-		q.arena = slices.Grow(q.arena, n) // Already pooled; let it grow in place.
-		return
-	}
-	if q.spare == nil {
-		q.spare = q.arena[:0] // Keep the private arena for after the flush.
-	}
-	var buf []byte
-	if p, ok := arenaPool.Get().(*[]byte); ok {
-		buf = (*p)[:0]
-	}
-	if cap(buf) < need {
-		buf = make([]byte, 0, max(need, 64<<10))
-	}
-	q.arena = append(buf, q.arena...)
-}
-
-// release hands a pooled arena back after its flush and restores the private
-// one it displaced. Callers hold mu.
-func (q *Queue) release() {
-	if cap(q.flushArena) > queueRetain {
-		a := q.flushArena[:0]
-		arenaPool.Put(&a)
-		q.flushArena, q.spare = q.spare, nil
-	}
-	if cap(q.flushSegments) > queueRetain/64 {
-		q.flushSegments = nil
-	}
-	if cap(q.bufs) > queueRetain/64 {
-		q.bufs = nil
-	}
-}
+// arenaKeep is the largest arena returned to the pool; bigger ones are
+// dropped so a rare huge burst does not pin memory.
+const arenaKeep = 1 << 20
 
 // NewQueue attaches a queue to c, or returns the one it already has. limit
 // is a high-water mark on bytes queued by Send and SendPrepared: an empty
@@ -226,10 +181,12 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, e
 		}
 		q.segments = append(q.segments, segment{ext: ext, p: p})
 	} else {
-		q.grow(len(header) + len(body))
-		start := len(q.arena)
-		q.arena = append(append(q.arena, header...), body...)
-		q.segments = append(q.segments, segment{start: start, end: len(q.arena)})
+		if q.cur == nil {
+			q.cur = arenaPool.Get().(*arena)
+		}
+		start := len(q.cur.b)
+		q.cur.b = append(append(q.cur.b, header...), body...)
+		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
 	}
 	q.size += n
 	q.enqueued++
@@ -271,9 +228,9 @@ func (q *Queue) run() {
 			q.mu.Unlock()
 			return
 		}
-		// Swap the producer's storage with the writer's, so enqueue continues
-		// while the write is in progress.
-		q.arena, q.flushArena = q.flushArena[:0], q.arena
+		// Take the producer's storage for writing, so enqueue continues into
+		// fresh storage while the write is in progress.
+		q.cur, q.flushing = nil, q.cur
 		q.segments, q.flushSegments = q.flushSegments[:0], q.segments
 		q.size = 0
 		q.mu.Unlock()
@@ -288,7 +245,13 @@ func (q *Queue) run() {
 			q.flushSegments[i] = segment{}
 		}
 		q.written += uint64(len(q.flushSegments))
-		q.release()
+		if a := q.flushing; a != nil {
+			q.flushing = nil
+			if cap(a.b) <= arenaKeep {
+				a.b = a.b[:0]
+				arenaPool.Put(a)
+			}
+		}
 		if err != nil {
 			q.err = err
 			for i := range q.segments {
@@ -320,7 +283,7 @@ func (q *Queue) flush() error {
 		s := q.flushSegments[0]
 		frame := s.ext
 		if frame == nil {
-			frame = q.flushArena[s.start:s.end]
+			frame = q.flushing.b[s.start:s.end]
 		}
 		_, err := c.rw.Write(frame)
 		return err
@@ -331,7 +294,7 @@ func (q *Queue) flush() error {
 			if s.ext != nil {
 				q.bufs = append(q.bufs, s.ext)
 			} else {
-				q.bufs = append(q.bufs, q.flushArena[s.start:s.end])
+				q.bufs = append(q.bufs, q.flushing.b[s.start:s.end])
 			}
 		}
 		q.nb = q.bufs
@@ -346,7 +309,7 @@ func (q *Queue) flush() error {
 		if s.ext != nil {
 			out = append(out, s.ext...)
 		} else {
-			out = append(out, q.flushArena[s.start:s.end]...)
+			out = append(out, q.flushing.b[s.start:s.end]...)
 		}
 	}
 	*buf = out
