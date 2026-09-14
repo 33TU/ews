@@ -217,9 +217,10 @@ queue exists, synchronous sends join it: they enqueue under the encoder lock,
 which makes enqueue order the encode order, then wait for their sequence
 number to be written. Order and compressed-stream consistency hold, `Write`
 keeps meaning written-on-return, and the encoder lock is never held while
-waiting, so `Send` stays non-blocking. The writer lingers ten milliseconds
-before exiting, so a sender faster than that pays a channel send per wake
-instead of a goroutine start, while a quiet connection holds no goroutine. `Prepared` storage is pooled behind a
+waiting, so `Send` stays non-blocking. The writer goroutine exits when the
+queue drains and is started again by the next `Send`; a lingering writer
+with a timer was tried and cost more per wake than a fresh goroutine, 4
+against 2 percent of CPU in a 2048-connection broadcast. `Prepared` storage is pooled behind a
 reference count: queues and batches retain while holding a message and
 release after the write, and the owner's `Release` is optional.
 

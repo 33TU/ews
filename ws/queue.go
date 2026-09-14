@@ -3,7 +3,6 @@ package ws
 import (
 	"net"
 	"sync"
-	"time"
 
 	"github.com/33TU/ews/codec"
 )
@@ -32,9 +31,6 @@ type Queue struct {
 	err      error
 	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
 	written  uint64 // Frames written so far.
-	parked   bool   // The writer is lingering, waiting on wake.
-	wake     chan struct{}
-	timer    *time.Timer
 
 	// Writer-side storage, reused across flushes. bufs keeps the backing
 	// array; nb is the header net.Buffers.WriteTo consumes, kept as a field
@@ -53,12 +49,6 @@ type segment struct {
 	p          *Prepared
 }
 
-// queueLinger is how long an idle writer goroutine waits for more frames
-// before exiting. Senders faster than this keep it alive and pay a channel
-// send per wake instead of a goroutine start; slower ones hold no goroutine
-// between messages. A parked goroutine costs only its stack.
-const queueLinger = 10 * time.Millisecond
-
 // NewQueue attaches a queue to c, or returns the one it already has. limit
 // is a high-water mark on bytes queued by Send and SendPrepared: an empty
 // queue accepts any message, and a message that would push a nonempty queue
@@ -73,7 +63,7 @@ func (c *Conn) NewQueue(limit int) *Queue {
 	if c.queue != nil {
 		return c.queue
 	}
-	q := &Queue{c: c, limit: limit, wake: make(chan struct{}, 1)}
+	q := &Queue{c: c, limit: limit}
 	q.cond.L = &q.mu
 	c.queue = q
 	return q
@@ -184,13 +174,9 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, e
 	}
 	q.size += n
 	q.enqueued++
-	switch {
-	case !q.running:
+	if !q.running {
 		q.running = true
 		go q.run()
-	case q.parked:
-		q.parked = false
-		q.wake <- struct{}{} // Buffered; the writer drains it before parking again.
 	}
 	return q.enqueued, nil
 }
@@ -214,15 +200,12 @@ func (q *Queue) waitLocked(seq uint64) error {
 	return q.err
 }
 
-// run writes queued frames until the queue has been empty for queueLinger,
-// then exits, so an idle connection holds no goroutine.
+// run writes queued frames until the queue is empty, then exits, so an idle
+// connection holds no goroutine. Measured against a lingering writer with a
+// timer, a fresh goroutine per burst costs less at every wake rate tried.
 func (q *Queue) run() {
 	for {
 		q.mu.Lock()
-		// Wait, lingering, while there is nothing to write; linger returns
-		// with mu held either way.
-		for len(q.segments) == 0 && q.err == nil && q.linger() {
-		}
 		if len(q.segments) == 0 || q.err != nil {
 			q.running = false
 			q.cond.Broadcast()
@@ -261,33 +244,6 @@ func (q *Queue) run() {
 		if err != nil {
 			return
 		}
-	}
-}
-
-// linger parks the writer for queueLinger or until a frame arrives. It is
-// called with mu held and returns with mu held; true means frames arrived.
-func (q *Queue) linger() bool {
-	q.parked = true
-	q.mu.Unlock()
-	if q.timer == nil {
-		q.timer = time.NewTimer(queueLinger)
-	} else {
-		q.timer.Reset(queueLinger)
-	}
-	select {
-	case <-q.wake:
-		q.timer.Stop()
-		q.mu.Lock()
-		return true
-	case <-q.timer.C:
-		q.mu.Lock()
-		if !q.parked {
-			// A frame arrived as the timer fired; take its wake token.
-			<-q.wake
-			return true
-		}
-		q.parked = false
-		return false
 	}
 }
 
