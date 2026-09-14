@@ -47,6 +47,7 @@ func (c *Conn) encodeData(op codec.Opcode, payload []byte) (header, body []byte,
 	if c.comp.config == nil || len(payload) < c.comp.minSize {
 		return c.tx.Encode(op, payload)
 	}
+	c.applyPending()
 	comp, shared := c.compressorFor()
 	compressed, err := comp.Compress(payload, c.comp.window)
 	if err == nil {
@@ -183,6 +184,7 @@ func (c *Conn) fragment(payload []byte, final bool) (*Queue, uint64, error) {
 		op = c.frag.op
 	}
 	if c.frag.compressed {
+		c.applyPending()
 		var err error
 		if payload, err = c.comp.attached.CompressChunk(payload, c.comp.window, final); err != nil {
 			return nil, 0, c.endFragmented(err)

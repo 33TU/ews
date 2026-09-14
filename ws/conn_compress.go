@@ -18,7 +18,23 @@ type compressorContext struct {
 	window   *deflate.Window        // Send-direction history when takeover is negotiated.
 	attached *deflate.Compressor    // Continues window's stream between messages.
 	scratch  []byte                 // Holds a shared compressor's output until written.
+
+	// pending holds compressed Prepared payloads sent on this connection but
+	// not yet copied into window, oldest first, each retained. Copying the
+	// history is the whole cost of a broadcast to a takeover connection, and
+	// it lands on the sender's goroutine, so it is deferred: entries whose
+	// bytes the later ones already cover are dropped, and the rest are copied
+	// only when this connection next compresses a message of its own. A
+	// recipient that only ever receives broadcasts never copies at all.
+	pending      [pendingHistory]*Prepared
+	npending     int
+	pendingBytes int
 }
+
+// pendingHistory bounds the prepared payloads a connection defers. Payloads
+// smaller than the window accumulate until they cover it or fill this many
+// slots, when they are copied in one go.
+const pendingHistory = 8
 
 // decompressorContext is the receive side. Used by the reading goroutine only.
 type decompressorContext struct {
@@ -86,6 +102,58 @@ func (c *Conn) compressorFor() (comp *deflate.Compressor, shared bool) {
 	}
 	c.comp.attached = comp
 	return comp, false
+}
+
+// notePrepared records that p's compressed variant was sent, advancing the
+// send window lazily. Callers hold wmu and have checked that window is set.
+func (c *Conn) notePrepared(p *Prepared) {
+	size := c.comp.window.Size()
+	n := len(p.payload)
+	if n >= size {
+		// p's tail is the whole history; nothing older matters.
+		c.dropPending()
+	} else {
+		for c.comp.npending > 0 && c.comp.pendingBytes-len(c.comp.pending[0].payload)+n >= size {
+			c.dropOldestPending()
+		}
+		if c.comp.npending == pendingHistory {
+			c.applyPending()
+		}
+	}
+	p.Retain()
+	c.comp.pending[c.comp.npending] = p
+	c.comp.npending++
+	c.comp.pendingBytes += n
+}
+
+// applyPending copies the deferred prepared payloads into the send window,
+// in order, and releases them. Callers hold wmu.
+func (c *Conn) applyPending() {
+	for i := 0; i < c.comp.npending; i++ {
+		p := c.comp.pending[i]
+		c.comp.window.Add(p.payload)
+		p.Release()
+		c.comp.pending[i] = nil
+	}
+	c.comp.npending, c.comp.pendingBytes = 0, 0
+}
+
+// dropPending releases every deferred payload without copying it.
+func (c *Conn) dropPending() {
+	for i := 0; i < c.comp.npending; i++ {
+		c.comp.pending[i].Release()
+		c.comp.pending[i] = nil
+	}
+	c.comp.npending, c.comp.pendingBytes = 0, 0
+}
+
+func (c *Conn) dropOldestPending() {
+	p := c.comp.pending[0]
+	c.comp.pendingBytes -= len(p.payload)
+	c.comp.npending--
+	copy(c.comp.pending[:], c.comp.pending[1:c.comp.npending+1])
+	c.comp.pending[c.comp.npending] = nil
+	p.Release()
 }
 
 // releaseCompressor returns an attached compressor to the pool. Callers hold wmu.

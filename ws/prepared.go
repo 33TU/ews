@@ -183,7 +183,7 @@ func (c *Conn) preparedFrame(p *Prepared) ([]byte, error) {
 	}
 	frame, compressed := p.frameFor(c)
 	if compressed && c.comp.window != nil {
-		c.comp.window.Add(p.payload)
+		c.notePrepared(p)
 	}
 	return frame, nil
 }

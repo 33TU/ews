@@ -19,7 +19,8 @@ type Window struct {
 
 const windowSize = 32 << 10
 
-func (w *Window) size() int {
+// Size returns the window size in bytes.
+func (w *Window) Size() int {
 	if w.Bits >= 8 && w.Bits <= 15 {
 		return 1 << w.Bits
 	}
@@ -47,7 +48,7 @@ func (w *Window) remember(p []byte) {
 		return
 	}
 	w.gen++
-	size := w.size()
+	size := w.Size()
 	if len(p) >= size {
 		w.buf = append(w.buf[:0], p[len(p)-size:]...)
 		return
@@ -68,7 +69,7 @@ func (w *Window) dict() []byte {
 	if w == nil {
 		return nil
 	}
-	if n := len(w.buf) - w.size(); n > 0 {
+	if n := len(w.buf) - w.Size(); n > 0 {
 		return w.buf[n:]
 	}
 	return w.buf

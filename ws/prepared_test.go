@@ -138,3 +138,61 @@ func TestPrepared(t *testing.T) {
 	}()
 	p.Release()
 }
+
+// TestPreparedTakeoverHistory interleaves prepared and ordinary compressed
+// messages on a takeover connection across the window size, so the deferred
+// history update is exercised in every branch: payloads that accumulate
+// below the window, one that covers it, and the connection's own compressed
+// messages that must see the right dictionary each time.
+func TestPreparedTakeoverHistory(t *testing.T) {
+	server, client := compressionPair(t, true, true, 1)
+	var want [][]byte
+	text := func(i, size int) []byte {
+		return bytes.Repeat([]byte(fmt.Sprintf("msg %02d payload text ", i)), size/20+1)[:size]
+	}
+	var prepared []*ws.Prepared
+	for i := 0; i < 24; i++ {
+		var p []byte
+		switch {
+		case i == 11:
+			p = text(i, 40<<10) // Larger than the 32 KB window.
+		case i%4 == 3:
+			p = text(i, 300)
+		default:
+			p = text(i, 4<<10)
+		}
+		pr, err := ws.Prepare(codec.Text, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prepared = append(prepared, pr)
+		want = append(want, p)
+	}
+	wait := run(t, func() error {
+		for i, w := range want {
+			_, got, err := client.ReadMessage()
+			if err != nil {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+			if !bytes.Equal(got, w) {
+				return fmt.Errorf("message %d: got %d bytes, want %d", i, len(got), len(w))
+			}
+		}
+		return nil
+	})
+	for i, pr := range prepared {
+		if i%4 == 3 {
+			// The connection's own compressed message, primed from the
+			// history the prepared messages built.
+			if err := server.Write(codec.Text, want[i]); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		if err := server.WritePrepared(pr); err != nil {
+			t.Fatal(err)
+		}
+		pr.Release()
+	}
+	wait()
+}

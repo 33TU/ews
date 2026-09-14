@@ -209,7 +209,14 @@ no mask, so the bytes are shared, with a compressed variant per compression
 configuration built on first use. That variant is compressed against an
 empty dictionary, which any peer decodes; on a takeover connection the send
 window is advanced and the attached compressor re-primes once on its next
-message, through the window generation counter. `Queue` is the one place
+message, through the window generation counter. Advancing the window is a
+copy of up to 32 KB per recipient on the sender's goroutine, and it was the
+whole cost of a compressed broadcast, so it is deferred: the connection
+retains the `Prepared` in a small pending list instead, drops entries the
+later ones already cover, and copies the rest only when it next compresses
+a message of its own. A recipient that only receives broadcasts never
+copies; measured at 512 connections that took compressed 64 KiB broadcasts
+from 161k to 465k messages a second. `Queue` is the one place
 `ws` runs a goroutine, and only while the queue is nonempty: `Send` encodes
 under the write lock into an arena and returns, the writer swaps arenas and
 writes everything accumulated in one writev, and a slow peer fails `Send`
