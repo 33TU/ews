@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
@@ -19,9 +20,35 @@ import (
 	"github.com/klauspost/compress/flate"
 )
 
-// clients maps each connection's queue to its transport, so a client that
-// falls behind can be closed.
-var clients sync.Map // *ws.Queue -> net.Conn
+// A client that sends nothing and answers no ping within idleTimeout is
+// dropped. Pings go out from one ticker for every client, so keepalive
+// costs no timer per connection.
+const (
+	pingInterval = 30 * time.Second
+	idleTimeout  = 2 * pingInterval
+)
+
+// client is one connection: the queue broadcasts go to, the connection for
+// pings, and the transport for deadlines and closing.
+type client struct {
+	c    *ws.Conn
+	conn net.Conn
+}
+
+// clients maps each client's queue to it, so a client that falls behind can
+// be closed.
+var clients sync.Map // *ws.Queue -> *client
+
+// keepalive refreshes the read deadline when a pong arrives, so a quiet but
+// live client stays connected.
+type keepalive struct {
+	ws.DefaultControlHandler
+	conn net.Conn
+}
+
+func (k keepalive) OnPong(*ws.Conn, []byte) error {
+	return k.conn.SetReadDeadline(time.Now().Add(idleTimeout))
+}
 
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
@@ -30,15 +57,21 @@ func main() {
 	server := &ews.Server{
 		Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
 		Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
-			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
+			c, err := ws.NewConn(conn, ws.Config{
+				Role:              ws.Server,
+				Compression:       res.Compression,
+				CompressionShared: true,
+				ControlHandler:    keepalive{conn: conn},
+			})
 			if err != nil {
 				return
 			}
 			q := c.NewQueue(1 << 20) // A client more than 1 MiB behind is dropped.
-			clients.Store(q, conn)
+			clients.Store(q, &client{c: c, conn: conn})
 			defer clients.Delete(q)
 
 			for {
+				conn.SetReadDeadline(time.Now().Add(idleTimeout))
 				op, payload, err := c.ReadMessage()
 				if err != nil {
 					return
@@ -47,6 +80,7 @@ func main() {
 			}
 		},
 	}
+	go pingAll()
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
@@ -66,8 +100,22 @@ func broadcast(op codec.Opcode, payload []byte) {
 	defer p.Release() // Queues keep their own references until written.
 	clients.Range(func(key, value any) bool {
 		if err := key.(*ws.Queue).SendPrepared(p); err != nil {
-			value.(net.Conn).Close()
+			value.(*client).conn.Close()
 		}
 		return true
 	})
+}
+
+// pingAll pings every client on one ticker. Ping is safe beside the queue's
+// writer and a failed ping closes the client.
+func pingAll() {
+	for range time.Tick(pingInterval) {
+		clients.Range(func(_, value any) bool {
+			cl := value.(*client)
+			if err := cl.c.Ping(nil); err != nil {
+				cl.conn.Close()
+			}
+			return true
+		})
+	}
 }

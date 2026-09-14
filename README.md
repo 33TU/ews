@@ -13,6 +13,8 @@ The frame API lives in `github.com/33TU/ews/codec`, message compression in `gith
 - Borrow input when possible; buffer incomplete frames when needed.
 - Keep networking and message assembly separate from frame encoding and decoding.
 
+Borrowing is the one rule to keep in mind throughout: a payload from `ReadMessage`, a chunk from the codec, a compressor's output, a prepared frame, is valid until the next call on the object that handed it out, and is then reused. Nothing enforces this, and the failure is silent corruption rather than a panic. Copy with `bytes.Clone` before keeping a payload past the next read, handing it to another goroutine, or storing it; the hot paths stay allocation-free and the copy happens only where the application needs one.
+
 ## Decoding
 
 Read each header, then drain its payload before advancing to the next frame.
@@ -124,7 +126,29 @@ if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
 ```
 
-With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` on a compressed message inflates it whole on the first call and hands out chunks of the result. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/echo/RESULTS.md` has the measurements behind this.
+With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` on a compressed message inflates it whole on the first call and hands out chunks of the result.
+
+The whole recipe for a compressed server, from negotiation to connection:
+
+```go
+server := &ews.Server{
+	Handshake: handshake.Options{Compression: &handshake.Compress{
+		Level:           flate.BestSpeed, // Level 1: the fastest, and what the benchmarks use.
+		MinSize:         256,             // Smaller messages go uncompressed; default 128.
+		ContextTakeover: true,            // Offer takeover in both directions; peers may decline.
+	}},
+	Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
+		c, err := ws.NewConn(conn, ws.Config{
+			Role:              ws.Server,
+			Compression:       res.Compression, // What was negotiated, or nil.
+			CompressionShared: true,            // Pool compressors: right from about a thousand connections.
+		})
+		// ...
+	},
+}
+```
+
+`res.Compression` carries the negotiated parameters, so the connection configuration never repeats what the handshake decided; a client gets the same from `ews.Dial`. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/echo/RESULTS.md` has the measurements behind this.
 
 `EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
 
@@ -158,6 +182,25 @@ A peer may negotiate a smaller window for this endpoint's messages; `NewCompress
 `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path.
 
 A message whose size is not known up front is sent in fragments: `BeginMessage(op)`, then `WriteChunk(p)` for each piece, which goes out as one frame immediately, then `EndMessage()`. Until `EndMessage`, `Write` returns `ErrMessageOpen` while `Ping`, `Pong`, and `Close` may interleave. Compressed fragments continue one deflate stream, so a fragmented message compresses as well as a whole one. `WriteFrom(op, r)` does this for an `io.Reader`, sending content up to `Config.FragmentSize`, 64 KiB by default, as a single frame and fragmenting anything longer as it is read. `WriteTo(w)` is its mirror on the read side: after `NextMessage` it writes the rest of the message to an `io.Writer`, handing over frames as they arrive, so `io.Copy(w, c)` moves a message without a buffer of its own.
+
+Idle detection and keepalive are the caller's, since the caller owns the transport and `ws` runs no timers. The pattern is a read deadline refreshed by every message and every pong, and pings from one ticker for all connections rather than a timer per connection; `examples/broadcast` does exactly this:
+
+```go
+type keepalive struct {
+	ws.DefaultControlHandler
+	conn net.Conn
+}
+
+func (k keepalive) OnPong(*ws.Conn, []byte) error {
+	return k.conn.SetReadDeadline(time.Now().Add(idleTimeout))
+}
+
+// Per connection: refresh before each read, and let one ticker ping everyone.
+conn.SetReadDeadline(time.Now().Add(idleTimeout))
+op, payload, err := c.ReadMessage()
+```
+
+A connection that neither sends nor answers pings within the timeout fails its read with a timeout error and the handler returns.
 
 `NetConn(c, op)` presents the connection as a `net.Conn` for tunneling other protocols over WebSocket: each `Write` is one message of the given type, `Read` delivers message payloads in order and moves on to the next message as one ends, a message of the other type closes with 1003, a peer close with 1000 or 1001 reads as `io.EOF`, and `Close` sends a normal close and closes the transport. Deadlines and addresses are the transport's, so a read deadline interrupts a blocked `Read` and leaves the connection usable.
 

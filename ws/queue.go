@@ -66,11 +66,13 @@ var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<
 // dropped so a rare huge burst does not pin memory.
 const arenaKeep = 1 << 20
 
-// NewQueue attaches a queue to c, or returns the one it already has. limit
-// is a high-water mark on bytes queued by Send and SendPrepared: an empty
-// queue accepts any message, and a message that would push a nonempty queue
-// past the limit is refused with ErrQueueFull rather than blocking, so a slow
-// peer cannot stall the sender. Zero means 1 MiB.
+// NewQueue attaches a queue to c, or returns the one it already has, so a
+// hub can look a connection's queue up again by calling it with any limit.
+// limit is a high-water mark on bytes queued by Send and SendPrepared: an
+// empty queue accepts any message, and a message that would push a nonempty
+// queue past the limit is refused with ErrQueueFull rather than blocking, so
+// a slow peer cannot stall the sender. The application decides what a full
+// queue means, usually closing the connection. Zero means 1 MiB.
 func (c *Conn) NewQueue(limit int) *Queue {
 	if limit <= 0 {
 		limit = 1 << 20

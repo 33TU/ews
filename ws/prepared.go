@@ -74,8 +74,9 @@ func (p *Prepared) Payload() []byte { return p.payload }
 // will Release it independently.
 func (p *Prepared) Retain() { p.refs.Add(1) }
 
-// Release drops a reference. At zero the storage returns to the pool and the
-// message must not be used again.
+// Release drops the caller's reference. At zero the storage returns to the
+// pool and the message must not be used again; releasing more times than
+// retained panics, so call it once per Prepare or Retain, or not at all.
 func (p *Prepared) Release() {
 	n := p.refs.Add(-1)
 	if n > 0 {
