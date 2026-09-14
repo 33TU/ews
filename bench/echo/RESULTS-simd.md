@@ -1,6 +1,6 @@
 # Echo benchmark results
 
-Generated 2026-09-15 from `go test -run '^$' -bench Echo -benchtime 500ms | go run ../cmd/results` at ews commit `8db424c`.
+Generated 2026-09-15 from `go test -run '^$' -bench Echo -benchtime 500ms | go run ../cmd/results` at ews commit `39a6bc0`.
 
 ![echo-plain-simd](echo-plain-simd.svg)
 
@@ -13,6 +13,7 @@ Generated 2026-09-15 from `go test -run '^$' -bench Echo -benchtime 500ms | go r
 - CPU: 13th Gen Intel(R) Core(TM) i9-13900H
 - Kernel: 6.12.0-211.53.1.el10_2.x86_64
 - Go: go1.27.0-X:simd, `GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation
+- GOMAXPROCS: 20
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3

@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-15 from `go test -run '^$' -bench Broadcast -benchtime 500ms | go run ../cmd/results` at ews commit `8db424c`.
+Generated 2026-09-15 from `go test -run '^$' -bench Broadcast -benchtime 500ms | go run ../cmd/results` at ews commit `39a6bc0`.
 
 ![broadcast-plain](broadcast-plain.svg)
 
@@ -13,6 +13,7 @@ Generated 2026-09-15 from `go test -run '^$' -bench Broadcast -benchtime 500ms |
 - CPU: 13th Gen Intel(R) Core(TM) i9-13900H
 - Kernel: 6.12.0-211.53.1.el10_2.x86_64
 - Go: go1.27.0, default build: SWAR masking and the shift-based UTF-8 validator
+- GOMAXPROCS: 20
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3

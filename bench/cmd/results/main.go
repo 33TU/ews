@@ -208,7 +208,7 @@ func main() {
 				fmt.Fprintf(w, "![%s](%s)\n\n", strings.TrimSuffix(name, ".svg"), name)
 			}
 		}
-		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- gws: %s\n- coder/websocket: %s\n- gorilla/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, modVersion("lxzan/gws"), modVersion("coder/websocket"), modVersion("gorilla/websocket"), f.setup)
+		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- GOMAXPROCS: %d\n- gws: %s\n- coder/websocket: %s\n- gorilla/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, runtime.GOMAXPROCS(0), modVersion("lxzan/gws"), modVersion("coder/websocket"), modVersion("gorilla/websocket"), f.setup)
 		comps := []string{""}
 		if _, ok := rowLabels[fam+"/false"]; ok {
 			comps = comps[:0]
