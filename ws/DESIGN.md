@@ -4,7 +4,7 @@ Message I/O over an already-upgraded WebSocket transport, built on `codec`. The
 handshake and extension negotiation live elsewhere; `ws` receives the
 negotiated result through `Config`.
 
-Status: steps 1 and 2 implemented; `handshake` and the root `Upgrade` exist. Fragmented send and the reactor remain.
+Status: steps 1 to 3 implemented, with `handshake`, the root `Upgrade`, `Dial` and `Server`. The reactor is not planned; see Layering and Later.
 
 ## Principles
 
@@ -16,15 +16,20 @@ Status: steps 1 and 2 implemented; `handshake` and the root `Upgrade` exist. Fra
 
 ## Layering
 
-A reactor-based API is planned after this conventional one. A reactor pushes
-bytes in from an event loop and never blocks, so everything that is not
-transport I/O is written push-style once and shared.
+The core is push-style so that a non-blocking transport could drive it: an
+event loop pushes bytes in and never blocks, and everything that is not
+transport I/O is written once and shared. That kept the layering honest,
+but a reactor package is not planned. The blocking `Conn` ties or beats the
+event-loop libraries it was measured against, a second poller beside the
+runtime's is awkward to use and to maintain in Go, and TLS cannot be driven
+from raw file descriptors without forking the record layer. The layering
+stays as is because it costs nothing, not because a reactor is coming.
 
 ```
 codec, deflate                 frame bytes, whole-message compression
 internal/proto (push core)     Feed(bytes) -> validated frame and message events
 ws.Conn (this design)          blocking loop: fill from io.ReadWriter, drive the core
-reactor (later)                event loop: feed the core from readiness callbacks
+a non-blocking transport         could feed the core from readiness callbacks; not planned
 ```
 
 The push core owns the protocol rules: mask bit per role, RSV checks,
@@ -174,8 +179,7 @@ rest with a shift-based DFA by default, or with SIMD lookups ported from
 github.com/33TU/json-experiment under `GOEXPERIMENT=simd` on amd64. Against
 the standard library, the DFA is 1.4 to 2 times faster on non-ASCII text and
 the SIMD kernel 5 to 8 times. `Read` cannot validate, since it never holds the message; gws makes the
-same choice for its streaming reader. The reactor will validate the same way
-as `ReadMessage`, since it assembles whole messages.
+same choice for its streaming reader.
 
 Control frames complete: call the handler. After `OnClose` returns nil, the
 current read returns `*CloseError` and every later read returns it again. An
@@ -324,22 +328,23 @@ nc.Close()
    the last is trimmed, and the connection holds one compressor for the
    message even in shared mode. The final compressed fragment carries the
    one header byte of the trimmed block, which is inherent to the format.
-4. `reactor`. Reuses the push core and whole-message `deflate` unchanged.
-   Streaming inflate is not offered on the reactor, decided up front: the
-   klauspost and standard-library inflaters are pull-only and cannot resume
-   after a short read, and a push-based inflater is not worth writing for it.
-   Compressed messages on the reactor are assembled through FIN and
-   decompressed whole, bounded by the message limit.
-
 ## Later
 
 - A cheaper per-connection mask key source than `crypto/rand` if profiling
   shows it matters.
+- An epoll or io_uring write pump under `Queue.flush` for plain TCP: raw
+  non-blocking writes from a fixed set of goroutines, chosen by the existing
+  `SyscallConn` check, with TLS and wrapped transports keeping the goroutine
+  writer. Measured as an upper bound at 8 percent more broadcast throughput
+  at 512 connections and 14 at 2048, with fewer goroutines in flight. It is
+  Linux-only, needs its own stall limit since write deadlines do not cover
+  raw writes, and is the last optimization worth doing, if a deployment
+  ever shows the profile for it. No user-facing event-loop API in any case.
 
 ## Handshake
 
 `handshake` holds the opening handshake rules as pure functions over header
-values, so a `net/http` server, a client, and a future reactor share them.
+values, so a `net/http` server, a client, and any other transport share them.
 The negotiated `handshake.Compression` is what `ws.Config` takes; `ws`
 depends on `handshake`, never the reverse. The root `ews` package is the only
 place `net/http` appears: `Upgrade` validates, hijacks, writes the 101, and
