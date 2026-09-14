@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 500ms | go run ../cmd/results` at ews commit `e220206`.
+Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `9965877`.
 
 ![broadcast-simd](broadcast-simd.svg)
 
@@ -24,17 +24,17 @@ Compression is permessage-deflate with context takeover, flate level 1 and 15-bi
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 581k msgs/s | 151k msgs/s | 576k msgs/s | 128 (2 KB) / 0 / 259 (9 KB) |
-| 512 | 820k msgs/s | 200k msgs/s | 836k msgs/s | 512 (8 KB) / 0 / 1027 (36 KB) |
-| 2048 | 852k msgs/s | 229k msgs/s | 853k msgs/s | 2049 (32 KB) / 0 / 4099 (144 KB) |
+| 128 | 962k msgs/s | 165k msgs/s | 905k msgs/s | 0 / 0 / 259 (9 KB) |
+| 512 | 1.18M msgs/s | 232k msgs/s | 792k msgs/s | 0 / 0 / 1027 (36 KB) |
+| 2048 | 1.27M msgs/s | 262k msgs/s | 1.28M msgs/s | 2 / 0 / 4100 (145 KB) |
 
 ## Compressed
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 426k msgs/s | 116k msgs/s | 500k msgs/s | 128 (5 KB) / 0 (20 KB) / 259 (9 KB) |
-| 512 | 642k msgs/s | 181k msgs/s | 441k msgs/s | 512 (8 KB) / 0 / 1027 (36 KB) |
-| 2048 | 664k msgs/s | 212k msgs/s | 466k msgs/s | 2049 (70 KB) / 2 (102 KB) / 4101 (145 KB) |
+| 128 | 594k msgs/s | 114k msgs/s | 634k msgs/s | 0 (1 KB) / 0 (9 KB) / 259 (9 KB) |
+| 512 | 888k msgs/s | 150k msgs/s | 505k msgs/s | 0 / 0 / 1027 (36 KB) |
+| 2048 | 741k msgs/s | 248k msgs/s | 446k msgs/s | 0 / 1 (70 KB) / 4099 (144 KB) |
 
 ## Reading the numbers
 

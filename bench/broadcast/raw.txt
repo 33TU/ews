@@ -2,23 +2,23 @@ goos: linux
 goarch: amd64
 pkg: github.com/33TU/ews/bench/broadcast
 cpu: 13th Gen Intel(R) Core(TM) i9-13900H
-BenchmarkBroadcast/compress=false/conns=128/gws-20         	    2468	    232355 ns/op	 141.03 MB/s	    550881 msgs/s	    9429 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=false/conns=128/ews-sync-20    	     823	    855603 ns/op	  38.30 MB/s	    149602 msgs/s	       7 B/op	       0 allocs/op
-BenchmarkBroadcast/compress=false/conns=128/ews-20         	    2566	    226001 ns/op	 144.99 MB/s	    566369 msgs/s	    2077 B/op	     128 allocs/op
-BenchmarkBroadcast/compress=false/conns=512/ews-20         	     908	    652179 ns/op	 200.98 MB/s	    785061 msgs/s	    8257 B/op	     512 allocs/op
-BenchmarkBroadcast/compress=false/conns=512/gws-20         	     868	    673039 ns/op	 194.75 MB/s	    760729 msgs/s	   37094 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=false/conns=512/ews-sync-20    	     234	   2560496 ns/op	  51.19 MB/s	    199961 msgs/s	      29 B/op	       0 allocs/op
-BenchmarkBroadcast/compress=false/conns=2048/ews-20        	     218	   2601971 ns/op	 201.50 MB/s	    787096 msgs/s	   33260 B/op	    2049 allocs/op
-BenchmarkBroadcast/compress=false/conns=2048/gws-20        	     243	   2479246 ns/op	 211.47 MB/s	    826057 msgs/s	  147668 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=false/conns=2048/ews-sync-20   	      63	   9306885 ns/op	  56.33 MB/s	    220052 msgs/s	       0 B/op	       0 allocs/op
-BenchmarkBroadcast/compress=true/conns=128/ews-20          	    2146	    268706 ns/op	 121.95 MB/s	    476358 msgs/s	    3959 B/op	     128 allocs/op
-BenchmarkBroadcast/compress=true/conns=128/gws-20          	    2048	    263847 ns/op	 124.19 MB/s	    485130 msgs/s	    9401 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=true/conns=128/ews-sync-20     	     795	    917025 ns/op	  35.73 MB/s	    139582 msgs/s	   14340 B/op	       0 allocs/op
-BenchmarkBroadcast/compress=true/conns=512/ews-20          	     732	    811903 ns/op	 161.44 MB/s	    630617 msgs/s	    8250 B/op	     512 allocs/op
-BenchmarkBroadcast/compress=true/conns=512/ews-sync-20     	     178	   3535760 ns/op	  37.07 MB/s	    144806 msgs/s	      24 B/op	       0 allocs/op
-BenchmarkBroadcast/compress=true/conns=512/gws-20          	     672	   1015050 ns/op	 129.13 MB/s	    504409 msgs/s	   37105 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=true/conns=2048/gws-20         	     207	   4861957 ns/op	 107.83 MB/s	    421230 msgs/s	  147631 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=true/conns=2048/ews-sync-20    	      69	  10296024 ns/op	  50.92 MB/s	    198912 msgs/s	  117957 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=true/conns=2048/ews-20         	     206	   3116302 ns/op	 168.24 MB/s	    657189 msgs/s	   52546 B/op	    2048 allocs/op
+BenchmarkBroadcast/compress=false/conns=128/gws-20         	    7234	    144978 ns/op	 226.02 MB/s	    882892 msgs/s	    9410 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=false/conns=128/ews-sync-20    	    1575	    844254 ns/op	  38.81 MB/s	    151613 msgs/s	       4 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=false/conns=128/ews-20         	    8696	    129994 ns/op	 252.07 MB/s	    984660 msgs/s	      10 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=false/conns=512/ews-20         	    2979	    400277 ns/op	 327.45 MB/s	   1279114 msgs/s	      51 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=false/conns=512/gws-20         	    3049	    386718 ns/op	 338.93 MB/s	   1323963 msgs/s	   37054 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=false/conns=512/ews-sync-20    	     536	   1986108 ns/op	  65.99 MB/s	    257791 msgs/s	      16 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=false/conns=2048/ews-20        	     788	   1502842 ns/op	 348.86 MB/s	   1362752 msgs/s	     665 B/op	       1 allocs/op
+BenchmarkBroadcast/compress=false/conns=2048/gws-20        	     788	   1489439 ns/op	 352.00 MB/s	   1375014 msgs/s	  148732 B/op	    4101 allocs/op
+BenchmarkBroadcast/compress=false/conns=2048/ews-sync-20   	     158	   7487611 ns/op	  70.02 MB/s	    273518 msgs/s	       2 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=true/conns=128/ews-20          	    5186	    215611 ns/op	 151.98 MB/s	    593662 msgs/s	    1271 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=true/conns=128/gws-20          	    5582	    206805 ns/op	 158.45 MB/s	    618941 msgs/s	    9387 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=true/conns=128/ews-sync-20     	    1378	   1036869 ns/op	  31.60 MB/s	    123449 msgs/s	    8864 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=true/conns=512/ews-20          	    2091	    570337 ns/op	 229.82 MB/s	    897715 msgs/s	      63 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=true/conns=512/ews-sync-20     	     477	   2914524 ns/op	  44.97 MB/s	    175672 msgs/s	       9 B/op	       0 allocs/op
+BenchmarkBroadcast/compress=true/conns=512/gws-20          	    1465	    997603 ns/op	 131.39 MB/s	    513230 msgs/s	   37047 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=true/conns=2048/gws-20         	     549	   5001298 ns/op	 104.83 MB/s	    409494 msgs/s	  148489 B/op	    4100 allocs/op
+BenchmarkBroadcast/compress=true/conns=2048/ews-sync-20    	     150	   8065844 ns/op	  65.00 MB/s	    253910 msgs/s	   65111 B/op	       1 allocs/op
+BenchmarkBroadcast/compress=true/conns=2048/ews-20         	     558	   2820234 ns/op	 185.90 MB/s	    726181 msgs/s	    7977 B/op	       1 allocs/op
 PASS
-ok  	github.com/33TU/ews/bench/broadcast	15.368s
+ok  	github.com/33TU/ews/bench/broadcast	26.838s
