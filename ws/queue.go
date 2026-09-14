@@ -2,6 +2,7 @@ package ws
 
 import (
 	"net"
+	"slices"
 	"sync"
 
 	"github.com/33TU/ews/codec"
@@ -34,9 +35,11 @@ type Queue struct {
 
 	// Writer-side storage, reused across flushes. bufs keeps the backing
 	// array; nb is the header net.Buffers.WriteTo consumes, kept as a field
-	// so it does not escape to the heap on every flush.
+	// so it does not escape to the heap on every flush. spare is a private
+	// arena displaced by a pooled one, restored when that is released.
 	flushArena    []byte
 	flushSegments []segment
+	spare         []byte
 	bufs          [][]byte
 	nb            net.Buffers
 }
@@ -47,6 +50,61 @@ type segment struct {
 	start, end int
 	ext        []byte
 	p          *Prepared
+}
+
+// queueRetain bounds the arena capacity a queue keeps for itself. Bursts
+// beyond it use arenas from a shared pool, returned after the flush, so
+// memory scales with the connections flushing at once rather than with every
+// connection that ever saw a burst: ten thousand connections that each once
+// queued 100 KB would otherwise hold a gigabyte.
+const queueRetain = 4 << 10
+
+var arenaPool sync.Pool // *[]byte with capacity above queueRetain.
+
+// grow makes room for n more bytes in the arena. A queue owns a private
+// arena of queueRetain bytes, allocated once; a burst that outgrows it
+// continues in a pooled arena, and the private one is set aside to come
+// back after the flush, so steady traffic allocates nothing.
+func (q *Queue) grow(n int) {
+	need := len(q.arena) + n
+	if need <= cap(q.arena) {
+		return
+	}
+	if cap(q.arena) == 0 && need <= queueRetain {
+		q.arena = make([]byte, 0, queueRetain)
+		return
+	}
+	if cap(q.arena) > queueRetain {
+		q.arena = slices.Grow(q.arena, n) // Already pooled; let it grow in place.
+		return
+	}
+	if q.spare == nil {
+		q.spare = q.arena[:0] // Keep the private arena for after the flush.
+	}
+	var buf []byte
+	if p, ok := arenaPool.Get().(*[]byte); ok {
+		buf = (*p)[:0]
+	}
+	if cap(buf) < need {
+		buf = make([]byte, 0, max(need, 64<<10))
+	}
+	q.arena = append(buf, q.arena...)
+}
+
+// release hands a pooled arena back after its flush and restores the private
+// one it displaced. Callers hold mu.
+func (q *Queue) release() {
+	if cap(q.flushArena) > queueRetain {
+		a := q.flushArena[:0]
+		arenaPool.Put(&a)
+		q.flushArena, q.spare = q.spare, nil
+	}
+	if cap(q.flushSegments) > queueRetain/64 {
+		q.flushSegments = nil
+	}
+	if cap(q.bufs) > queueRetain/64 {
+		q.bufs = nil
+	}
 }
 
 // NewQueue attaches a queue to c, or returns the one it already has. limit
@@ -168,6 +226,7 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, e
 		}
 		q.segments = append(q.segments, segment{ext: ext, p: p})
 	} else {
+		q.grow(len(header) + len(body))
 		start := len(q.arena)
 		q.arena = append(append(q.arena, header...), body...)
 		q.segments = append(q.segments, segment{start: start, end: len(q.arena)})
@@ -229,6 +288,7 @@ func (q *Queue) run() {
 			q.flushSegments[i] = segment{}
 		}
 		q.written += uint64(len(q.flushSegments))
+		q.release()
 		if err != nil {
 			q.err = err
 			for i := range q.segments {
