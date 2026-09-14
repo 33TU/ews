@@ -72,7 +72,8 @@ func (c *Conn) Read(b []byte) (int, error)
 
 // ReadMessage returns the next complete message. The payload is borrowed until
 // the next read call. Messages over MaxMessageSize fail with 1009;
-// text that is not valid UTF-8 fails with 1007. Read delivers text unvalidated.
+// with ValidateUTF8, text that is not valid UTF-8 fails with 1007. Read
+// delivers text unvalidated.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error)
 
 // Write sends one message as a single frame. payload is not retained after return.
@@ -166,8 +167,8 @@ transport straight into the message buffer's spare capacity, so a large frame
 costs one copy of its first chunk and as few reads as the kernel allows. A frame whose
 length exceeds the remaining budget fails with 1009 before its payload is read.
 The budget does not apply to `Read`, since the caller controls memory there.
-A complete text message is validated with one pass of `internal/utf8.Valid`
-and fails with 1007. That package skips the ASCII prefix with 32-byte word
+With `ValidateUTF8` set, off by default as in gws, a complete text message
+is validated with one pass of `internal/utf8.Valid` and fails with 1007. That package skips the ASCII prefix with 32-byte word
 loads, so pure ASCII returns without touching a validator, then checks the
 rest with a shift-based DFA by default, or with SIMD lookups ported from
 github.com/33TU/json-experiment under `GOEXPERIMENT=simd` on amd64. Against

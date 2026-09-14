@@ -43,6 +43,12 @@ type Config struct {
 	// fewer frames and syscalls; two buffers of this size are in flight per
 	// call. Zero uses DefaultFragmentSize.
 	FragmentSize int
+	// ValidateUTF8 makes ReadMessage check that text messages are valid
+	// UTF-8 and fail the connection with close code 1007 when they are not,
+	// as RFC 6455 requires. Off by default: it costs one pass over each text
+	// message, and applications that decode text themselves catch invalid
+	// input anyway. Read delivers chunks unvalidated either way.
+	ValidateUTF8 bool
 	// Compression holds negotiated permessage-deflate parameters, or nil.
 	Compression *handshake.Compression
 	// CompressionShared borrows a compressor from the shared pool for every
@@ -73,6 +79,7 @@ type Conn struct {
 	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
 	limit        int  // MaxMessageSize.
 	fragmentSize int  // WriteFrom chunk size.
+	validateUTF8 bool // Check text messages in ReadMessage.
 
 	// Read side, used by the one goroutine reading at a time.
 	rx        proto.Receiver
@@ -109,6 +116,7 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 		role:           cfg.Role,
 		limit:          cmp.Or(cfg.MaxMessageSize, DefaultMaxMessageSize),
 		fragmentSize:   cmp.Or(cfg.FragmentSize, DefaultFragmentSize),
+		validateUTF8:   cfg.ValidateUTF8,
 		buf:            make([]byte, cmp.Or(cfg.ReadBufferSize, DefaultReadBufferSize)),
 	}
 	_, c.vectored = rw.(interface {

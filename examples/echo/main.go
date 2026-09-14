@@ -32,7 +32,7 @@ func main() {
 		}
 		defer conn.Close()
 
-		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 32 << 20, Compression: res.Compression})
+		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 32 << 20, Compression: res.Compression, ValidateUTF8: true})
 		if err != nil {
 			log.Print(err)
 			return

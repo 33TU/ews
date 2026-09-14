@@ -306,7 +306,6 @@ func TestProtocolError(t *testing.T) {
 	}{
 		{"rsv1", frame(t, 0xc1, nil), 1002},
 		{"unmasked", []byte{0x81, 1, 'a'}, 1002},
-		{"text utf8", frame(t, 0x81, []byte{255}), 1007},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -335,9 +334,20 @@ func TestProtocolError(t *testing.T) {
 }
 
 func TestTextValidation(t *testing.T) {
+	// Off by default: invalid text is delivered like binary.
 	server, peer := raw(t, ws.Config{})
-	wire := append(frame(t, 0x01, []byte{0xe2, 0x82}), frame(t, 0x80, []byte{0x41})...) // Broken rune across frames.
 	wait := run(t, func() error {
+		_, err := peer.Write(frame(t, 0x81, []byte{255}))
+		return err
+	})
+	if op, p, err := server.ReadMessage(); err != nil || op != codec.Text || !bytes.Equal(p, []byte{255}) {
+		t.Fatalf("default must not validate: %d %x %v", op, p, err)
+	}
+	wait()
+
+	server, peer = raw(t, ws.Config{ValidateUTF8: true})
+	wire := append(frame(t, 0x01, []byte{0xe2, 0x82}), frame(t, 0x80, []byte{0x41})...) // Broken rune across frames.
+	wait = run(t, func() error {
 		if _, err := peer.Write(wire); err != nil {
 			return err
 		}
@@ -354,8 +364,9 @@ func TestTextValidation(t *testing.T) {
 	}
 	wait()
 
-	// Chunked reads deliver text unvalidated; only whole messages can be checked.
-	server, peer = raw(t, ws.Config{})
+	// Chunked reads deliver text unvalidated even when enabled; only whole
+	// messages can be checked.
+	server, peer = raw(t, ws.Config{ValidateUTF8: true})
 	wait = run(t, func() error {
 		_, err := peer.Write(frame(t, 0x81, []byte{255, 254}))
 		return err

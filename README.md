@@ -153,7 +153,7 @@ A peer may negotiate a smaller window for this endpoint's messages; `NewCompress
 
 ## Connections
 
-`ws.Conn` wraps an upgraded transport and speaks messages over it. One goroutine reads at a time; writes may come from any goroutine. Three read styles share one core: `ReadMessage` returns the next complete message, borrowed until the next read; `NextMessage` then `Read(b)` streams a message into caller buffers, spanning fragments and dispatching control frames on the way, with `io.EOF` at the end of the message; both handle pings and close frames through the `ControlHandler`, whose default answers pings and echoes close codes.
+`ws.Conn` wraps an upgraded transport and speaks messages over it. One goroutine reads at a time; writes may come from any goroutine. Text messages are delivered as bytes; set `Config.ValidateUTF8` to have `ReadMessage` reject invalid UTF-8 with close code 1007 as the RFC requires, at the cost of one pass over each text message. Three read styles share one core: `ReadMessage` returns the next complete message, borrowed until the next read; `NextMessage` then `Read(b)` streams a message into caller buffers, spanning fragments and dispatching control frames on the way, with `io.EOF` at the end of the message; both handle pings and close frames through the `ControlHandler`, whose default answers pings and echoes close codes.
 
 `ws.Config.ReadBufferSize` defaults to 4 KiB; frames that fit in it are returned without copying, and larger remainders are read straight into a pooled message buffer that the connection holds only until the next read. Deployments with few connections and large messages can raise it so more messages take the zero-copy path.
 
@@ -222,7 +222,7 @@ docker run --rm --network host -v "$PWD/autobahn:/config" -v "$PWD/autobahn/repo
   crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
 ```
 
-All cases pass. 6.4.x report non-strict, since text is validated per message rather than per chunk.
+All cases pass with `ValidateUTF8` on, which the example sets; 6.4.x report non-strict, since text is validated per message rather than per chunk.
 
 `bench` is a separate module comparing ews with other libraries end to end over loopback TCP, driven by the same ews client: `bench/echo` for request-response across message sizes and connection counts, `bench/broadcast` for one message to many connections. Each has a results file from a recent run, `RESULTS.md` for the default build and `RESULTS-simd.md` for `GOEXPERIMENT=simd`:
 

@@ -32,7 +32,7 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 // Read copies payload of the current message into b, spanning continuation
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
 // the end of the message and before NextMessage has been called. Transport EOF
-// mid-message is io.ErrUnexpectedEOF. Text read in chunks is not UTF-8
+// mid-message is io.ErrUnexpectedEOF. Text read in chunks is never UTF-8
 // validated; only complete messages can be. Compressed messages are inflated
 // as they stream; a transport error during one ends the connection, since the
 // inflater cannot resume.
@@ -152,8 +152,8 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 // ReadMessage returns the next complete text or binary message. The payload is
 // borrowed until the next read call. Messages larger than
 // Config.MaxMessageSize, before or after decompression, fail with close code
-// 1009; text that is not valid UTF-8 and undecodable compressed data fail
-// with 1007.
+// 1009; undecodable compressed data, and with Config.ValidateUTF8 text that
+// is not valid UTF-8, fail with 1007.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	op, err := c.NextMessage()
 	if err != nil {
@@ -210,7 +210,7 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 			return 0, nil, err
 		}
 	}
-	if op == codec.Text && !utf8.Valid(payload) {
+	if op == codec.Text && c.validateUTF8 && !utf8.Valid(payload) {
 		return 0, nil, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidUTF8})
 	}
 	return op, payload, nil
