@@ -1,6 +1,6 @@
 # Echo benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `d9b4a55`.
+Generated 2026-09-14 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `3a81efb`.
 
 ## Setup
 
@@ -27,59 +27,59 @@ Single-connection small-message cells are loopback round trips of 12 to 15 µs a
 
 | Size | Conns | ews | gws | gws-stream | coder | coder-stream | allocs/op ews / gws / gws-stream / coder / coder-stream |
 |---|---|---|---|---|---|---|---|
-| 64 B | 1 | 8 MB/s | 8 MB/s | 6 MB/s | 5 MB/s | 5 MB/s | 0 / 1 / 6 / 13 / 16 |
-| 64 B | 32 | 52 MB/s | 52 MB/s | 49 MB/s | 37 MB/s | 39 MB/s | 0 / 1 / 6 / 13 (1 KB) / 16 |
-| 64 B | 128 | 54 MB/s | 53 MB/s | 51 MB/s | 39 MB/s | 37 MB/s | 0 / 1 / 6 / 13 / 16 |
-| 64 B | 512 | 50 MB/s | 51 MB/s | 49 MB/s | 38 MB/s | 40 MB/s | 0 / 1 / 6 / 13 / 16 |
-| 64 B | 1024 | 47 MB/s | 44 MB/s | 46 MB/s | 39 MB/s | 39 MB/s | 0 / 1 / 6 / 13 / 16 |
-| 64 B | 2048 | 44 MB/s | 45 MB/s | 42 MB/s | 32 MB/s | 35 MB/s | 0 / 1 / 6 / 13 / 16 |
-| 1 KiB | 1 | 121 MB/s | 127 MB/s | 122 MB/s | 49 MB/s | 90 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 1 KiB | 32 | 797 MB/s | 86 MB/s | 77 MB/s | 49 MB/s | 61 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 1 KiB | 128 | 84 MB/s | 133 MB/s | 135 MB/s | 84 MB/s | 104 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 1 KiB | 512 | 159 MB/s | 148 MB/s | 158 MB/s | 115 MB/s | 140 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 1 KiB | 1024 | 679 MB/s | 742 MB/s | 711 MB/s | 522 MB/s | 594 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 1 KiB | 2048 | 632 MB/s | 633 MB/s | 624 MB/s | 445 MB/s | 470 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
-| 16 KiB | 1 | 1.3 GB/s | 1.3 GB/s | 1.2 GB/s | 146 MB/s | 670 MB/s | 0 / 1 / 6 / 61 (40 KB) / 16 |
-| 16 KiB | 32 | 8.9 GB/s | 8.6 GB/s | 8.5 GB/s | 1.8 GB/s | 4.4 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
-| 16 KiB | 128 | 8.9 GB/s | 8.6 GB/s | 8.5 GB/s | 2.3 GB/s | 3.5 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
-| 16 KiB | 512 | 6.0 GB/s | 5.9 GB/s | 6.1 GB/s | 2.4 GB/s | 3.6 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
-| 16 KiB | 1024 | 5.3 GB/s | 5.1 GB/s | 1.3 GB/s | 397 MB/s | 561 MB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
-| 16 KiB | 2048 | 1.4 GB/s | 1.5 GB/s | 4.3 GB/s | 2.4 GB/s | 3.1 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
-| 256 KiB | 1 | 2.9 GB/s | 446 MB/s | 2.6 GB/s | 336 MB/s | 1.4 GB/s | 0 / 6 (600 KB) / 12 / 97 (705 KB) / 72 (5 KB) |
-| 256 KiB | 32 | 13.2 GB/s | 4.2 GB/s | 12.3 GB/s | 4.3 GB/s | 9.9 GB/s | 0 / 5 (572 KB) / 12 / 96 (656 KB) / 72 (3 KB) |
-| 256 KiB | 128 | 7.8 GB/s | 4.5 GB/s | 8.0 GB/s | 5.0 GB/s | 7.3 GB/s | 0 / 5 (535 KB) / 12 / 96 (627 KB) / 72 (5 KB) |
-| 256 KiB | 512 | 7.9 GB/s | 5.1 GB/s | 7.3 GB/s | 4.8 GB/s | 7.0 GB/s | 0 / 5 (536 KB) / 12 / 96 (627 KB) / 72 (2 KB) |
-| 256 KiB | 1024 | 7.2 GB/s | 5.1 GB/s | 6.8 GB/s | 4.8 GB/s | 6.8 GB/s | 0 / 5 (541 KB) / 12 / 96 (632 KB) / 72 (2 KB) |
-| 256 KiB | 2048 | 6.9 GB/s | 4.9 GB/s | 7.4 GB/s | 4.2 GB/s | 6.3 GB/s | 0 / 5 (554 KB) / 12 / 96 (652 KB) / 72 (2 KB) |
+| 64 B | 1 | 8 MB/s | 8 MB/s | 7 MB/s | 5 MB/s | 6 MB/s | 0 / 1 / 6 / 13 / 16 |
+| 64 B | 32 | 52 MB/s | 54 MB/s | 46 MB/s | 39 MB/s | 41 MB/s | 0 / 1 / 6 / 13 (1 KB) / 16 |
+| 64 B | 128 | 56 MB/s | 56 MB/s | 55 MB/s | 43 MB/s | 43 MB/s | 0 / 1 / 6 / 13 / 16 |
+| 64 B | 512 | 54 MB/s | 54 MB/s | 51 MB/s | 43 MB/s | 43 MB/s | 0 / 1 / 6 / 13 / 16 |
+| 64 B | 1024 | 54 MB/s | 53 MB/s | 53 MB/s | 42 MB/s | 43 MB/s | 0 / 1 / 6 / 13 / 16 |
+| 64 B | 2048 | 50 MB/s | 49 MB/s | 46 MB/s | 38 MB/s | 39 MB/s | 0 / 1 / 6 / 13 / 16 |
+| 1 KiB | 1 | 127 MB/s | 128 MB/s | 120 MB/s | 53 MB/s | 87 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 1 KiB | 32 | 805 MB/s | 776 MB/s | 758 MB/s | 500 MB/s | 483 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 1 KiB | 128 | 698 MB/s | 668 MB/s | 606 MB/s | 498 MB/s | 489 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 1 KiB | 512 | 662 MB/s | 741 MB/s | 736 MB/s | 78 MB/s | 144 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 1 KiB | 1024 | 179 MB/s | 189 MB/s | 192 MB/s | 129 MB/s | 159 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 1 KiB | 2048 | 188 MB/s | 215 MB/s | 703 MB/s | 508 MB/s | 584 MB/s | 0 / 1 / 6 / 24 (2 KB) / 16 |
+| 16 KiB | 1 | 1.4 GB/s | 1.3 GB/s | 1.3 GB/s | 178 MB/s | 681 MB/s | 0 / 1 / 6 / 61 (40 KB) / 16 |
+| 16 KiB | 32 | 9.5 GB/s | 8.9 GB/s | 9.0 GB/s | 1.9 GB/s | 4.6 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
+| 16 KiB | 128 | 9.5 GB/s | 9.2 GB/s | 7.7 GB/s | 2.2 GB/s | 4.0 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
+| 16 KiB | 512 | 6.9 GB/s | 7.1 GB/s | 6.8 GB/s | 2.5 GB/s | 3.8 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
+| 16 KiB | 1024 | 6.3 GB/s | 6.2 GB/s | 6.0 GB/s | 2.8 GB/s | 3.6 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
+| 16 KiB | 2048 | 5.3 GB/s | 5.4 GB/s | 5.1 GB/s | 2.7 GB/s | 3.6 GB/s | 0 / 1 / 6 / 61 (39 KB) / 16 |
+| 256 KiB | 1 | 3.2 GB/s | 642 MB/s | 2.9 GB/s | 448 MB/s | 1.3 GB/s | 0 / 6 (598 KB) / 12 / 97 (705 KB) / 72 (3 KB) |
+| 256 KiB | 32 | 2.0 GB/s | 1.2 GB/s | 2.4 GB/s | 1.1 GB/s | 2.1 GB/s | 0 / 5 (564 KB) / 12 (1 KB) / 96 (662 KB) / 72 (4 KB) |
+| 256 KiB | 128 | 9.0 GB/s | 6.3 GB/s | 9.3 GB/s | 5.7 GB/s | 7.6 GB/s | 0 / 5 (535 KB) / 12 / 96 (629 KB) / 72 (3 KB) |
+| 256 KiB | 512 | 8.0 GB/s | 5.5 GB/s | 7.5 GB/s | 4.9 GB/s | 6.7 GB/s | 0 / 5 (535 KB) / 12 / 96 (627 KB) / 72 (2 KB) |
+| 256 KiB | 1024 | 7.2 GB/s | 5.2 GB/s | 7.1 GB/s | 4.7 GB/s | 6.7 GB/s | 0 / 5 (540 KB) / 12 / 96 (631 KB) / 72 (2 KB) |
+| 256 KiB | 2048 | 7.3 GB/s | 4.8 GB/s | 7.3 GB/s | 4.3 GB/s | 6.8 GB/s | 0 / 5 (555 KB) / 12 / 96 (650 KB) / 72 (2 KB) |
 
 ## Compressed
 
 | Size | Conns | ews | ews-shared | gws | gws-stream | coder | coder-stream | allocs/op ews / ews-shared / gws / gws-stream / coder / coder-stream |
 |---|---|---|---|---|---|---|---|---|
 | 64 B | 1 | 5 MB/s | 4 MB/s | 4 MB/s | 4 MB/s | 4 MB/s | 3 MB/s | 0 / 0 / 1 / 6 / 13 (1 KB) / 32 (1 KB) |
-| 64 B | 32 | 37 MB/s | 30 MB/s | 25 MB/s | 26 MB/s | 29 MB/s | 25 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
-| 64 B | 128 | 37 MB/s | 29 MB/s | 26 MB/s | 25 MB/s | 28 MB/s | 24 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
-| 64 B | 512 | 30 MB/s | 20 MB/s | 20 MB/s | 20 MB/s | 23 MB/s | 21 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
-| 64 B | 1024 | 24 MB/s | 22 MB/s | 19 MB/s | 20 MB/s | 21 MB/s | 18 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
-| 64 B | 2048 | 31 MB/s | 25 MB/s | 24 MB/s | 25 MB/s | 25 MB/s | 22 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
-| 1 KiB | 1 | 74 MB/s | 60 MB/s | 56 MB/s | 56 MB/s | 55 MB/s | 59 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 1 KiB | 32 | 542 MB/s | 369 MB/s | 255 MB/s | 269 MB/s | 279 MB/s | 289 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 1 KiB | 128 | 374 MB/s | 309 MB/s | 277 MB/s | 283 MB/s | 294 MB/s | 304 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 1 KiB | 512 | 343 MB/s | 280 MB/s | 237 MB/s | 231 MB/s | 250 MB/s | 257 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 1 KiB | 1024 | 314 MB/s | 266 MB/s | 216 MB/s | 217 MB/s | 250 MB/s | 252 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 1 KiB | 2048 | 264 MB/s | 280 MB/s | 174 MB/s | 228 MB/s | 229 MB/s | 236 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
-| 16 KiB | 1 | 661 MB/s | 580 MB/s | 553 MB/s | 579 MB/s | 189 MB/s | 573 MB/s | 0 / 0 / 1 / 6 / 25 (41 KB) / 20 |
-| 16 KiB | 32 | 4.9 GB/s | 4.6 GB/s | 4.2 GB/s | 4.2 GB/s | 2.8 GB/s | 4.1 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
-| 16 KiB | 128 | 3.2 GB/s | 3.4 GB/s | 3.3 GB/s | 3.4 GB/s | 2.4 GB/s | 3.1 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
-| 16 KiB | 512 | 2.4 GB/s | 2.6 GB/s | 2.3 GB/s | 2.4 GB/s | 2.0 GB/s | 2.3 GB/s | 0 / 0 / 1 / 6 / 25 (38 KB) / 20 |
-| 16 KiB | 1024 | 2.2 GB/s | 2.3 GB/s | 2.1 GB/s | 2.1 GB/s | 390 MB/s | 470 MB/s | 0 / 0 / 1 / 6 / 25 (38 KB) / 20 |
-| 16 KiB | 2048 | 742 MB/s | 2.1 GB/s | 2.1 GB/s | 2.1 GB/s | 1.6 GB/s | 2.0 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
-| 256 KiB | 1 | 1.4 GB/s | 1.4 GB/s | 385 MB/s | 440 MB/s | 296 MB/s | 1.3 GB/s | 0 / 0 (2 KB) / 18 (1440 KB) / 22 (1155 KB) / 37 (848 KB) / 56 (2 KB) |
-| 256 KiB | 32 | 10.4 GB/s | 12.0 GB/s | 3.4 GB/s | 3.6 GB/s | 4.8 GB/s | 10.0 GB/s | 0 / 0 / 18 (1415 KB) / 22 (1141 KB) / 33 (661 KB) / 56 (2 KB) |
-| 256 KiB | 128 | 9.1 GB/s | 10.2 GB/s | 3.6 GB/s | 3.8 GB/s | 5.0 GB/s | 8.7 GB/s | 0 / 0 / 17 (1339 KB) / 20 (1080 KB) / 32 (634 KB) / 56 (2 KB) |
-| 256 KiB | 512 | 9.0 GB/s | 10.2 GB/s | 3.8 GB/s | 3.7 GB/s | 5.2 GB/s | 8.7 GB/s | 0 / 0 / 17 (1338 KB) / 21 (1118 KB) / 32 (646 KB) / 56 (2 KB) |
-| 256 KiB | 1024 | 9.0 GB/s | 2.5 GB/s | 1.5 GB/s | 1.5 GB/s | 1.8 GB/s | 2.5 GB/s | 0 / 0 / 18 (1405 KB) / 22 (1213 KB) / 33 (719 KB) / 56 (2 KB) |
-| 256 KiB | 2048 | 9.0 GB/s | 10.4 GB/s | 2.4 GB/s | 2.4 GB/s | 3.9 GB/s | 7.4 GB/s | 0 / 0 / 19 (1483 KB) / 25 (1413 KB) / 34 (747 KB) / 56 (2 KB) |
+| 64 B | 32 | 39 MB/s | 32 MB/s | 26 MB/s | 27 MB/s | 30 MB/s | 27 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
+| 64 B | 128 | 36 MB/s | 31 MB/s | 28 MB/s | 28 MB/s | 30 MB/s | 26 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
+| 64 B | 512 | 30 MB/s | 24 MB/s | 20 MB/s | 21 MB/s | 25 MB/s | 24 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
+| 64 B | 1024 | 30 MB/s | 8 MB/s | 23 MB/s | 22 MB/s | 25 MB/s | 23 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
+| 64 B | 2048 | 32 MB/s | 29 MB/s | 29 MB/s | 29 MB/s | 27 MB/s | 24 MB/s | 0 / 0 / 1 / 6 / 13 / 32 (1 KB) |
+| 1 KiB | 1 | 72 MB/s | 59 MB/s | 49 MB/s | 53 MB/s | 42 MB/s | 56 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 1 KiB | 32 | 386 MB/s | 461 MB/s | 384 MB/s | 404 MB/s | 408 MB/s | 421 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 1 KiB | 128 | 521 MB/s | 421 MB/s | 369 MB/s | 373 MB/s | 409 MB/s | 416 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 1 KiB | 512 | 385 MB/s | 339 MB/s | 258 MB/s | 257 MB/s | 305 MB/s | 312 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 1 KiB | 1024 | 331 MB/s | 292 MB/s | 224 MB/s | 214 MB/s | 250 MB/s | 257 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 1 KiB | 2048 | 281 MB/s | 264 MB/s | 220 MB/s | 223 MB/s | 247 MB/s | 243 MB/s | 0 / 0 / 1 / 6 / 16 (2 KB) / 20 |
+| 16 KiB | 1 | 660 MB/s | 573 MB/s | 577 MB/s | 573 MB/s | 193 MB/s | 561 MB/s | 0 / 0 / 1 / 6 / 25 (41 KB) / 20 |
+| 16 KiB | 32 | 4.5 GB/s | 4.3 GB/s | 4.0 GB/s | 3.9 GB/s | 2.6 GB/s | 4.1 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
+| 16 KiB | 128 | 3.2 GB/s | 3.4 GB/s | 3.2 GB/s | 3.3 GB/s | 2.4 GB/s | 3.0 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
+| 16 KiB | 512 | 2.4 GB/s | 2.5 GB/s | 2.3 GB/s | 2.4 GB/s | 2.0 GB/s | 2.2 GB/s | 0 / 0 / 1 / 6 (1 KB) / 25 (38 KB) / 20 |
+| 16 KiB | 1024 | 2.3 GB/s | 2.3 GB/s | 2.2 GB/s | 2.1 GB/s | 1.8 GB/s | 2.2 GB/s | 0 / 0 (4 KB) / 1 / 6 / 25 (38 KB) / 20 |
+| 16 KiB | 2048 | 2.2 GB/s | 2.4 GB/s | 2.1 GB/s | 2.0 GB/s | 1.6 GB/s | 2.1 GB/s | 0 / 0 / 1 / 6 / 25 (37 KB) / 20 |
+| 256 KiB | 1 | 1.4 GB/s | 1.4 GB/s | 351 MB/s | 411 MB/s | 275 MB/s | 1.3 GB/s | 0 (1 KB) / 0 (2 KB) / 18 (1432 KB) / 21 (1150 KB) / 37 (841 KB) / 56 (3 KB) |
+| 256 KiB | 32 | 11.6 GB/s | 11.7 GB/s | 3.3 GB/s | 3.6 GB/s | 4.9 GB/s | 9.6 GB/s | 0 / 0 / 18 (1399 KB) / 21 (1109 KB) / 33 (669 KB) / 56 (2 KB) |
+| 256 KiB | 128 | 8.4 GB/s | 10.3 GB/s | 3.5 GB/s | 3.6 GB/s | 5.1 GB/s | 8.9 GB/s | 0 / 0 / 17 (1339 KB) / 20 (1089 KB) / 32 (636 KB) / 56 (2 KB) |
+| 256 KiB | 512 | 8.7 GB/s | 9.8 GB/s | 3.6 GB/s | 3.6 GB/s | 5.1 GB/s | 7.9 GB/s | 0 / 0 / 17 (1334 KB) / 21 (1128 KB) / 32 (644 KB) / 56 (2 KB) |
+| 256 KiB | 1024 | 8.8 GB/s | 9.8 GB/s | 3.8 GB/s | 3.4 GB/s | 4.8 GB/s | 8.7 GB/s | 0 / 0 / 17 (1373 KB) / 21 (1170 KB) / 32 (674 KB) / 56 (2 KB) |
+| 256 KiB | 2048 | 9.0 GB/s | 9.9 GB/s | 3.2 GB/s | 2.6 GB/s | 2.5 GB/s | 8.5 GB/s | 0 / 0 / 18 (1454 KB) / 24 (1303 KB) / 32 (615 KB) / 56 (2 KB) |
 
 ## Reading the numbers
 

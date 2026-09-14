@@ -207,16 +207,18 @@ func metric(rest, unit string) float64 {
 	return v
 }
 
+// throughput prefers the benchmark's own metric, messages per second, over
+// the bytes-per-second figure SetBytes derives.
 func throughput(r result) string {
 	switch {
-	case r.mbs >= 1000:
-		return fmt.Sprintf("%.1f GB/s", r.mbs/1000)
-	case r.mbs > 0:
-		return fmt.Sprintf("%.0f MB/s", r.mbs)
 	case r.msgs >= 1e6:
 		return fmt.Sprintf("%.2fM msgs/s", r.msgs/1e6)
 	case r.msgs > 0:
 		return fmt.Sprintf("%.0fk msgs/s", r.msgs/1e3)
+	case r.mbs >= 1000:
+		return fmt.Sprintf("%.1f GB/s", r.mbs/1000)
+	case r.mbs > 0:
+		return fmt.Sprintf("%.0f MB/s", r.mbs)
 	default:
 		return fmt.Sprintf("%.0f µs", r.ns/1000)
 	}

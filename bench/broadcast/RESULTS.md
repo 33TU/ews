@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `d9b4a55`.
+Generated 2026-09-14 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `3a81efb`.
 
 ## Setup
 
@@ -22,17 +22,17 @@ Compression is permessage-deflate with context takeover, flate level 1 and 15-bi
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 140 MB/s | 40 MB/s | 157 MB/s | 0 / 0 / 259 (9 KB) |
-| 512 | 190 MB/s | 48 MB/s | 194 MB/s | 2 / 0 / 1028 (36 KB) |
-| 2048 | 182 MB/s | 47 MB/s | 180 MB/s | 50 (5 KB) / 0 / 4120 (147 KB) |
+| 128 | 614k msgs/s | 159k msgs/s | 639k msgs/s | 0 / 0 / 259 (9 KB) |
+| 512 | 826k msgs/s | 199k msgs/s | 714k msgs/s | 2 / 0 / 1028 (36 KB) |
+| 2048 | 689k msgs/s | 205k msgs/s | 850k msgs/s | 61 (6 KB) / 0 / 4117 (146 KB) |
 
 ## Compressed
 
 | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|
-| 128 | 119 MB/s | 28 MB/s | 117 MB/s | 0 (9 KB) / 0 (10 KB) / 259 (11 KB) |
-| 512 | 137 MB/s | 33 MB/s | 78 MB/s | 4 (68 KB) / 3 (203 KB) / 1030 (80 KB) |
-| 2048 | 107 MB/s | 46 MB/s | 92 MB/s | 113 (1315 KB) / 46 (2979 KB) / 4138 (644 KB) |
+| 128 | 531k msgs/s | 115k msgs/s | 536k msgs/s | 0 (7 KB) / 0 (12 KB) / 259 (10 KB) |
+| 512 | 665k msgs/s | 149k msgs/s | 444k msgs/s | 3 (53 KB) / 3 (181 KB) / 1030 (73 KB) |
+| 2048 | 530k msgs/s | 202k msgs/s | 421k msgs/s | 92 (1022 KB) / 41 (2621 KB) / 4139 (646 KB) |
 
 ## Reading the numbers
 
