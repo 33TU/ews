@@ -297,8 +297,10 @@ All cases pass with `ValidateUTF8` on, which the example sets; 6.4.x report non-
 ![Text echo with UTF-8 validation, one connection](bench/utf8/utf8-1conn.svg)
 
 ```sh
-cd bench/echo && go test -run '^$' -bench Echo -benchtime=1s | go run ../cmd/results > RESULTS.md
+just bench-echo    # also bench-broadcast, bench-utf8, and -simd variants
 ```
+
+The recipes run at `GOMAXPROCS=8` so results from different machines measure the same shape, and the header of each results file records the thread count, CPU and library versions; set `GOMAXPROCS` in the environment to override. A run prints a warning for every cell that moved more than 25 percent against the committed raw output, which is how a busy machine shows up.
 
 Masking uses 64-bit SWAR by default. On amd64, arm64, and wasm, `GOEXPERIMENT=simd` enables an optional 128-bit path for payloads of at least 512 bytes. SIMD builds require AVX on amd64. This uses Go's experimental `simd/archsimd` API. Text messages are UTF-8 validated with a shift-based DFA after skipping the ASCII prefix in 32-byte words; on amd64 the same flag replaces the DFA with SIMD lookups, using a 256-bit path when AVX2 is available.
 
