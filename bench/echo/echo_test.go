@@ -20,6 +20,7 @@ import (
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
 	"github.com/coder/websocket"
+	gorilla "github.com/gorilla/websocket"
 	"github.com/klauspost/compress/flate"
 	"github.com/lxzan/gws"
 )
@@ -184,6 +185,67 @@ func coderStreamServer(compress bool) *httptest.Server {
 	}))
 }
 
+// gorillaUpgrader negotiates compression when asked; gorilla only offers
+// no_context_takeover, so its compressed cells compress each message alone.
+func gorillaUpgrader(compress bool) *gorilla.Upgrader {
+	return &gorilla.Upgrader{EnableCompression: compress, CheckOrigin: func(*http.Request) bool { return true }}
+}
+
+// gorillaServer echoes through gorilla's ReadMessage and WriteMessage.
+func gorillaServer(compress bool) *httptest.Server {
+	up := gorillaUpgrader(compress)
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := up.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		c.SetReadLimit(64 << 20)
+		c.SetCompressionLevel(flate.BestSpeed)
+		for {
+			mt, p, err := c.ReadMessage()
+			if err != nil {
+				return
+			}
+			if err := c.WriteMessage(mt, p); err != nil {
+				return
+			}
+		}
+	}))
+}
+
+// gorillaStreamServer pipes NextReader into NextWriter through a reusable
+// buffer, so no message is held whole.
+func gorillaStreamServer(compress bool) *httptest.Server {
+	up := gorillaUpgrader(compress)
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := up.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		c.SetReadLimit(64 << 20)
+		c.SetCompressionLevel(flate.BestSpeed)
+		buf := make([]byte, 32<<10)
+		for {
+			mt, rd, err := c.NextReader()
+			if err != nil {
+				return
+			}
+			wr, err := c.NextWriter(mt)
+			if err != nil {
+				return
+			}
+			if _, err := io.CopyBuffer(wr, rd, buf); err != nil {
+				return
+			}
+			if err := wr.Close(); err != nil {
+				return
+			}
+		}
+	}))
+}
+
 // ---- benchmark -------------------------------------------------------------
 
 func BenchmarkEcho(b *testing.B) {
@@ -191,7 +253,7 @@ func BenchmarkEcho(b *testing.B) {
 		name         string
 		start        func(bool) *httptest.Server
 		compressOnly bool // Identical to another server without compression.
-	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"ews-stream", ewsStreamServer, false}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}}
+	}{{"ews", ewsServer, false}, {"ews-shared", ewsSharedServer, true}, {"ews-stream", ewsStreamServer, false}, {"gws", gwsServer, false}, {"gws-stream", gwsStreamServer, false}, {"coder", coderServer, false}, {"coder-stream", coderStreamServer, false}, {"gorilla", gorillaServer, false}, {"gorilla-stream", gorillaStreamServer, false}}
 	// Servers run in a seeded shuffled order per cell, so no library always
 	// measures right after the connection setup.
 	rng := rand.New(rand.NewPCG(7, 11))

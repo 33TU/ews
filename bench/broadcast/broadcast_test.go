@@ -13,6 +13,7 @@ import (
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
+	gorilla "github.com/gorilla/websocket"
 	"github.com/klauspost/compress/flate"
 	"github.com/lxzan/gws"
 )
@@ -30,15 +31,33 @@ func BenchmarkBroadcast(b *testing.B) {
 	for _, compress := range []bool{false, true} {
 		for _, size := range []int{256, 4 << 10, 64 << 10} {
 			for _, conns := range []int{128, 512, 2048} {
-				libs := []string{"ews", "ews-sync", "gws"}
+				libs := []string{"ews", "ews-sync", "gws", "gorilla"}
 				rng.Shuffle(len(libs), func(i, j int) { libs[i], libs[j] = libs[j], libs[i] })
 				for _, lib := range libs {
 					b.Run(fmt.Sprintf("compress=%t/size=%d/conns=%d/%s", compress, size, conns, lib), func(b *testing.B) {
 						var mu sync.Mutex
 						var ewsConns []*ws.Conn
 						var gwsConns []*gws.Conn
+						var gorillaConns []*gorilla.Conn
 						var srv *httptest.Server
-						if lib == "gws" {
+						if lib == "gorilla" {
+							up := &gorilla.Upgrader{EnableCompression: compress, CheckOrigin: func(*http.Request) bool { return true }}
+							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+								c, err := up.Upgrade(w, r, nil)
+								if err != nil {
+									return
+								}
+								c.SetCompressionLevel(flate.BestSpeed)
+								mu.Lock()
+								gorillaConns = append(gorillaConns, c)
+								mu.Unlock()
+								for {
+									if _, _, err := c.ReadMessage(); err != nil {
+										return
+									}
+								}
+							}))
+						} else if lib == "gws" {
 							up := harness.GwsUpgrader(compress, gws.BuiltinEventHandler{})
 							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 								socket, err := up.Upgrade(w, r)
@@ -97,7 +116,7 @@ func BenchmarkBroadcast(b *testing.B) {
 						}
 						for {
 							mu.Lock()
-							ready := len(ewsConns) == conns || len(gwsConns) == conns
+							ready := len(ewsConns) == conns || len(gwsConns) == conns || len(gorillaConns) == conns
 							mu.Unlock()
 							if ready {
 								break
@@ -129,6 +148,18 @@ func BenchmarkBroadcast(b *testing.B) {
 									}
 								}
 								p.Release()
+							case "gorilla":
+								// PreparedMessage encodes once per configuration; gorilla
+								// writes synchronously, like ews-sync.
+								pm, err := gorilla.NewPreparedMessage(gorilla.BinaryMessage, msg)
+								if err != nil {
+									b.Fatal(err)
+								}
+								for _, c := range gorillaConns {
+									if err := c.WritePreparedMessage(pm); err != nil {
+										b.Fatal(err)
+									}
+								}
 							case "gws":
 								bc := gws.NewBroadcaster(gws.OpcodeBinary, msg)
 								for _, c := range gwsConns {

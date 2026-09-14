@@ -47,14 +47,16 @@ var charts = map[string][]chartSpec{
 }
 
 var colors = map[string]string{
-	"ews":          "#50c878",
-	"ews-shared":   "#5aa9e6",
-	"ews-stream":   "#a3e4b0",
-	"ews-sync":     "#5aa9e6",
-	"gws":          "#ef8354",
-	"gws-stream":   "#f2c14e",
-	"coder":        "#b388eb",
-	"coder-stream": "#e76f9a",
+	"ews":            "#50c878",
+	"ews-shared":     "#5aa9e6",
+	"ews-stream":     "#a3e4b0",
+	"ews-sync":       "#5aa9e6",
+	"gws":            "#ef8354",
+	"gws-stream":     "#f2c14e",
+	"coder":          "#b388eb",
+	"coder-stream":   "#e76f9a",
+	"gorilla":        "#c9a86a",
+	"gorilla-stream": "#e8d5a3",
 }
 
 const svgStyle = `text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#d8dee9}.title{font-family:ui-sans-serif,system-ui,sans-serif;font-size:28px;font-weight:700}.subtitle{font-family:ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:#aab4c3}.group{font-family:ui-sans-serif,system-ui,sans-serif;font-size:18px;font-weight:650}.contract{font-family:ui-sans-serif,system-ui,sans-serif;font-size:14px;font-weight:650;fill:#9eabbc}.series{font-size:13px;fill:#c4ccd8}.value{font-size:13px;font-weight:650}.panel{fill:#151c27}`
