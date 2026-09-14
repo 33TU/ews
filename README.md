@@ -204,7 +204,26 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 ```
 
-Both return the raw connection; the caller keeps it for deadlines and closing. Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+Both return the raw connection; the caller keeps it for deadlines and closing.
+
+A server that does not need `net/http` for anything else can skip it: `ews.Server` runs an accept loop on a listener, parses only the upgrade request, and calls a handler per connection with the negotiated result. It keeps none of the roughly 10 KB of buffers `net/http` holds for the life of a hijacked connection, which was most of the per-connection memory difference to servers with their own HTTP parsing:
+
+```go
+server := &ews.Server{
+    Handshake: handshake.Options{Protocols: []string{"chat"}},
+    Accept: func(req *ews.Request) int {
+        if req.Path != "/socket" {
+            return 404 // Refuse with an HTTP status; zero accepts.
+        }
+        return 0
+    },
+    Handler: func(conn net.Conn, res handshake.Result, req *ews.Request) {
+        c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
+        // ... read and write; the connection is closed when the handler returns.
+    },
+}
+log.Fatal(server.Serve(ln))
+``` Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
 
 ## Development
 

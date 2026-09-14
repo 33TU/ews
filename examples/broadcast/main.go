@@ -10,7 +10,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"net/http"
 	"sync"
 
 	"github.com/33TU/ews"
@@ -28,31 +27,32 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	flag.Parse()
 
-	opts := handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}}
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		conn, res, err := ews.Upgrade(w, r, opts)
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
-		if err != nil {
-			return
-		}
-		q := c.NewQueue(1 << 20) // A client more than 1 MiB behind is dropped.
-		clients.Store(q, conn)
-		defer clients.Delete(q)
-
-		for {
-			op, payload, err := c.ReadMessage()
+	server := &ews.Server{
+		Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
+		Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
+			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, CompressionShared: true})
 			if err != nil {
 				return
 			}
-			broadcast(op, payload)
-		}
-	})
+			q := c.NewQueue(1 << 20) // A client more than 1 MiB behind is dropped.
+			clients.Store(q, conn)
+			defer clients.Delete(q)
+
+			for {
+				op, payload, err := c.ReadMessage()
+				if err != nil {
+					return
+				}
+				broadcast(op, payload)
+			}
+		},
+	}
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("broadcast hub on %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Fatal(server.Serve(ln))
 }
 
 // broadcast compresses and encodes the message once and queues it to every
