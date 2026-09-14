@@ -223,3 +223,52 @@ func BenchmarkDecoderBatch(b *testing.B) {
 		}
 	}
 }
+
+// FuzzDecoder feeds arbitrary bytes in arbitrary splits: the decoder must
+// never panic, must never hand out more payload than a header announced, and
+// must reject nonminimal lengths.
+func FuzzDecoder(f *testing.F) {
+	f.Add([]byte{0x81, 0x05, 'h', 'e', 'l', 'l', 'o'}, uint8(3))
+	f.Add([]byte{0x82, 0xfe, 0x00, 0x7d, 1, 2, 3}, uint8(1))
+	f.Add([]byte{0x82, 0xff, 0, 0, 0, 0, 0, 0, 0, 5, 1, 2, 3, 4, 5}, uint8(2))
+	f.Fuzz(func(t *testing.T, wire []byte, split uint8) {
+		var d codec.Decoder
+		step := int(split)%7 + 1
+		var remaining uint64
+		for len(wire) > 0 {
+			n := min(step, len(wire))
+			d.Feed(wire[:n])
+			wire = wire[n:]
+			for {
+				if remaining == 0 {
+					h, ok, err := d.NextHeader()
+					if err != nil {
+						if err != codec.ErrInvalidPayloadLength {
+							t.Fatal(err)
+						}
+						return
+					}
+					if !ok {
+						break
+					}
+					remaining = h.PayloadLen()
+					if h.Len() < 2 || h.Len() > codec.MaxHeaderSize {
+						t.Fatal("header length", h.Len())
+					}
+				}
+				chunk, done := d.Payload()
+				if uint64(len(chunk)) > remaining {
+					t.Fatalf("payload %d exceeds remaining %d", len(chunk), remaining)
+				}
+				remaining -= uint64(len(chunk))
+				if done && remaining != 0 {
+					t.Fatal("done with payload remaining")
+				}
+				if !done {
+					break
+				}
+			}
+			d.Preserve()
+		}
+	})
+}

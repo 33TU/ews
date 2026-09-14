@@ -134,3 +134,34 @@ func compressWith(t *testing.T, c *deflate.Compressor, message []byte, w *deflat
 	}
 	return b
 }
+
+// FuzzDecompress runs arbitrary bytes through the inflater, with and without
+// a window, and checks that what the compressor produces round-trips.
+func FuzzDecompress(f *testing.F) {
+	f.Add([]byte("hello hello hello"), uint8(0))
+	f.Add([]byte{0xff, 0xff, 0xff, 0xff}, uint8(1))
+	f.Add(bytes.Repeat([]byte("abc"), 20000), uint8(9))
+	f.Fuzz(func(t *testing.T, data []byte, level uint8) {
+		var d deflate.Decompressor
+		var w deflate.Window
+		// Arbitrary input: no panic, and an error clears the window.
+		if _, err := d.Decompress(data, 1<<20, &w); err != nil && w.Size() != 32<<10 {
+			t.Fatal("window size changed")
+		}
+		d.Decompress(data, 1<<20, nil)
+
+		// Compressed input round-trips through a fresh window pair.
+		c, err := deflate.NewCompressor(int(level)%10 - 1) // -1 (default) through 8.
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cw, dw deflate.Window
+		for i := 0; i < 2; i++ {
+			compressed := bytes.Clone(compressWith(t, c, data, &cw))
+			got, err := d.Decompress(compressed, len(data), &dw)
+			if err != nil || !bytes.Equal(got, data) {
+				t.Fatalf("round %d: %d bytes, %v", i, len(got), err)
+			}
+		}
+	})
+}

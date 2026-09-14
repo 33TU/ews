@@ -142,3 +142,63 @@ func TestCloseReceived(t *testing.T) {
 		t.Fatal("empty close must report NoStatus")
 	}
 }
+
+// FuzzReceiver drives the receiver with arbitrary input in arbitrary chunks.
+// It must never panic, and after a failure every call must keep failing.
+func FuzzReceiver(f *testing.F) {
+	f.Add([]byte{0x81, 0x85, 1, 2, 3, 4, 'h' ^ 1, 'e' ^ 2, 'l' ^ 3, 'l' ^ 4, 'o' ^ 1}, uint8(2), true)
+	f.Add([]byte{0x88, 0x82, 0, 0, 0, 0, 0x03, 0xe8}, uint8(1), true)
+	f.Add([]byte{0xc1, 0x02, 0xff, 0xff}, uint8(1), false)
+	f.Fuzz(func(t *testing.T, wire []byte, split uint8, compression bool) {
+		var r proto.Receiver
+		r.Init(proto.Server, compression)
+		step := int(split)%9 + 1
+		var failed error
+		for len(wire) > 0 {
+			n := min(step, len(wire))
+			r.Feed(wire[:n])
+			wire = wire[n:]
+			for {
+				kind, err := r.Next()
+				if err != nil {
+					if failed != nil && err != failed {
+						t.Fatalf("error changed after failure: %v then %v", failed, err)
+					}
+					failed = err
+					if err != codec.ErrPayloadPending {
+						break
+					}
+				}
+				if kind == proto.NeedInput {
+					break
+				}
+				if kind == proto.DataFrame {
+					for {
+						chunk, done, err := r.Payload()
+						if err != nil {
+							t.Fatal(err)
+						}
+						if uint64(len(chunk)) > r.Header().PayloadLen() {
+							t.Fatal("chunk exceeds frame")
+						}
+						if done || len(chunk) == 0 {
+							break
+						}
+					}
+				}
+				if r.CloseReceived() {
+					return
+				}
+			}
+			if failed != nil {
+				// Feeding after a failure is ignored and Next keeps failing.
+				r.Feed([]byte{0x81, 0x80, 0, 0, 0, 0})
+				if _, err := r.Next(); err != failed {
+					t.Fatalf("failure not sticky: %v", err)
+				}
+				return
+			}
+			r.Preserve()
+		}
+	})
+}
