@@ -313,10 +313,19 @@ nc.Close()
    of the result, so memory during a chunked read is bounded by
    `MaxMessageSize` as it is for `ReadMessage`. A streaming mode that fed
    the inflater borrowed chunks straight from the core existed and worked,
-   but the klauspost and standard-library inflaters are pull-only and cannot
-   resume after a short read, which made it the most intricate code in the
-   library for a feature gws also does without; it was removed once the
-   reactor, which would have decompressed whole anyway, left the roadmap.
+   and was removed as the most intricate code in the library: keeping
+   chunks borrowed, dispatching control frames mid-message, sharing one
+   decompressor between whole and streaming use, and failing cleanly when
+   the transport died inside an inflate doubled the decompressor. gorilla
+   and coder do stream, by wrapping a blocking frame reader in the inflater
+   and copying as they go; gws inflates whole as ews now does. The trade is
+   peak memory and time to first byte on large compressed messages read
+   through `Read`, `WriteTo` or `NetConn`, which no current consumer has.
+   What would bring it back is such a consumer, and the shape would be
+   gorilla's, about eighty lines: a frame-pulling reader handed to the
+   inflater, `ReadMessage` untouched, and a transport error mid-message
+   ending the connection. It costs the other paths nothing and the chunked
+   path about 3 percent on small messages.
    `Write` compresses when `len(payload) >=
    MinSize`. Takeover state is a 32 KB `deflate.Window` per direction on the
    connection; compressors and decompressors are pooled, one compressor pool
