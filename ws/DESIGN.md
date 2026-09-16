@@ -366,8 +366,29 @@ one header byte of the trimmed block, which is inherent to the format.
 
 ## Later
 
+Open, each worth a few percent in one cell or some retained memory, to be
+done one at a time with alternating before-and-after benchmarks:
+
+- Update the receive history once per message instead of after every 32 KB
+  of inflater output; only the last window survives a large message, and the
+  mid-message reset for final DEFLATE blocks still needs the history so far.
+- Skip the shared-compressor double copy on queue paths: `encodeData` copies
+  the borrowed output into connection scratch so the compressor can return
+  to the pool, then the queue copies it into its arena.
+- Cap what pooled buffers retain: message buffers, decompressor output and
+  the coalescing buffers keep their largest capacity; the queue arena cap is
+  the precedent. Zero allocations per operation says nothing about retained
+  memory after a burst of large messages.
 - A cheaper per-connection mask key source than `crypto/rand` if profiling
   shows it matters.
+
+Measured and left out, so they stay out unless the numbers change: a decoder
+header scratch to avoid copying a read that completes a split header showed
+no gain even when every read split a header; encoding straight into
+destination storage only helps the client's masking path; a message-scoped
+`io.Writer` would be ergonomics only beside `Read`, `WriteTo` and `WriteFrom`;
+and automatic switching between attached and shared compression has no good
+rule, since the crossover depends on message size and connection count.
 - An epoll or io_uring write pump under `Queue.flush` for plain TCP: raw
   non-blocking writes from a fixed set of goroutines, chosen by the existing
   `SyscallConn` check, with TLS and wrapped transports keeping the goroutine
