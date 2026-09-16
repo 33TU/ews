@@ -45,7 +45,9 @@ log.Fatal(server.Serve(ln))
 ```
 
 Inside an existing `net/http` handler, `transport.Upgrade(w, r, opts)` returns the
-same `conn, res` pair. The read loop above is what `ws.Serve` does:
+same `conn, res` pair. Read on a goroutine of your own and return from the
+handler: `net/http` keeps about 10 KB of request state alive until it returns,
+100 MB at ten thousand connections. The read loop above is what `ws.Serve` does:
 
 ```go
 err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []byte) error {
