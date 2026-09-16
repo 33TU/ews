@@ -65,21 +65,28 @@ var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<
 // dropped so a rare huge burst does not pin memory.
 const arenaKeep = 1 << 20
 
-// NewQueue attaches a queue to c, or returns the one it already has, so a
-// hub can look a connection's queue up again by calling it with any limit.
-// limit is a high-water mark on bytes queued by Send and SendPrepared: an
-// empty queue accepts any message, and a message that would push a nonempty
-// queue past the limit is refused with ErrQueueFull rather than blocking, so
-// a slow peer cannot stall the sender. The application decides what a full
-// queue means, usually closing the connection. Zero means 1 MiB.
+// NewQueue attaches a queue to c, or returns the one it already has. limit
+// is a high-water mark on bytes queued by Send and SendPrepared: an empty
+// queue accepts any message, and a message that would push a nonempty queue
+// past the limit is refused with ErrQueueFull rather than blocking, so a
+// slow peer cannot stall the sender. The application decides what a full
+// queue means, usually closing the connection. Zero means 1 MiB on a new
+// queue and leaves an existing queue's limit alone, so a hub can look a
+// connection's queue up again with NewQueue(0); a nonzero limit on an
+// existing queue adjusts it, taking effect on the next Send.
 func (c *Conn) NewQueue(limit int) *Queue {
-	if limit <= 0 {
-		limit = 1 << 20
-	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	if c.queue != nil {
-		return c.queue
+	if q := c.queue; q != nil {
+		if limit > 0 {
+			q.mu.Lock()
+			q.limit = limit
+			q.mu.Unlock()
+		}
+		return q
+	}
+	if limit <= 0 {
+		limit = 1 << 20
 	}
 	q := &Queue{c: c, limit: limit}
 	q.cond.L = &q.mu
