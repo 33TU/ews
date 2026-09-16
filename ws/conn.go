@@ -28,6 +28,12 @@ const (
 	DefaultMinSize = 128
 )
 
+// poolKeep is the largest buffer returned to a pool. An arena, message
+// buffer, decompressor or coalescing buffer that grew past it is dropped
+// instead, so a rare huge message or burst does not pin memory in every
+// pool it touched.
+const poolKeep = 1 << 20
+
 // Config describes the local endpoint and negotiated parameters.
 type Config struct {
 	Role Role

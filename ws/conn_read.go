@@ -221,8 +221,10 @@ func (c *Conn) appendMsg(msg, chunk []byte) []byte {
 
 func (c *Conn) releaseMsg() {
 	if c.msg != nil {
-		c.msg.b = c.msg.b[:0]
-		msgPool.Put(c.msg)
+		if cap(c.msg.b) <= poolKeep {
+			c.msg.b = c.msg.b[:0]
+			msgPool.Put(c.msg)
+		}
 		c.msg = nil
 	}
 }

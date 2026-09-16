@@ -61,10 +61,6 @@ type arena struct{ b []byte }
 
 var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<10)} }}
 
-// arenaKeep is the largest arena returned to the pool; bigger ones are
-// dropped so a rare huge burst does not pin memory.
-const arenaKeep = 1 << 20
-
 // NewQueue attaches a queue to c, or returns the one it already has. limit
 // is a high-water mark on bytes queued by Send and SendPrepared: an empty
 // queue accepts any message, and a message that would push a nonempty queue
@@ -254,7 +250,7 @@ func (q *Queue) run() {
 		q.written += uint64(len(q.flushSegments))
 		if a := q.flushing; a != nil {
 			q.flushing = nil
-			if cap(a.b) <= arenaKeep {
+			if cap(a.b) <= poolKeep {
 				a.b = a.b[:0]
 				arenaPool.Put(a)
 			}
@@ -305,7 +301,6 @@ func (q *Queue) flush() error {
 		return err
 	}
 	buf := writePool.Get().(*[]byte)
-	defer writePool.Put(buf)
 	out := (*buf)[:0]
 	for _, s := range q.flushSegments {
 		if s.ext != nil {
@@ -316,5 +311,8 @@ func (q *Queue) flush() error {
 	}
 	*buf = out
 	_, err := c.rw.Write(out)
+	if cap(out) <= poolKeep {
+		writePool.Put(buf)
+	}
 	return err
 }
