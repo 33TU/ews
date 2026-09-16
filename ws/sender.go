@@ -21,6 +21,7 @@ type sender struct {
 func (s *sender) Init(role Role) {
 	s.role = role
 	s.enc.Reset()
+	s.enc.ScratchKeep = poolKeep
 	s.closeSent = false
 }
 

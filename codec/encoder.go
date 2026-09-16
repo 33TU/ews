@@ -14,6 +14,12 @@ var (
 
 // Encoder prepares WebSocket frames. The zero value is ready to use.
 type Encoder struct {
+	// ScratchKeep bounds the masking scratch kept between frames. A payload
+	// that needs more gets a scratch of its size, which the next frame that
+	// fits within the bound releases, so one huge masked message does not
+	// pin a copy for the life of the encoder. Zero keeps whatever was needed.
+	ScratchKeep int
+
 	h       Header
 	payload []byte
 	scratch []byte // Reusable storage for masked payloads.
@@ -95,6 +101,9 @@ func (e *Encoder) Encode(final bool, opcode Opcode, payload []byte, key *[4]byte
 	if key == nil {
 		e.payload = payload
 	} else {
+		if keep := e.ScratchKeep; keep != 0 && cap(e.scratch) > keep && len(payload) <= keep {
+			e.scratch = nil
+		}
 		e.scratch = slices.Grow(e.scratch[:0], len(payload))[:len(payload)]
 		mask(e.scratch, payload, maskKey, 0)
 		e.payload = e.scratch

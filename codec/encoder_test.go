@@ -78,3 +78,40 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 	})
 }
+
+func TestScratchKeep(t *testing.T) {
+	key := &[4]byte{1, 2, 3, 4}
+	large, small := make([]byte, 2<<20), make([]byte, 100)
+	var e codec.Encoder
+	e.ScratchKeep = 1 << 20
+	if err := e.Encode(true, codec.Binary, large, key); err != nil {
+		t.Fatal(err)
+	}
+	if cap(e.PayloadBytes()) < len(large) {
+		t.Fatal("large payload not masked into scratch")
+	}
+	if err := e.Encode(true, codec.Binary, small, key); err != nil {
+		t.Fatal(err)
+	}
+	if got := cap(e.PayloadBytes()); got > e.ScratchKeep {
+		t.Fatalf("scratch kept %d bytes after a small payload, want at most %d", got, e.ScratchKeep)
+	}
+	// Payloads within the bound keep reusing the scratch.
+	before := cap(e.PayloadBytes())
+	if err := e.Encode(true, codec.Binary, small, key); err != nil {
+		t.Fatal(err)
+	}
+	if cap(e.PayloadBytes()) != before {
+		t.Fatal("scratch reallocated for a payload that fit")
+	}
+	// Zero keeps whatever was needed.
+	var unbounded codec.Encoder
+	for _, p := range [][]byte{large, small} {
+		if err := unbounded.Encode(true, codec.Binary, p, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cap(unbounded.PayloadBytes()) < len(large) {
+		t.Fatal("zero ScratchKeep released the scratch")
+	}
+}
