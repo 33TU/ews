@@ -71,6 +71,9 @@ func Dial(tb testing.TB, url string, mode Mode) *ws.Conn {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	// Closing an httptest server does not close upgraded connections, so
+	// each cell closes its own when it ends; reader goroutines then exit.
+	tb.Cleanup(func() { nc.Close() })
 	var b strings.Builder
 	fmt.Fprintf(&b, "GET / HTTP/1.1\r\nHost: %s\r\nUpgrade: %s\r\nConnection: %s\r\nSec-WebSocket-Version: %s\r\nSec-WebSocket-Key: %s\r\n",
 		addr, req.Upgrade, req.Connection, req.Version, req.Key)
