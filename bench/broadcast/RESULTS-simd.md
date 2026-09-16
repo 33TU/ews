@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-15 from `go test -run '^$' -bench Broadcast -benchtime 500ms | go run ../cmd/results` at ews commit `39a6bc0`.
+Generated 2026-09-16 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `fa0e5e3`.
 
 ![broadcast-plain-simd](broadcast-plain-simd.svg)
 
@@ -10,10 +10,10 @@ Generated 2026-09-15 from `go test -run '^$' -bench Broadcast -benchtime 500ms |
 
 ## Setup
 
-- CPU: 13th Gen Intel(R) Core(TM) i9-13900H
-- Kernel: 6.12.0-211.53.1.el10_2.x86_64
-- Go: go1.27.0-X:simd, `GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation
-- GOMAXPROCS: 20
+- CPU: AMD Ryzen 9 9950X3D 16-Core Processor
+- Kernel: 7.2.2-1-cachyos
+- Go: go1.27.1-X:simd, `GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation
+- GOMAXPROCS: 32
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3
@@ -31,43 +31,43 @@ Compression is permessage-deflate at flate level 1 with 15-bit windows, with and
 
 | Size | Conns | ews | ews-sync | gws | gorilla | allocs/op ews / ews-sync / gws / gorilla |
 |---|---|---|---|---|---|---|
-| 256 B | 128 | 927k msgs/s | 151k msgs/s | 859k msgs/s | 138k msgs/s | 0 / 0 / 259 (9 KB) / 15 (11 KB) |
-| 256 B | 512 | 1.28M msgs/s | 237k msgs/s | 1.25M msgs/s | 230k msgs/s | 0 / 0 / 1027 (36 KB) / 15 (11 KB) |
-| 256 B | 2048 | 1.26M msgs/s | 261k msgs/s | 1.26M msgs/s | 236k msgs/s | 1 (1 KB) / 0 / 4100 (144 KB) / 15 (11 KB) |
-| 4 KiB | 128 | 838k msgs/s | 165k msgs/s | 845k msgs/s | 139k msgs/s | 0 / 0 / 258 (9 KB) / 15 (20 KB) |
-| 4 KiB | 512 | 1.11M msgs/s | 196k msgs/s | 1.09M msgs/s | 196k msgs/s | 0 / 0 / 1027 (36 KB) / 15 (20 KB) |
-| 4 KiB | 2048 | 970k msgs/s | 225k msgs/s | 972k msgs/s | 224k msgs/s | 2 (1 KB) / 0 / 4101 (145 KB) / 15 (20 KB) |
-| 64 KiB | 128 | 447k msgs/s | 90k msgs/s | 441k msgs/s | 91k msgs/s | 0 / 0 / 259 (9 KB) / 21 (164 KB) |
-| 64 KiB | 512 | 451k msgs/s | 103k msgs/s | 453k msgs/s | 101k msgs/s | 0 / 0 / 1027 (37 KB) / 21 (168 KB) |
-| 64 KiB | 2048 | 259k msgs/s | 96k msgs/s | 257k msgs/s | 93k msgs/s | 2 (3 KB) / 0 / 4100 (148 KB) / 21 (165 KB) |
+| 256 B | 128 | 1.68M msgs/s | 738k msgs/s | 1.67M msgs/s | 690k msgs/s | 0 / 0 / 259 (9 KB) / 15 (11 KB) |
+| 256 B | 512 | 2.11M msgs/s | 772k msgs/s | 2.11M msgs/s | 731k msgs/s | 0 / 0 / 1027 (36 KB) / 15 (11 KB) |
+| 256 B | 2048 | 2.06M msgs/s | 763k msgs/s | 2.02M msgs/s | 712k msgs/s | 0 / 0 / 4099 (144 KB) / 15 (11 KB) |
+| 4 KiB | 128 | 1.56M msgs/s | 678k msgs/s | 1.52M msgs/s | 634k msgs/s | 0 / 0 / 258 (9 KB) / 15 (20 KB) |
+| 4 KiB | 512 | 1.94M msgs/s | 719k msgs/s | 1.92M msgs/s | 677k msgs/s | 0 / 0 / 1027 (36 KB) / 15 (20 KB) |
+| 4 KiB | 2048 | 1.36M msgs/s | 626k msgs/s | 1.35M msgs/s | 586k msgs/s | 0 / 0 / 4099 (144 KB) / 15 (20 KB) |
+| 64 KiB | 128 | 809k msgs/s | 184k msgs/s | 810k msgs/s | 179k msgs/s | 0 / 0 / 259 (9 KB) / 21 (164 KB) |
+| 64 KiB | 512 | 588k msgs/s | 198k msgs/s | 596k msgs/s | 192k msgs/s | 0 / 0 / 1027 (36 KB) / 21 (164 KB) |
+| 64 KiB | 2048 | 274k msgs/s | 176k msgs/s | 277k msgs/s | 173k msgs/s | 0 (1 KB) / 0 / 4100 (146 KB) / 21 (165 KB) |
 
 ## Compressed with context takeover
 
 | Size | Conns | ews | ews-sync | gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|---|
-| 256 B | 128 | 564k msgs/s | 128k msgs/s | 553k msgs/s | 0 / 0 / 258 (9 KB) |
-| 256 B | 512 | 817k msgs/s | 159k msgs/s | 452k msgs/s | 0 / 0 (25 KB) / 1027 (36 KB) |
-| 256 B | 2048 | 708k msgs/s | 222k msgs/s | 337k msgs/s | 1 / 0 / 4101 (145 KB) |
-| 4 KiB | 128 | 569k msgs/s | 145k msgs/s | 552k msgs/s | 0 (1 KB) / 0 (6 KB) / 259 (9 KB) |
-| 4 KiB | 512 | 707k msgs/s | 185k msgs/s | 446k msgs/s | 0 / 0 (23 KB) / 1027 (36 KB) |
-| 4 KiB | 2048 | 603k msgs/s | 221k msgs/s | 323k msgs/s | 1 (12 KB) / 1 (62 KB) / 4101 (145 KB) |
-| 64 KiB | 128 | 369k msgs/s | 146k msgs/s | 358k msgs/s | 0 (2 KB) / 0 / 259 (9 KB) |
-| 64 KiB | 512 | 453k msgs/s | 148k msgs/s | 372k msgs/s | 0 / 0 (22 KB) / 1027 (37 KB) |
-| 64 KiB | 2048 | 412k msgs/s | 164k msgs/s | 317k msgs/s | 0 (2 KB) / 0 (5 KB) / 4104 (148 KB) |
+| 256 B | 128 | 1.35M msgs/s | 751k msgs/s | 1.29M msgs/s | 0 / 0 / 259 (9 KB) |
+| 256 B | 512 | 1.57M msgs/s | 770k msgs/s | 1.05M msgs/s | 0 / 0 (2 KB) / 1027 (36 KB) |
+| 256 B | 2048 | 977k msgs/s | 525k msgs/s | 572k msgs/s | 0 / 0 / 4099 (144 KB) |
+| 4 KiB | 128 | 1.11M msgs/s | 740k msgs/s | 1.08M msgs/s | 0 / 0 / 259 (9 KB) |
+| 4 KiB | 512 | 1.19M msgs/s | 762k msgs/s | 835k msgs/s | 0 / 0 (2 KB) / 1027 (36 KB) |
+| 4 KiB | 2048 | 822k msgs/s | 480k msgs/s | 447k msgs/s | 0 / 0 (17 KB) / 4099 (144 KB) |
+| 64 KiB | 128 | 641k msgs/s | 665k msgs/s | 630k msgs/s | 0 / 0 / 259 (9 KB) |
+| 64 KiB | 512 | 724k msgs/s | 744k msgs/s | 572k msgs/s | 0 / 0 / 1027 (36 KB) |
+| 64 KiB | 2048 | 545k msgs/s | 393k msgs/s | 347k msgs/s | 0 / 0 / 4099 (144 KB) |
 
 ## Compressed without context takeover
 
 | Size | Conns | ews | ews-sync | gws | gorilla | allocs/op ews / ews-sync / gws / gorilla |
 |---|---|---|---|---|---|---|
-| 256 B | 128 | 786k msgs/s | 151k msgs/s | 954k msgs/s | 160k msgs/s | 0 / 0 (6 KB) / 258 (9 KB) / 18 (17 KB) |
-| 256 B | 512 | 1.16M msgs/s | 227k msgs/s | 1.27M msgs/s | 204k msgs/s | 0 (2 KB) / 0 / 1027 (36 KB) / 18 (39 KB) |
-| 256 B | 2048 | 1.18M msgs/s | 253k msgs/s | 1.27M msgs/s | 249k msgs/s | 2 (9 KB) / 1 (70 KB) / 4100 (145 KB) / 19 (84 KB) |
-| 4 KiB | 128 | 651k msgs/s | 185k msgs/s | 648k msgs/s | 134k msgs/s | 0 / 0 (5 KB) / 259 (9 KB) / 18 (21 KB) |
-| 4 KiB | 512 | 929k msgs/s | 184k msgs/s | 932k msgs/s | 175k msgs/s | 0 / 0 (27 KB) / 1027 (36 KB) / 18 (43 KB) |
-| 4 KiB | 2048 | 951k msgs/s | 240k msgs/s | 964k msgs/s | 234k msgs/s | 0 (8 KB) / 0 / 4099 (144 KB) / 19 (87 KB) |
-| 64 KiB | 128 | 426k msgs/s | 162k msgs/s | 445k msgs/s | 150k msgs/s | 0 (1 KB) / 0 (6 KB) / 259 (9 KB) / 21 (93 KB) |
-| 64 KiB | 512 | 538k msgs/s | 182k msgs/s | 551k msgs/s | 173k msgs/s | 0 (6 KB) / 0 (20 KB) / 1027 (37 KB) / 21 (108 KB) |
-| 64 KiB | 2048 | 558k msgs/s | 220k msgs/s | 556k msgs/s | 234k msgs/s | 0 (2 KB) / 0 / 4099 (146 KB) / 22 (165 KB) |
+| 256 B | 128 | 1.50M msgs/s | 721k msgs/s | 1.68M msgs/s | 676k msgs/s | 0 / 0 / 258 (9 KB) / 18 (11 KB) |
+| 256 B | 512 | 1.91M msgs/s | 769k msgs/s | 2.13M msgs/s | 728k msgs/s | 0 / 0 / 1027 (36 KB) / 18 (14 KB) |
+| 256 B | 2048 | 1.94M msgs/s | 762k msgs/s | 2.05M msgs/s | 721k msgs/s | 0 / 0 (9 KB) / 4099 (144 KB) / 18 (20 KB) |
+| 4 KiB | 128 | 1.21M msgs/s | 712k msgs/s | 1.21M msgs/s | 667k msgs/s | 0 / 0 / 259 (9 KB) / 18 (16 KB) |
+| 4 KiB | 512 | 1.45M msgs/s | 774k msgs/s | 1.47M msgs/s | 729k msgs/s | 0 / 0 (3 KB) / 1027 (36 KB) / 18 (18 KB) |
+| 4 KiB | 2048 | 1.50M msgs/s | 772k msgs/s | 1.48M msgs/s | 717k msgs/s | 0 / 0 / 4099 (144 KB) / 18 (25 KB) |
+| 64 KiB | 128 | 700k msgs/s | 695k msgs/s | 706k msgs/s | 636k msgs/s | 0 / 0 / 259 (9 KB) / 21 (88 KB) |
+| 64 KiB | 512 | 805k msgs/s | 775k msgs/s | 806k msgs/s | 726k msgs/s | 0 / 0 (1 KB) / 1027 (36 KB) / 21 (89 KB) |
+| 64 KiB | 2048 | 802k msgs/s | 719k msgs/s | 788k msgs/s | 679k msgs/s | 0 / 0 / 4099 (144 KB) / 21 (96 KB) |
 
 ## Reading the numbers
 

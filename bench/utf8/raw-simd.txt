@@ -1,42 +1,42 @@
 goos: linux
 goarch: amd64
 pkg: github.com/33TU/ews/bench/utf8
-cpu: 13th Gen Intel(R) Core(TM) i9-13900H
-BenchmarkUTF8/kind=ascii/size=1024/conns=1/coder-20         	   34602	     14562 ns/op	  70.32 MB/s	    2968 B/op	      24 allocs/op
-BenchmarkUTF8/kind=ascii/size=1024/conns=1/gws-20           	   81274	      7428 ns/op	 137.86 MB/s	      16 B/op	       1 allocs/op
-BenchmarkUTF8/kind=ascii/size=1024/conns=1/ews-20           	   71167	      7542 ns/op	 135.77 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=ascii/size=1024/conns=128/ews-20         	  649794	       862.7 ns/op	1186.95 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=ascii/size=1024/conns=128/coder-20       	  335527	      1660 ns/op	 616.72 MB/s	    3047 B/op	      24 allocs/op
-BenchmarkUTF8/kind=ascii/size=1024/conns=128/gws-20         	  643656	       902.5 ns/op	1134.67 MB/s	      18 B/op	       1 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=1/ews-20          	   51302	     11290 ns/op	1451.14 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=1/coder-20        	    9417	     78150 ns/op	 209.65 MB/s	   42014 B/op	      61 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=1/gws-20          	   44359	     11813 ns/op	1386.96 MB/s	      16 B/op	       1 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=128/ews-20        	  410234	      1459 ns/op	11227.07 MB/s	       1 B/op	       0 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=128/coder-20      	   77143	      7246 ns/op	2261.09 MB/s	   41026 B/op	      61 allocs/op
-BenchmarkUTF8/kind=ascii/size=16384/conns=128/gws-20        	  366050	      1559 ns/op	10509.25 MB/s	      31 B/op	       1 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=1/ews-20           	   72973	      7930 ns/op	 128.75 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=1/gws-20           	   66417	      8513 ns/op	 119.93 MB/s	      16 B/op	       1 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=1/coder-20         	   30826	     17569 ns/op	  58.11 MB/s	    2988 B/op	      24 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=128/coder-20       	  324380	      1658 ns/op	 615.71 MB/s	    3028 B/op	      24 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=128/gws-20         	  581575	       966.6 ns/op	1056.32 MB/s	      17 B/op	       1 allocs/op
-BenchmarkUTF8/kind=mixed/size=1024/conns=128/ews-20         	  644463	       880.3 ns/op	1159.89 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=1/coder-20        	   10000	     80050 ns/op	 204.67 MB/s	   41987 B/op	      61 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=1/gws-20          	   21772	     25891 ns/op	 632.80 MB/s	      22 B/op	       1 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=1/ews-20          	   45013	     12561 ns/op	1304.39 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=128/ews-20        	  312243	      1650 ns/op	9930.48 MB/s	       1 B/op	       0 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=128/coder-20      	   75792	      7123 ns/op	2300.02 MB/s	   40967 B/op	      61 allocs/op
-BenchmarkUTF8/kind=mixed/size=16384/conns=128/gws-20        	  189948	      2881 ns/op	5686.35 MB/s	      45 B/op	       1 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=1/gws-20       	   62270	      8528 ns/op	 119.96 MB/s	      16 B/op	       1 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=1/ews-20       	   80545	      7634 ns/op	 134.00 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=1/coder-20     	   32092	     16387 ns/op	  62.43 MB/s	    2980 B/op	      24 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=128/coder-20   	  341113	      1644 ns/op	 622.19 MB/s	    3043 B/op	      24 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=128/ews-20     	  662539	       883.2 ns/op	1158.28 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=multibyte/size=1024/conns=128/gws-20     	  569252	       996.6 ns/op	1026.49 MB/s	      18 B/op	       1 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=1/ews-20      	   43324	     12556 ns/op	1304.83 MB/s	       0 B/op	       0 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=1/coder-20    	   10000	     76499 ns/op	 214.16 MB/s	   42076 B/op	      61 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=1/gws-20      	   19054	     29008 ns/op	 564.77 MB/s	      23 B/op	       1 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=128/coder-20  	   75374	      7383 ns/op	2219.13 MB/s	   41010 B/op	      61 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=128/ews-20    	  316638	      1639 ns/op	9996.21 MB/s	       1 B/op	       0 allocs/op
-BenchmarkUTF8/kind=multibyte/size=16384/conns=128/gws-20    	  164712	      3284 ns/op	4988.79 MB/s	      46 B/op	       1 allocs/op
+cpu: AMD Ryzen 9 9950X3D 16-Core Processor
+BenchmarkUTF8/kind=ascii/size=1024/conns=1/coder-8         	  423109	      5635 ns/op	 181.72 MB/s	    2967 B/op	      24 allocs/op
+BenchmarkUTF8/kind=ascii/size=1024/conns=1/gws-8           	  675229	      3556 ns/op	 287.95 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=ascii/size=1024/conns=1/ews-8           	  680238	      3474 ns/op	 294.75 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=ascii/size=1024/conns=128/ews-8         	 4490270	       540.7 ns/op	1893.72 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=ascii/size=1024/conns=128/coder-8       	 2529465	       949.0 ns/op	1079.07 MB/s	    2966 B/op	      24 allocs/op
+BenchmarkUTF8/kind=ascii/size=1024/conns=128/gws-8         	 4357188	       553.9 ns/op	1848.84 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=1/ews-8          	  429094	      5430 ns/op	3017.04 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=1/coder-8        	  168314	     14143 ns/op	1158.49 MB/s	   41397 B/op	      61 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=1/gws-8          	  418375	      5710 ns/op	2869.17 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=128/ews-8        	 2912774	       831.0 ns/op	19715.98 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=128/coder-8      	  742387	      3226 ns/op	5079.22 MB/s	   40087 B/op	      61 allocs/op
+BenchmarkUTF8/kind=ascii/size=16384/conns=128/gws-8        	 2770706	       868.4 ns/op	18867.58 MB/s	      19 B/op	       1 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=1/ews-8           	  642544	      3573 ns/op	 285.72 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=1/gws-8           	  581629	      4039 ns/op	 252.78 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=1/coder-8         	  424698	      5644 ns/op	 180.90 MB/s	    2973 B/op	      24 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=128/coder-8       	 2541241	       949.7 ns/op	1075.03 MB/s	    2967 B/op	      24 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=128/gws-8         	 3936776	       610.8 ns/op	1671.46 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=mixed/size=1024/conns=128/ews-8         	 4383913	       550.4 ns/op	1855.09 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=1/coder-8        	  167971	     14201 ns/op	1153.73 MB/s	   41385 B/op	      61 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=1/gws-8          	  182640	     12971 ns/op	1263.16 MB/s	      17 B/op	       1 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=1/ews-8          	  396955	      5991 ns/op	2734.97 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=128/ews-8        	 2664237	       905.7 ns/op	18089.20 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=128/coder-8      	  747115	      3262 ns/op	5022.36 MB/s	   40083 B/op	      61 allocs/op
+BenchmarkUTF8/kind=mixed/size=16384/conns=128/gws-8        	 1317788	      1832 ns/op	8941.53 MB/s	      19 B/op	       1 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=1/gws-8       	  541197	      4280 ns/op	 239.04 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=1/ews-8       	  661983	      3567 ns/op	 286.83 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=1/coder-8     	  424989	      5644 ns/op	 181.26 MB/s	    2976 B/op	      24 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=128/coder-8   	 2552264	       945.0 ns/op	1082.55 MB/s	    2964 B/op	      24 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=128/ews-8     	 4332746	       551.1 ns/op	1856.17 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=multibyte/size=1024/conns=128/gws-8     	 3746352	       638.1 ns/op	1603.25 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=1/ews-8      	  384634	      6029 ns/op	2717.23 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=1/coder-8    	  167822	     14080 ns/op	1163.56 MB/s	   41445 B/op	      61 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=1/gws-8      	  145004	     16496 ns/op	 993.17 MB/s	      16 B/op	       1 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=128/coder-8  	  716960	      3243 ns/op	5051.34 MB/s	   40089 B/op	      61 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=128/ews-8    	 2647843	       913.2 ns/op	17939.93 MB/s	       0 B/op	       0 allocs/op
+BenchmarkUTF8/kind=multibyte/size=16384/conns=128/gws-8    	 1000000	      2297 ns/op	7132.11 MB/s	      23 B/op	       1 allocs/op
 PASS
-ok  	github.com/33TU/ews/bench/utf8	32.387s
+ok  	github.com/33TU/ews/bench/utf8	99.905s

@@ -44,7 +44,7 @@ var families = map[string]family{
 
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
 - ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Takeover table only; it is identical to ` + "`ews`" + ` otherwise.
-- ` + "`ews-stream`" + `: ` + "`NextMessage`" + ` then ` + "`WriteFrom`" + ` reading the connection itself, so no message is held whole; ews's streaming shape, against ` + "`gws-stream`" + ` and ` + "`coder-stream`" + `.
+- ` + "`ews-stream`" + `: ` + "`NextMessage`" + ` then ` + "`WriteFrom`" + ` reading the connection itself. Plain messages are not held whole; compressed input is currently inflated whole before being delivered in chunks. This is ews's streaming shape, against ` + "`gws-stream`" + ` and ` + "`coder-stream`" + `.
 - ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
 - ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
@@ -54,14 +54,14 @@ var families = map[string]family{
 
 Compression is permessage-deflate at flate level 1, every message compressed, in two modes that are separate tables because they are different work. With context takeover each direction keeps a 32 KB history that every message extends, so the inflater is primed with a dictionary per message and both ends copy history; it compresses real traffic far better. Without takeover each message is compressed on its own. gws is configured for 15-bit windows to match the 32 KB window ews uses, since its default is 12 bits. coder/websocket uses its fixed level and pooled flate readers and writers, with its compression threshold lowered so that, like the others, it compresses every message. gorilla/websocket uses the standard library's flate. Compressed payloads are repeated JSON-like text; uncompressed payloads are random bytes.
 
-Single-connection small-message cells are loopback round trips of 12 to 15 µs and vary by 10 to 20 percent between runs. Large-message and allocation figures are stable. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
+Single-connection small-message cells are dominated by loopback round-trip latency and vary more between runs than large-message and allocation figures. Beyond the machine's thread count, more connections measure scheduling and per-connection overhead rather than parallelism.
 `,
 		reading: `- Small messages are bound by loopback round trips, so all servers tie uncompressed. Compressed with takeover, ews leads because its deflate path allocates nothing and reuses pooled or per-connection helpers.
-- Without takeover the small-message cells tie across ews, gws and gorilla-stream, coder and gorilla's simple API trail on allocations, and at 256 KiB ews reaches 14 GB/s against 13 for gorilla-stream and coder-stream and 3 to 5 for the simple APIs. Comparing the two compressed tables gives each library's cost of takeover: a 32 KB dictionary primed per message and history copied on both ends. For ews that is 5 to 10 percent at 1 KiB and a third at 256 KiB, and the same or more for the others; takeover buys ratio, not speed, on traffic that repeats.
+- Without takeover gws leads the 64-byte cells, while ews, gws and the streaming paths converge from 1 KiB through 16 KiB; coder and gorilla's simple APIs trail on allocations. At 256 KiB ews leads the fastest streaming paths and is several times faster than the simple APIs. Comparing the compressed tables shows the cost of takeover: a 32 KB dictionary is primed per message and history is copied on both ends. Takeover buys compression ratio rather than raw speed on traffic that already repeats within each message, and its per-connection history becomes costly at high concurrency.
 - 16 KiB frames exceed the 4 KiB read buffer. ews reads the remainder straight into the message buffer, so both libraries do two reads and one copy, and they tie.
 - Large messages favor ews and the streaming variants. gws's and coder's simple read APIs allocate a buffer above their pool thresholds on every such message.
 - With hundreds of connections and 256 KiB messages every library is bound by memory bandwidth, with a quarter-megabyte buffer per connection in flight on each side.
-- coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is 2 to 4 times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
+- coder's documented ` + "`Read`" + ` assembles messages through ` + "`io.ReadAll`" + `, which dominates its large-message cells; piping ` + "`Reader`" + ` into ` + "`Writer`" + ` is several times faster there and is the fairer comparison for large messages, though slightly slower on small ones.
 `,
 	},
 	"UTF8": {
@@ -75,7 +75,7 @@ Single-connection small-message cells are loopback round trips of 12 to 15 µs a
 Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese prose (multibyte), cut on rune boundaries. Clients are ews connections without validation, so the client side costs the same for every server.
 `,
 		reading: `- ASCII payloads cost almost nothing to validate in any library: the standard library and ews both skip ASCII in word-sized steps, so these cells match the plain echo results.
-- Non-ASCII payloads are where the validators differ. The standard library decodes rune by rune at 1 to 2 GB/s, the ews DFA runs at 2.5 GB/s, and the SIMD kernel at about 10 GB/s; gws also pays the pass twice per echo.
+- Non-ASCII payloads are where the validators differ. Ews's DFA outpaces the standard library's rune-by-rune path, and the SIMD kernel widens the gap; gws also pays the validation pass twice per echo.
 - A validation pass matters most on large messages over few connections, where it is a visible fraction of the round trip; at many connections the syscalls dominate again.
 `,
 	},
