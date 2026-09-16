@@ -138,7 +138,6 @@ func BenchmarkBroadcast(b *testing.B) {
 										b.Fatal(err)
 									}
 								}
-								p.Release()
 							case "ews-sync":
 								p, _ := ws.Prepare(codec.Binary, msg)
 								for _, c := range ewsConns {
@@ -146,7 +145,6 @@ func BenchmarkBroadcast(b *testing.B) {
 										b.Fatal(err)
 									}
 								}
-								p.Release()
 							case "gorilla":
 								// PreparedMessage encodes once per configuration; gorilla
 								// writes synchronously, like ews-sync.

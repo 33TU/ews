@@ -204,7 +204,7 @@ A connection that neither sends nor answers pings within the timeout fails its r
 
 `NetConn(c, op)` presents the connection as a `net.Conn` for tunneling other protocols over WebSocket: each `Write` is one message of the given type, `Read` delivers message payloads in order and moves on to the next message as one ends, a message of the other type closes with 1003, a peer close with 1000 or 1001 reads as `io.EOF`, and `Close` sends a normal close and closes the transport. Deadlines and addresses are the transport's, so a read deadline interrupts a blocked `Read` and leaves the connection usable.
 
-Senders that emit bursts, such as fan-out to many subscribers, queue messages in a `Batch` and send them with one write: `b := c.NewBatch(); b.Write(op, p); ...; b.Flush()`. Payloads are borrowed until `Flush`, compression follows the connection's settings per message, and a batch is reusable.
+Senders that emit bursts, such as fan-out to many subscribers, send them through a `Queue`: its writer coalesces everything queued since its last write into one write, so a burst costs one syscall rather than one per message.
 
 A message for many recipients is encoded once and written to each connection without further encoding or copying:
 
@@ -213,13 +213,12 @@ p, err := ws.Prepare(op, payload)
 if err != nil {
     return err
 }
-defer p.Release()
 for _, c := range conns {
     _ = c.WritePrepared(p)
 }
 ```
 
-A compressed variant is built on first use per compression configuration; a client falls back to `Write` since it must mask. `Release` returns the pooled storage once every holder has let go; queues and batches take their own reference while they hold the message, and releasing is optional.
+A compressed variant is built on first use per compression configuration; a client falls back to `Write` since it must mask. A `Prepared` is an immutable value: hand it to as many queues as you like and let it go when done, the garbage collector does the rest.
 
 For sending without blocking on a slow peer, `q := c.NewQueue(limit)` gives an asynchronous queue: `q.Send(op, p)` encodes and returns, `q.SendPrepared(p)` queues shared bytes by reference, and a goroutine that runs only while the queue is nonempty writes the accumulated frames in one write. The limit is a high-water mark: an empty queue accepts any message, and one that would push a nonempty queue past `limit` bytes gets `ErrQueueFull` rather than blocking; the first write error is sticky in `q.Err()`. Once a connection has a queue, `Write` and the other synchronous sends join it in submission order and return when their frames have been written, so the two styles mix freely and compressed streams stay in order. A broadcast is then `Prepare` once and `SendPrepared` on every recipient's queue; `examples/broadcast` is a hub built this way in one file.
 

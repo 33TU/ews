@@ -204,9 +204,11 @@ any goroutine, including a control handler on the read goroutine. Steps:
    is one TLS record; larger payloads take two writes, since the copy would
    cost more than it saves. An empty payload writes the header alone.
 
-`Batch` queues messages, borrowing payloads, and `Flush` encodes them all
-under one lock into one contiguous buffer for a single write, so a fan-out
-burst costs one syscall instead of one per message. `WriteFrom` streams an
+A burst of messages to one connection goes through its `Queue`, whose
+writer coalesces everything accumulated into one write, so a fan-out burst
+costs one syscall instead of one per message; a separate synchronous
+`Batch` existed for the same purpose and was removed as a second way to do
+it. `WriteFrom` streams an
 `io.Reader` in `FragmentSize` chunks through the fragmented-send path, and
 `WriteTo` is its mirror on the read side: the rest of the current message
 goes to an `io.Writer` frame by frame, borrowed from the read buffer or read
@@ -246,9 +248,12 @@ keeps meaning written-on-return, and the encoder lock is never held while
 waiting, so `Send` stays non-blocking. The writer goroutine exits when the
 queue drains and is started again by the next `Send`; a lingering writer
 with a timer was tried and cost more per wake than a fresh goroutine, 4
-against 2 percent of CPU in a 2048-connection broadcast. `Prepared` storage is pooled behind a
-reference count: queues and batches retain while holding a message and
-release after the write, and the owner's `Release` is optional.
+against 2 percent of CPU in a 2048-connection broadcast. `Prepared` is
+nothing else: it is an immutable value the garbage collector keeps alive
+while any queue refers to it, which costs one allocation per broadcast
+rather than per recipient. A pooled, reference-counted version existed and
+was removed: it saved that one allocation at the price of `Retain`,
+`Release`, and a double-release panic in user code.
 
 The queue limit is the memory bound to plan around: a server holds at most
 connections times limit of unwritten frames, plus arena growth. Measured in

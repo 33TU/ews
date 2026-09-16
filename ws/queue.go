@@ -13,7 +13,7 @@ import (
 // write. Prepared messages are queued by reference.
 //
 // Once a connection has a queue, its other data writes join the queue too:
-// Write, WritePrepared, Batch.Flush, and fragmented sends enqueue their
+// Write, WritePrepared, and fragmented sends enqueue their
 // frames in submission order and return when those frames have been written,
 // so message order and compressed-stream order are preserved and the two
 // styles mix freely. Control frames bypass the queue. A Queue is safe for
@@ -45,12 +45,11 @@ type Queue struct {
 	nb            net.Buffers
 }
 
-// segment is one queued frame: a range of the arena, or external bytes that
-// may belong to a Prepared holding a reference for the segment's lifetime.
+// segment is one queued frame: a range of the arena, or the shared bytes of
+// a Prepared, which stay alive as long as a segment refers to them.
 type segment struct {
 	start, end int
 	ext        []byte
-	p          *Prepared
 }
 
 // arena is a frame buffer shared through a pool. A queue holds one while it
@@ -110,7 +109,7 @@ func (q *Queue) Send(op codec.Opcode, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = q.enqueue(header, body, nil, nil)
+	_, err = q.enqueue(header, body, nil)
 	return err
 }
 
@@ -130,7 +129,7 @@ func (q *Queue) SendPrepared(p *Prepared) error {
 	if err != nil {
 		return err
 	}
-	_, err = q.enqueue(nil, nil, p, frame)
+	_, err = q.enqueue(nil, nil, frame)
 	return err
 }
 
@@ -175,7 +174,7 @@ func (q *Queue) reserve(n int) error {
 // ext, and returns its sequence number. The limit is reserve's business, so
 // synchronous callers that wait for the write skip it. Callers hold wmu,
 // which makes enqueue order the encode order.
-func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, error) {
+func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.err != nil {
@@ -183,10 +182,7 @@ func (q *Queue) enqueue(header, body []byte, p *Prepared, ext []byte) (uint64, e
 	}
 	n := len(header) + len(body) + len(ext)
 	if ext != nil {
-		if p != nil {
-			p.Retain()
-		}
-		q.segments = append(q.segments, segment{ext: ext, p: p})
+		q.segments = append(q.segments, segment{ext: ext})
 	} else {
 		if q.cur == nil {
 			q.cur = arenaPool.Get().(*arena)
@@ -246,9 +242,6 @@ func (q *Queue) run() {
 
 		q.mu.Lock()
 		for i := range q.flushSegments {
-			if p := q.flushSegments[i].p; p != nil {
-				p.Release()
-			}
 			q.flushSegments[i] = segment{}
 		}
 		q.written += uint64(len(q.flushSegments))
@@ -261,11 +254,6 @@ func (q *Queue) run() {
 		}
 		if err != nil {
 			q.err = err
-			for i := range q.segments {
-				if p := q.segments[i].p; p != nil {
-					p.Release()
-				}
-			}
 			q.segments, q.size = q.segments[:0], 0
 			q.running = false
 		}

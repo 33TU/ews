@@ -72,7 +72,7 @@ bench-utf8 benchtime="2s":
 bench-utf8-simd benchtime="2s":
     export GOMAXPROCS={{ procs }} && cd bench/utf8 && GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
 
-# Fan-out benchmark: bursts of small messages per event, batched and unbatched.
+# Fan-out benchmark: bursts of small messages per event, written directly or through a queue.
 bench-fanout:
     export GOMAXPROCS={{ procs }} && cd bench/broadcast && go test -run '^$' -bench Fanout -benchmem
 

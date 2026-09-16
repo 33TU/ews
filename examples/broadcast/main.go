@@ -97,7 +97,6 @@ func broadcast(op codec.Opcode, payload []byte) {
 	if err != nil {
 		return
 	}
-	defer p.Release() // Queues keep their own references until written.
 	clients.Range(func(key, value any) bool {
 		if err := key.(*ws.Queue).SendPrepared(p); err != nil {
 			value.(*client).conn.Close()

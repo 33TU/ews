@@ -2,7 +2,6 @@ package ws
 
 import (
 	"sync"
-	"sync/atomic"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/deflate"
@@ -11,23 +10,16 @@ import (
 
 // Prepared is a message encoded once for sending to many connections. Server
 // frames carry no mask, so one encoding serves every recipient; a compressed
-// variant is built on first use per compression configuration.
-//
-// Storage is pooled and reference counted. Prepare returns one reference,
-// owned by the caller; Queue.SendPrepared and Batch.WritePrepared take their
-// own for as long as they hold the message. Call Release when done handing
-// the message out and the storage returns to the pool once every reference is
-// dropped. Releasing is optional: an unreleased Prepared is collected
-// normally. A Prepared is safe for concurrent use.
+// variant is built on first use per compression configuration. A Prepared is
+// immutable once made, safe for concurrent use, and garbage collected like
+// any value: queues and connections that still refer to it keep it alive.
 type Prepared struct {
 	op      codec.Opcode
-	refs    atomic.Int32
 	frame   []byte // Plain header and payload, contiguous.
 	payload []byte // Aliases frame.
 
 	mu       sync.Mutex
-	variants []variant // Compressed frames by configuration; the first nvar are live.
-	nvar     int
+	variants []variant // Compressed frames by configuration.
 }
 
 type variant struct {
@@ -36,12 +28,6 @@ type variant struct {
 }
 
 type compressKey struct{ level, bits int }
-
-var preparedPool sync.Pool
-
-// preparedPoolLimit keeps very large messages out of the pool so they do not
-// pin memory.
-const preparedPoolLimit = 1 << 20
 
 // Prepare encodes a text or binary message for WritePrepared. payload is copied.
 func Prepare(op codec.Opcode, payload []byte) (*Prepared, error) {
@@ -52,14 +38,9 @@ func Prepare(op codec.Opcode, payload []byte) (*Prepared, error) {
 	if err := enc.Encode(true, op, payload, nil); err != nil {
 		return nil, err
 	}
-	p, ok := preparedPool.Get().(*Prepared)
-	if !ok {
-		p = new(Prepared)
-	}
-	p.op = op
-	p.refs.Store(1)
 	header := enc.HeaderBytes()
-	p.frame = append(append(p.frame[:0], header...), payload...)
+	p := &Prepared{op: op, frame: make([]byte, 0, len(header)+len(payload))}
+	p.frame = append(append(p.frame, header...), payload...)
 	p.payload = p.frame[len(header):]
 	return p, nil
 }
@@ -69,34 +50,6 @@ func (p *Prepared) Opcode() codec.Opcode { return p.op }
 
 // Payload borrows the message payload.
 func (p *Prepared) Payload() []byte { return p.payload }
-
-// Retain adds a reference, for handing the message to another owner that
-// will Release it independently.
-func (p *Prepared) Retain() { p.refs.Add(1) }
-
-// Release drops the caller's reference. At zero the storage returns to the
-// pool and the message must not be used again; releasing more times than
-// retained panics, so call it once per Prepare or Retain, or not at all.
-func (p *Prepared) Release() {
-	n := p.refs.Add(-1)
-	if n > 0 {
-		return
-	}
-	if n < 0 {
-		panic("ews/ws: Prepared released more times than retained")
-	}
-	if cap(p.frame) > preparedPoolLimit {
-		return
-	}
-	p.payload = nil
-	for i := 0; i < p.nvar; i++ {
-		if cap(p.variants[i].frame) > preparedPoolLimit {
-			p.variants[i].frame = nil
-		}
-	}
-	p.nvar = 0
-	preparedPool.Put(p)
-}
 
 // frameFor picks the bytes to send on a connection: the compressed variant
 // when the connection compresses and the payload clears MinSize, else plain.
@@ -112,7 +65,7 @@ func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
 	key := compressKey{comp.Level, comp.SendWindowBits}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for i := 0; i < p.nvar; i++ {
+	for i := range p.variants {
 		if p.variants[i].key == key {
 			return p.variants[i].frame
 		}
@@ -124,25 +77,21 @@ func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
 	if !ok {
 		cp = newCompressor(comp)
 	}
-	if p.nvar == len(p.variants) {
-		p.variants = append(p.variants, variant{})
-	}
-	v := &p.variants[p.nvar]
-	v.key = key
+	v := variant{key: key}
 	compressed, err := cp.Compress(p.payload, nil)
 	if err == nil {
 		var enc codec.Encoder
 		if err = enc.EncodeCompressed(true, p.op, compressed, nil); err == nil {
-			v.frame = append(append(v.frame[:0], enc.HeaderBytes()...), compressed...)
+			v.frame = append(append(make([]byte, 0, len(enc.HeaderBytes())+len(compressed)), enc.HeaderBytes()...), compressed...)
 		}
 	}
 	cp.Reset()
 	pool.Put(cp)
 	if err != nil {
 		// Compression cannot fail on valid input; fall back rather than error.
-		v.frame = append(v.frame[:0], p.frame...)
+		v.frame = p.frame
 	}
-	p.nvar++
+	p.variants = append(p.variants, v)
 	return v.frame
 }
 
@@ -162,7 +111,7 @@ func (c *Conn) WritePrepared(p *Prepared) error {
 		return err
 	}
 	if q := c.queue; q != nil {
-		seq, err := q.enqueue(nil, nil, p, frame)
+		seq, err := q.enqueue(nil, nil, frame)
 		c.wmu.Unlock()
 		return await(q, seq, err)
 	}

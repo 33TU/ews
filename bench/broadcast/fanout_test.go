@@ -15,17 +15,17 @@ import (
 )
 
 // BenchmarkFanout measures a server answering each request with a burst of
-// small messages, sent one Write at a time or queued in a Batch and flushed
-// once. Throughput is in requests per second; each request is one message in
-// and fanout messages out.
+// small messages, sent one Write at a time or through a Queue, whose writer
+// coalesces the burst into one write. Throughput is in requests per second;
+// each request is one message in and fanout messages out.
 func BenchmarkFanout(b *testing.B) {
 	const fanout, size = 16, 128
 	reply := harness.Payload(size, true)
-	for _, batched := range []bool{false, true} {
+	for _, queued := range []bool{false, true} {
 		for _, conns := range []int{1, 32, 512} {
 			name := fmt.Sprintf("mode=write/conns=%d", conns)
-			if batched {
-				name = fmt.Sprintf("mode=batch/conns=%d", conns)
+			if queued {
+				name = fmt.Sprintf("mode=queue/conns=%d", conns)
 			}
 			b.Run(name, func(b *testing.B) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,20 +35,22 @@ func BenchmarkFanout(b *testing.B) {
 					}
 					defer conn.Close()
 					c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server})
-					batch := c.NewBatch()
+					var q *ws.Queue
+					if queued {
+						q = c.NewQueue(0)
+					}
 					for {
 						if _, _, err := c.ReadMessage(); err != nil {
 							return
 						}
 						for i := 0; i < fanout; i++ {
-							if batched {
-								batch.Write(codec.Binary, reply)
-							} else if err := c.Write(codec.Binary, reply); err != nil {
-								return
+							var err error
+							if queued {
+								err = q.Send(codec.Binary, reply)
+							} else {
+								err = c.Write(codec.Binary, reply)
 							}
-						}
-						if batched {
-							if err := batch.Flush(); err != nil {
+							if err != nil {
 								return
 							}
 						}

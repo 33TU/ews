@@ -81,7 +81,7 @@ Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese pr
 	},
 	"Broadcast": {
 		title: "Broadcast benchmark results",
-		setup: `One message of 256 bytes, 4 KiB or 64 KiB delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second; allocations are process-wide per round.
+		setup: `One message of 256 bytes, 4 KiB or 64 KiB delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second; allocations are process-wide per round, so ews's few are the ` + "`Prepared`" + ` made once per round, not per recipient.
 
 - ` + "`ews`" + `: ` + "`Prepare`" + ` once, then ` + "`SendPrepared`" + ` on each connection's ` + "`Queue`" + `, returning before the writes complete.
 - ` + "`ews-sync`" + `: ` + "`Prepare`" + ` once, then ` + "`WritePrepared`" + ` on each connection in a loop, waiting for each write.

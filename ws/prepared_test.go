@@ -62,9 +62,8 @@ func TestPrepared(t *testing.T) {
 		wait()
 	}
 
-	// Through real peers: a client masks and falls back to Write; a takeover
-	// server interleaves prepared and ordinary compressed messages, and a
-	// Batch carries prepared messages too.
+	// Through real peers: a client masks and falls back to Write, and a
+	// takeover server interleaves prepared and ordinary compressed messages.
 	server, client := compressionPair(t, true, true, 1)
 	wait := run(t, func() error {
 		for i := 0; i < 4; i++ {
@@ -90,53 +89,6 @@ func TestPrepared(t *testing.T) {
 	}
 	wait()
 
-	server, client = pair(t, ws.Config{}, ws.Config{})
-	wait = run(t, func() error {
-		for _, want := range [][]byte{payload, []byte("plain"), payload} {
-			if _, got, err := client.ReadMessage(); err != nil || !bytes.Equal(got, want) {
-				return fmt.Errorf("batch: %v", err)
-			}
-		}
-		return nil
-	})
-	b := server.NewBatch()
-	b.WritePrepared(p)
-	b.Write(codec.Binary, []byte("plain"))
-	b.WritePrepared(p)
-	if err := b.Flush(); err != nil {
-		t.Fatal(err)
-	}
-	wait()
-
-	// Reference counting: the owner may release right after handing the
-	// message to a queue, which keeps its own reference until written, and
-	// over-release panics.
-	server, client = pair(t, ws.Config{}, ws.Config{})
-	q := server.NewQueue(0)
-	p2, _ := ws.Prepare(codec.Binary, payload)
-	wait = run(t, func() error {
-		if _, got, err := client.ReadMessage(); err != nil || !bytes.Equal(got, payload) {
-			return fmt.Errorf("released prepared: %v", err)
-		}
-		return nil
-	})
-	if err := q.SendPrepared(p2); err != nil {
-		t.Fatal(err)
-	}
-	p2.Release()
-	if err := q.Wait(); err != nil {
-		t.Fatal(err)
-	}
-	wait()
-	func() {
-		defer func() {
-			if recover() == nil {
-				t.Fatal("double release did not panic")
-			}
-		}()
-		p2.Release()
-	}()
-	p.Release()
 }
 
 // TestPreparedTakeoverHistory interleaves prepared and ordinary compressed
@@ -192,7 +144,6 @@ func TestPreparedTakeoverHistory(t *testing.T) {
 		if err := server.WritePrepared(pr); err != nil {
 			t.Fatal(err)
 		}
-		pr.Release()
 	}
 	wait()
 }

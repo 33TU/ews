@@ -107,15 +107,13 @@ func ExamplePrepare() {
 		got <- string(p)
 	}()
 
-	// Encode once, send to every recipient; each queue holds its own
-	// reference until the frame is written.
+	// Encode once, send to every recipient by reference.
 	p, err := ws.Prepare(codec.Text, []byte("to everyone"))
 	if err != nil {
 		panic(err)
 	}
 	q := server.NewQueue(0)
 	q.SendPrepared(p)
-	p.Release()
 	fmt.Println(<-got)
 	// Output: to everyone
 }
