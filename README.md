@@ -210,6 +210,12 @@ nothing.
 Build with `GOEXPERIMENT=simd` for SIMD masking and UTF-8 validation;
 results for that build are beside the default ones.
 
+ews is also wired into a fork of lxzan's
+[go-websocket-benchmark](https://github.com/33TU/go-websocket-benchmark),
+the harness behind gws's published chart, with current library versions and
+[results](https://github.com/33TU/go-websocket-benchmark/tree/main/results)
+from its echo and rate tests at 10k connections.
+
 ## Development
 
 ```sh
