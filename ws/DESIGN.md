@@ -26,10 +26,10 @@ from raw file descriptors without forking the record layer. The layering
 stays as is because it costs nothing, not because a reactor is coming.
 
 ```
-codec, deflate                 frame bytes, whole-message compression
-internal/proto (push core)     Feed(bytes) -> validated frame and message events
-ws.Conn (this design)          blocking loop: fill from io.ReadWriter, drive the core
-a non-blocking transport         could feed the core from readiness callbacks; not planned
+codec, deflate             frame bytes, whole-message compression
+ws: receiver, sender       push-style core: Feed(bytes) -> validated frame and message events
+ws: Conn                   blocking loop: fill from io.ReadWriter, drive the core
+a non-blocking transport   could feed the core from readiness callbacks; not planned
 ```
 
 The push core owns the protocol rules: mask bit per role, RSV checks,

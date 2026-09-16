@@ -1,24 +1,24 @@
-package proto
+package ws
 
 import "github.com/33TU/ews/codec"
 
-// Kind is the result of Receiver.Next.
-type Kind uint8
+// frameKind is the result of receiver.Next.
+type frameKind uint8
 
 const (
-	// NeedInput means no complete event is available; feed more bytes.
-	NeedInput Kind = iota
-	// DataFrame means a validated text, binary, or continuation header was
+	// needInput means no complete event is available; feed more bytes.
+	needInput frameKind = iota
+	// dataFrame means a validated text, binary, or continuation header was
 	// accepted. Drain it with Payload before calling Next again.
-	DataFrame
-	// ControlFrame means a complete ping, pong, or close frame is available
+	dataFrame
+	// controlFrame means a complete ping, pong, or close frame is available
 	// through ControlOpcode and ControlPayload.
-	ControlFrame
+	controlFrame
 )
 
-// Receiver validates incoming frames and tracks message state. Use Init.
+// receiver validates incoming frames and tracks message state. Use Init.
 // Calls must be serialized. Failures are terminal until Init.
-type Receiver struct {
+type receiver struct {
 	role        Role
 	compression bool // RSV1 is meaningful on first data frames.
 	dec         codec.Decoder
@@ -43,65 +43,65 @@ type Receiver struct {
 
 // Init prepares the receiver for a connection, retaining decoder storage.
 // compression allows RSV1 on the first frame of a message.
-func (r *Receiver) Init(role Role, compression bool) {
+func (r *receiver) Init(role Role, compression bool) {
 	dec := r.dec
-	*r = Receiver{role: role, compression: compression, dec: dec}
+	*r = receiver{role: role, compression: compression, dec: dec}
 	r.dec.Reset()
 }
 
 // Feed borrows input like codec.Decoder.Feed. Nothing is fed after a close or failure.
-func (r *Receiver) Feed(b []byte) {
+func (r *receiver) Feed(b []byte) {
 	if r.failed == nil && !r.closeReceived {
 		r.dec.Feed(b)
 	}
 }
 
 // Preserve copies pending input so the feed buffer can be reused.
-func (r *Receiver) Preserve() { r.dec.Preserve() }
+func (r *receiver) Preserve() { r.dec.Preserve() }
 
 // Buffered returns fed bytes not yet consumed.
-func (r *Receiver) Buffered() int { return r.dec.Buffered() }
+func (r *receiver) Buffered() int { return r.dec.Buffered() }
 
 // Idle reports whether no frame, message, or partial input is in progress.
-func (r *Receiver) Idle() bool {
+func (r *receiver) Idle() bool {
 	return r.remaining == 0 && !r.controlOpen && r.messageOpcode == 0 && r.dec.Buffered() == 0
 }
 
 // Header borrows the most recent data frame header until the next Next call.
-func (r *Receiver) Header() *codec.Header { return &r.header }
+func (r *receiver) Header() *codec.Header { return &r.header }
 
 // Remaining returns unread payload bytes of the open data frame.
-func (r *Receiver) Remaining() uint64 { return r.remaining }
+func (r *receiver) Remaining() uint64 { return r.remaining }
 
 // MessageOpen reports whether a data message has started but not finished.
-func (r *Receiver) MessageOpen() bool { return r.messageOpcode != 0 }
+func (r *receiver) MessageOpen() bool { return r.messageOpcode != 0 }
 
 // MessageOpcode returns the open message's opcode, or zero.
-func (r *Receiver) MessageOpcode() codec.Opcode { return r.messageOpcode }
+func (r *receiver) MessageOpcode() codec.Opcode { return r.messageOpcode }
 
 // MessageCompressed reports whether the most recent message started with RSV1.
-func (r *Receiver) MessageCompressed() bool { return r.compressed }
+func (r *receiver) MessageCompressed() bool { return r.compressed }
 
 // ControlOpcode returns the opcode of the last complete control frame.
-func (r *Receiver) ControlOpcode() codec.Opcode { return r.controlOpcode }
+func (r *receiver) ControlOpcode() codec.Opcode { return r.controlOpcode }
 
 // ControlPayload borrows the last complete control frame's payload until the next call.
-func (r *Receiver) ControlPayload() []byte { return r.control[:r.controlLen] }
+func (r *receiver) ControlPayload() []byte { return r.control[:r.controlLen] }
 
 // CloseReceived reports whether a valid close frame has been received.
-func (r *Receiver) CloseReceived() bool { return r.closeReceived }
+func (r *receiver) CloseReceived() bool { return r.closeReceived }
 
 // Next advances to the next frame event. It returns codec.ErrPayloadPending
 // if the open data frame has not been drained.
-func (r *Receiver) Next() (Kind, error) {
+func (r *receiver) Next() (frameKind, error) {
 	if r.failed != nil {
-		return NeedInput, r.failed
+		return needInput, r.failed
 	}
 	if r.remaining != 0 {
-		return NeedInput, codec.ErrPayloadPending
+		return needInput, codec.ErrPayloadPending
 	}
 	if r.closeReceived {
-		return NeedInput, nil
+		return needInput, nil
 	}
 	for {
 		if r.controlOpen {
@@ -112,7 +112,7 @@ func (r *Receiver) Next() (Kind, error) {
 				r.maskOffset = codec.Mask(r.control[int(r.controlLen)-n:r.controlLen], r.maskKey, r.maskOffset)
 			}
 			if !done {
-				return NeedInput, nil
+				return needInput, nil
 			}
 			r.controlOpen = false
 			return r.finishControl()
@@ -120,13 +120,13 @@ func (r *Receiver) Next() (Kind, error) {
 
 		h, ok, err := r.dec.NextHeader()
 		if err != nil {
-			return NeedInput, r.fail(1002, err)
+			return needInput, r.fail(1002, err)
 		}
 		if !ok {
-			return NeedInput, nil
+			return needInput, nil
 		}
 		if err := r.accept(h); err != nil {
-			return NeedInput, r.fail(1002, err)
+			return needInput, r.fail(1002, err)
 		}
 		r.masked, r.maskOffset = h.Masked(), 0
 		if r.masked {
@@ -146,14 +146,14 @@ func (r *Receiver) Next() (Kind, error) {
 		if r.remaining == 0 {
 			r.finishFrame()
 		}
-		return DataFrame, nil
+		return dataFrame, nil
 	}
 }
 
 // Payload consumes available bytes of the open data frame, unmasked. The
 // chunk is borrowed until the next call. done reports frame completion; it is
 // true when no frame is open.
-func (r *Receiver) Payload() ([]byte, bool, error) {
+func (r *receiver) Payload() ([]byte, bool, error) {
 	if r.failed != nil {
 		return nil, false, r.failed
 	}
@@ -165,7 +165,7 @@ func (r *Receiver) Payload() ([]byte, bool, error) {
 }
 
 // PayloadN is like Payload but consumes at most n bytes.
-func (r *Receiver) PayloadN(n int) ([]byte, bool, error) {
+func (r *receiver) PayloadN(n int) ([]byte, bool, error) {
 	if r.failed != nil {
 		return nil, false, r.failed
 	}
@@ -176,7 +176,7 @@ func (r *Receiver) PayloadN(n int) ([]byte, bool, error) {
 	return r.consumed(chunk, done)
 }
 
-func (r *Receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
+func (r *receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
 	if len(chunk) != 0 {
 		if r.masked {
 			r.maskOffset = codec.Mask(chunk, r.maskKey, r.maskOffset)
@@ -189,7 +189,7 @@ func (r *Receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
 	return chunk, done, nil
 }
 
-func (r *Receiver) accept(h codec.Header) error {
+func (r *receiver) accept(h codec.Header) error {
 	if h.Masked() != (r.role == Server) || h.RSV2() || h.RSV3() {
 		return ErrProtocol
 	}
@@ -214,28 +214,28 @@ func (r *Receiver) accept(h codec.Header) error {
 }
 
 // finishFrame closes the drained data frame and, if final, the message.
-func (r *Receiver) finishFrame() {
+func (r *receiver) finishFrame() {
 	if r.header.Final() {
 		r.messageOpcode = 0
 	}
 }
 
-func (r *Receiver) finishControl() (Kind, error) {
+func (r *receiver) finishControl() (frameKind, error) {
 	if r.controlOpcode == codec.Close {
-		if err := ValidateClose(r.control[:r.controlLen]); err != nil {
+		if err := validateClose(r.control[:r.controlLen]); err != nil {
 			code := uint16(1002)
 			if err == ErrInvalidUTF8 {
 				code = 1007
 			}
-			return NeedInput, r.fail(code, err)
+			return needInput, r.fail(code, err)
 		}
 		r.closeReceived = true
 		r.dec.Reset()
 	}
-	return ControlFrame, nil
+	return controlFrame, nil
 }
 
-func (r *Receiver) fail(code uint16, err error) error {
+func (r *receiver) fail(code uint16, err error) error {
 	r.failed = &Error{Code: code, Err: err}
 	r.remaining, r.controlOpen, r.messageOpcode = 0, false, 0
 	r.dec.Reset()

@@ -1,4 +1,4 @@
-package proto_test
+package ws
 
 import (
 	"bytes"
@@ -7,16 +7,15 @@ import (
 	"testing"
 
 	"github.com/33TU/ews/codec"
-	"github.com/33TU/ews/internal/proto"
 )
 
 func TestFragmentsAndControls(t *testing.T) {
 	for _, masked := range []bool{false, true} {
 		t.Run(fmt.Sprintf("masked=%t", masked), func(t *testing.T) {
-			var r proto.Receiver
-			r.Init(proto.Client, false)
+			var r receiver
+			r.Init(Client, false)
 			if masked {
-				r.Init(proto.Server, false)
+				r.Init(Server, false)
 			}
 			payload := []byte("A😀B€C")
 			var wire []byte
@@ -76,10 +75,10 @@ func TestInvalidFrames(t *testing.T) {
 	for _, tt := range tests {
 		for _, chunk := range []int{1, 1 << 16} {
 			t.Run(fmt.Sprintf("%s/chunk=%d", tt.name, chunk), func(t *testing.T) {
-				var r proto.Receiver
-				r.Init(proto.Client, false)
+				var r receiver
+				r.Init(Client, false)
 				_, err := drive(t, &r, tt.wire, chunk)
-				var pe *proto.Error
+				var pe *Error
 				if !errors.As(err, &pe) || pe.Code != tt.code {
 					t.Fatalf("expected code %d, got %v", tt.code, err)
 				}
@@ -87,7 +86,7 @@ func TestInvalidFrames(t *testing.T) {
 				if _, again := r.Next(); again != err {
 					t.Fatal("failure was not terminal")
 				}
-				r.Init(proto.Client, false)
+				r.Init(Client, false)
 				if _, err := drive(t, &r, frame(t, 0x81, []byte("ok"), false), chunk); err != nil {
 					t.Fatalf("Init did not recover: %v", err)
 				}
@@ -97,26 +96,26 @@ func TestInvalidFrames(t *testing.T) {
 }
 
 func TestCompressedFlag(t *testing.T) {
-	var r proto.Receiver
-	r.Init(proto.Client, true)
+	var r receiver
+	r.Init(Client, true)
 	wire := append(frame(t, 0x41, []byte{1}, false), frame(t, 0x80, []byte{2}, false)...) // RSV1 text, continuation.
 	wire = append(wire, frame(t, 0x82, []byte{3}, false)...)                              // Plain binary.
 	events, err := drive(t, &r, wire, len(wire))
 	if err != nil || len(events) != 2 {
 		t.Fatalf("%+v %v", events, err)
 	}
-	r.Init(proto.Client, true)
+	r.Init(Client, true)
 	r.Feed(frame(t, 0x41, []byte{1}, false))
-	if kind, err := r.Next(); kind != proto.DataFrame || err != nil || !r.MessageCompressed() {
+	if kind, err := r.Next(); kind != dataFrame || err != nil || !r.MessageCompressed() {
 		t.Fatal("compressed flag not set")
 	}
-	r.Init(proto.Client, true)
+	r.Init(Client, true)
 	for _, bad := range [][]byte{
 		frame(t, 0xc9, nil, false), // RSV1 ping.
 		append(frame(t, 0x01, nil, false), frame(t, 0xc0, nil, false)...), // RSV1 continuation.
 		append(frame(t, 0x41, nil, false), frame(t, 0xc0, nil, false)...), // RSV1 continuation of compressed.
 	} {
-		r.Init(proto.Client, true)
+		r.Init(Client, true)
 		if _, err := drive(t, &r, bad, len(bad)); err == nil {
 			t.Fatalf("accepted %x", bad)
 		}
@@ -124,21 +123,21 @@ func TestCompressedFlag(t *testing.T) {
 }
 
 func TestCloseReceived(t *testing.T) {
-	var r proto.Receiver
-	r.Init(proto.Client, false)
+	var r receiver
+	r.Init(Client, false)
 	wire := append(frame(t, 0x88, []byte{3, 232, 'b', 'y', 'e'}, false), frame(t, 0x81, []byte("late"), false)...)
 	events, err := drive(t, &r, wire, len(wire))
 	if err != nil || len(events) != 1 || !events[0].control || events[0].opcode != codec.Close {
 		t.Fatalf("events %+v, err %v", events, err)
 	}
-	code, reason := proto.ParseClose(events[0].payload)
+	code, reason := parseClose(events[0].payload)
 	if code != 1000 || string(reason) != "bye" || !r.CloseReceived() {
 		t.Fatalf("code %d reason %q", code, reason)
 	}
-	if kind, err := r.Next(); kind != proto.NeedInput || err != nil {
+	if kind, err := r.Next(); kind != needInput || err != nil {
 		t.Fatal("input after close must be ignored")
 	}
-	if code, reason := proto.ParseClose(nil); code != proto.NoStatus || reason != nil {
+	if code, reason := parseClose(nil); code != NoStatus || reason != nil {
 		t.Fatal("empty close must report NoStatus")
 	}
 }
@@ -150,8 +149,8 @@ func FuzzReceiver(f *testing.F) {
 	f.Add([]byte{0x88, 0x82, 0, 0, 0, 0, 0x03, 0xe8}, uint8(1), true)
 	f.Add([]byte{0xc1, 0x02, 0xff, 0xff}, uint8(1), false)
 	f.Fuzz(func(t *testing.T, wire []byte, split uint8, compression bool) {
-		var r proto.Receiver
-		r.Init(proto.Server, compression)
+		var r receiver
+		r.Init(Server, compression)
 		step := int(split)%9 + 1
 		var failed error
 		for len(wire) > 0 {
@@ -169,10 +168,10 @@ func FuzzReceiver(f *testing.F) {
 						break
 					}
 				}
-				if kind == proto.NeedInput {
+				if kind == needInput {
 					break
 				}
-				if kind == proto.DataFrame {
+				if kind == dataFrame {
 					for {
 						chunk, done, err := r.Payload()
 						if err != nil {

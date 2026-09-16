@@ -1,15 +1,15 @@
-package proto
+package ws
 
 import (
 	"encoding/binary"
 	"unicode/utf8"
 )
 
-// NoStatus is the code reported for a close payload without a status code.
+// NoStatus is the close code reported when the peer sent none.
 const NoStatus = 1005
 
-// ValidateClose checks a close frame payload.
-func ValidateClose(payload []byte) error {
+// validateClose checks a close frame payload.
+func validateClose(payload []byte) error {
 	if len(payload) == 0 {
 		return nil
 	}
@@ -22,9 +22,9 @@ func ValidateClose(payload []byte) error {
 	return nil
 }
 
-// ParseClose splits a validated close payload into code and reason.
+// parseClose splits a validated close payload into code and reason.
 // An empty payload reports NoStatus.
-func ParseClose(payload []byte) (code uint16, reason []byte) {
+func parseClose(payload []byte) (code uint16, reason []byte) {
 	if len(payload) < 2 {
 		return NoStatus, nil
 	}

@@ -3,21 +3,19 @@ package ws
 import (
 	"errors"
 	"strconv"
-
-	"github.com/33TU/ews/internal/proto"
 )
 
 var (
 	// ErrClosing means a close frame has already been sent.
-	ErrClosing = proto.ErrClosing
+	ErrClosing = errors.New("ews/ws: close frame already sent")
 	// ErrProtocol means the peer violated the framing or message rules.
-	ErrProtocol = proto.ErrProtocol
+	ErrProtocol = errors.New("ews/ws: invalid frame or message sequence")
 	// ErrInvalidUTF8 means a text message or close reason is not valid UTF-8.
-	ErrInvalidUTF8 = proto.ErrInvalidUTF8
+	ErrInvalidUTF8 = errors.New("ews/ws: invalid UTF-8")
 	// ErrMessageTooLarge means a message exceeds Config.MaxMessageSize.
-	ErrMessageTooLarge = proto.ErrMessageTooLarge
+	ErrMessageTooLarge = errors.New("ews/ws: message exceeds limit")
 	// ErrInvalidData means a compressed message could not be decompressed.
-	ErrInvalidData = proto.ErrInvalidData
+	ErrInvalidData = errors.New("ews/ws: invalid compressed message data")
 	// ErrInvalidConfig means NewConn received an invalid Config.
 	ErrInvalidConfig = errors.New("ews/ws: invalid configuration")
 	// ErrMessageOpen means a fragmented message is in progress, so Write and
@@ -29,8 +27,9 @@ var (
 	ErrQueueFull = errors.New("ews/ws: send queue full")
 )
 
-// Error is a terminal protocol failure. A close frame carrying Code has been
-// sent when possible. Every later read returns the same error.
+// Error is a terminal protocol failure and the close code that describes it.
+// A close frame carrying Code has been sent when possible. Every later read
+// returns the same error.
 type Error struct {
 	Code uint16
 	Err  error

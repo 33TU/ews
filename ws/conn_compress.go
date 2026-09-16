@@ -7,7 +7,6 @@ import (
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
-	"github.com/33TU/ews/internal/proto"
 )
 
 // compressorContext is the send side of permessage-deflate. Guarded by wmu.
@@ -184,9 +183,9 @@ func (c *Conn) decompress(payload []byte) ([]byte, error) {
 	out, err := c.acquireDecompressor().Decompress(payload, c.limit, c.decomp.window)
 	if err != nil {
 		if errors.Is(err, deflate.ErrMessageTooLarge) {
-			return nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
+			return nil, c.fail(&Error{Code: 1009, Err: ErrMessageTooLarge})
 		}
-		return nil, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidData})
+		return nil, c.fail(&Error{Code: 1007, Err: ErrInvalidData})
 	}
 	return out, nil
 }

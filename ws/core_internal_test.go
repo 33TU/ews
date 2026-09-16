@@ -1,4 +1,4 @@
-package proto_test
+package ws
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/33TU/ews/codec"
-	"github.com/33TU/ews/internal/proto"
 )
 
 // frame builds one frame and overwrites its first byte for header variants.
@@ -33,7 +32,7 @@ type event struct {
 
 // drive feeds wire in chunks and collects complete messages and control frames
 // the way a blocking or event-driven consumer would.
-func drive(t testing.TB, r *proto.Receiver, wire []byte, chunk int) ([]event, error) {
+func drive(t testing.TB, r *receiver, wire []byte, chunk int) ([]event, error) {
 	t.Helper()
 	var events []event
 	var message []byte
@@ -61,10 +60,10 @@ func drive(t testing.TB, r *proto.Receiver, wire []byte, chunk int) ([]event, er
 			if err != nil {
 				return events, err
 			}
-			if kind == proto.NeedInput {
+			if kind == needInput {
 				break
 			}
-			if kind == proto.ControlFrame {
+			if kind == controlFrame {
 				events = append(events, event{r.ControlOpcode(), bytes.Clone(r.ControlPayload()), true})
 				continue
 			}
@@ -79,7 +78,7 @@ func drive(t testing.TB, r *proto.Receiver, wire []byte, chunk int) ([]event, er
 	return events, nil
 }
 
-func encode(t testing.TB, s *proto.Sender, op codec.Opcode, payload []byte) []byte {
+func encode(t testing.TB, s *sender, op codec.Opcode, payload []byte) []byte {
 	t.Helper()
 	h, b, err := s.Encode(op, payload)
 	if err != nil {
@@ -99,11 +98,11 @@ func TestRoundTrip(t *testing.T) {
 		{codec.Text, bytes.Repeat([]byte("κόσμε"), 3000)},
 		{codec.Binary, []byte{255, 0, 254}},
 	}
-	for _, role := range []proto.Role{proto.Server, proto.Client} {
+	for _, role := range []Role{Server, Client} {
 		for _, chunk := range []int{1, 7, 65536} {
 			t.Run(fmt.Sprintf("role=%d/chunk=%d", role, chunk), func(t *testing.T) {
-				var s proto.Sender
-				var r proto.Receiver
+				var s sender
+				var r receiver
 				s.Init(role)
 				r.Init(1-role, false)
 				var wire []byte
@@ -132,10 +131,10 @@ func TestRoundTrip(t *testing.T) {
 
 func BenchmarkRoundTrip(b *testing.B) {
 	for _, size := range []int{125, 4096} {
-		for _, role := range []proto.Role{proto.Server, proto.Client} {
+		for _, role := range []Role{Server, Client} {
 			b.Run(fmt.Sprintf("size=%d/role=%d", size, role), func(b *testing.B) {
-				var s proto.Sender
-				var r proto.Receiver
+				var s sender
+				var r receiver
 				s.Init(role)
 				r.Init(1-role, false)
 				payload := bytes.Repeat([]byte("x"), size)
@@ -149,7 +148,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 					}
 					wire = append(append(wire[:0], h...), body...)
 					r.Feed(wire)
-					if kind, err := r.Next(); kind != proto.DataFrame || err != nil {
+					if kind, err := r.Next(); kind != dataFrame || err != nil {
 						b.Fatalf("next: %v %v", kind, err)
 					}
 					if _, done, err := r.Payload(); !done || err != nil {

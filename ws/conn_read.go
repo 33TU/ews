@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/33TU/ews/codec"
-	"github.com/33TU/ews/internal/proto"
 	"github.com/33TU/ews/internal/utf8"
 )
 
@@ -249,7 +248,7 @@ func (c *Conn) assemble() ([]byte, error) {
 	msg := []byte(nil)
 	for {
 		if c.rx.Header().PayloadLen() > uint64(c.limit-len(msg)) {
-			return nil, c.fail(&proto.Error{Code: 1009, Err: ErrMessageTooLarge})
+			return nil, c.fail(&Error{Code: 1009, Err: ErrMessageTooLarge})
 		}
 		for {
 			chunk, done, err := c.rx.Payload()
@@ -298,7 +297,7 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 		}
 	}
 	if op == codec.Text && c.validateUTF8 && !utf8.Valid(payload) {
-		return 0, nil, c.fail(&proto.Error{Code: 1007, Err: ErrInvalidUTF8})
+		return 0, nil, c.fail(&Error{Code: 1007, Err: ErrInvalidUTF8})
 	}
 	return op, payload, nil
 }
@@ -348,9 +347,9 @@ func (c *Conn) nextFrame() error {
 			return c.fail(err)
 		}
 		switch kind {
-		case proto.DataFrame:
+		case dataFrame:
 			return nil
-		case proto.ControlFrame:
+		case controlFrame:
 			if err := c.handleControl(); err != nil {
 				return err
 			}
@@ -405,7 +404,7 @@ func (c *Conn) handleControl() error {
 	case codec.Pong:
 		err = h.OnPong(c, payload)
 	case codec.Close:
-		code, reason := proto.ParseClose(payload)
+		code, reason := parseClose(payload)
 		if err = h.OnClose(c, code, reason); err == nil {
 			err = &CloseError{Code: code, Reason: string(reason)}
 		}
@@ -418,9 +417,8 @@ func (c *Conn) handleControl() error {
 
 // fail records a terminal failure. Protocol failures send their close code.
 func (c *Conn) fail(err error) error {
-	if pe, ok := err.(*proto.Error); ok {
+	if pe, ok := err.(*Error); ok {
 		c.sendClose(pe.Code)
-		err = &Error{Code: pe.Code, Err: pe.Err}
 	}
 	c.readErr, c.inMessage = err, false
 	return err

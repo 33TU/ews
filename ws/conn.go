@@ -8,7 +8,6 @@ import (
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
-	"github.com/33TU/ews/internal/proto"
 )
 
 // Role identifies the local endpoint.
@@ -27,8 +26,6 @@ const (
 	// when Compression.MinSize is zero: flate encoders emit literals only for
 	// smaller flushed blocks, so compressing them costs CPU and adds bytes.
 	DefaultMinSize = 128
-	// NoStatus is the close code reported when the peer sent none.
-	NoStatus = proto.NoStatus
 )
 
 // Config describes the local endpoint and negotiated parameters.
@@ -83,7 +80,7 @@ type Conn struct {
 	validateUTF8 bool // Check text messages in ReadMessage.
 
 	// Read side, used by the one goroutine reading at a time.
-	rx        proto.Receiver
+	rx        receiver
 	buf       []byte  // Transport read buffer.
 	msg       *msgBuf // ReadMessage assembly, pooled; held until the next read.
 	inMessage bool    // NextMessage returned and Read has not reached io.EOF.
@@ -95,7 +92,7 @@ type Conn struct {
 	// writers and alone by a Queue's writer.
 	wmu   sync.Mutex
 	iomu  sync.Mutex
-	tx    proto.Sender
+	tx    sender
 	queue *Queue // Set by NewQueue; synchronous sends then join it.
 	comp  compressorContext
 	frag  fragmentState
@@ -123,8 +120,8 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 	_, c.vectored = rw.(interface {
 		SyscallConn() (syscall.RawConn, error)
 	})
-	c.rx.Init(proto.Role(cfg.Role), comp != nil)
-	c.tx.Init(proto.Role(cfg.Role))
+	c.rx.Init(cfg.Role, comp != nil)
+	c.tx.Init(cfg.Role)
 	if comp != nil {
 		c.comp.config = comp
 		c.comp.minSize = cmp.Or(comp.MinSize, DefaultMinSize)
