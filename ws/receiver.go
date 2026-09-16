@@ -59,9 +59,6 @@ func (r *receiver) Feed(b []byte) {
 // Preserve copies pending input so the feed buffer can be reused.
 func (r *receiver) Preserve() { r.dec.Preserve() }
 
-// Buffered returns fed bytes not yet consumed.
-func (r *receiver) Buffered() int { return r.dec.Buffered() }
-
 // Idle reports whether no frame, message, or partial input is in progress.
 func (r *receiver) Idle() bool {
 	return r.remaining == 0 && !r.controlOpen && r.messageOpcode == 0 && r.dec.Buffered() == 0
@@ -75,9 +72,6 @@ func (r *receiver) Remaining() uint64 { return r.remaining }
 
 // MessageOpen reports whether a data message has started but not finished.
 func (r *receiver) MessageOpen() bool { return r.messageOpcode != 0 }
-
-// MessageOpcode returns the open message's opcode, or zero.
-func (r *receiver) MessageOpcode() codec.Opcode { return r.messageOpcode }
 
 // MessageCompressed reports whether the most recent message started with RSV1.
 func (r *receiver) MessageCompressed() bool { return r.compressed }

@@ -26,3 +26,25 @@ func TestStatusCode(t *testing.T) {
 		t.Fatal("status mapping")
 	}
 }
+
+func TestExtensionParseErrors(t *testing.T) {
+	req := request()
+	for _, ext := range []string{"; permessage-deflate", "permessage-deflate; =3", "permessage-deflate; client_no_context_takeover=1"} {
+		req.Extensions = ext
+		resp, res, err := handshake.Negotiate(req, handshake.Options{Compression: &handshake.Compress{Level: 1}})
+		if err != nil && ext != "; permessage-deflate" && ext != "permessage-deflate; =3" {
+			t.Fatalf("%q: %v", ext, err)
+		}
+		if err == nil && res.Compression != nil {
+			t.Fatalf("%q: bad offer negotiated: %+v", ext, resp)
+		}
+	}
+	// The client side rejects a malformed extensions header outright.
+	creq, err := handshake.NewRequest(handshake.Options{Compression: &handshake.Compress{Level: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handshake.Confirm(creq, handshake.Response{Status: 101, Upgrade: "websocket", Connection: "Upgrade", Accept: handshake.Accept(creq.Key), Extensions: "; bogus"}, handshake.Options{Compression: &handshake.Compress{Level: 1}}); err == nil {
+		t.Fatal("malformed extensions accepted by Confirm")
+	}
+}
