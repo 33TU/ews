@@ -37,6 +37,7 @@ type Decompressor struct {
 	output    []byte  // Decompress result; also the reset dictionary in slice mode.
 	window    *Window // The current message's direction history, or nil.
 	scratch   Window  // Within-message history for streaming without a window.
+	kept      int     // Output already added to the window in slice mode.
 	streaming bool
 	active    bool
 	done      bool // Last byte delivered; the next Read returns io.EOF.
@@ -96,10 +97,13 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 	}
 	for {
 		n, err := d.reader.Read(p)
-		if n != 0 {
+		// Streamed output leaves with the caller, so its history is kept as
+		// it is produced. In slice mode the whole output is at hand and the
+		// window is updated once, when the message ends or a reset needs it.
+		if n != 0 && d.streaming {
 			if d.window != nil {
 				d.window.remember(p[:n])
-			} else if d.streaming {
+			} else {
 				d.scratch.remember(p[:n])
 			}
 		}
@@ -146,6 +150,7 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 	d.scratch.Reset()
 	d.input = messageReader{src: src, payload: payload, tail: inflateTail[:], eof: src == nil}
 	d.streaming = src != nil
+	d.kept = 0
 	d.active, d.done = true, false
 	if d.reader == nil {
 		d.reader = flate.NewReaderDict(&d.input, w.dict()).(resetReader)
@@ -158,18 +163,23 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 }
 
 // dict is the dictionary for a mid-message reset: the direction's window when
-// there is one, the within-message history when streaming, otherwise the tail
-// of the output so far. In slice mode Read is only called by Decompress with
-// the spare capacity of d.output, so the n bytes just produced sit directly
-// after it.
+// there is one, brought up to date with the output so far in slice mode; the
+// within-message history when streaming; otherwise the tail of the output so
+// far. In slice mode Read is only called by Decompress with the spare
+// capacity of d.output, so the n bytes just produced sit directly after it.
 func (d *Decompressor) dict(n int) []byte {
-	if d.window != nil {
-		return d.window.dict()
-	}
 	if d.streaming {
+		if d.window != nil {
+			return d.window.dict()
+		}
 		return d.scratch.dict()
 	}
 	out := d.output[:len(d.output)+n]
+	if d.window != nil {
+		d.window.remember(out[d.kept:])
+		d.kept = len(out)
+		return d.window.dict()
+	}
 	return out[max(0, len(out)-windowSize):]
 }
 
@@ -178,11 +188,17 @@ func (d *Decompressor) fail(err error) error {
 	return err
 }
 
-// finish ends the current message. Failure clears the window, since the
-// takeover stream cannot continue past a corrupt message.
+// finish ends the current message. Success in slice mode adds the output to
+// the window, all at once; failure clears the window, since the takeover
+// stream cannot continue past a corrupt message.
 func (d *Decompressor) finish(ok bool) {
-	if !ok && d.window != nil {
-		d.window.Reset()
+	if d.window != nil {
+		switch {
+		case !ok:
+			d.window.Reset()
+		case !d.streaming:
+			d.window.remember(d.output[d.kept:])
+		}
 	}
 	d.window = nil
 	d.input = messageReader{}
