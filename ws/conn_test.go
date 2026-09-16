@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"testing"
 	"testing/iotest"
@@ -1405,8 +1406,27 @@ func TestDiscardKeepsReceiveHistory(t *testing.T) {
 }
 
 func BenchmarkCompressed(b *testing.B) {
+	for _, size := range []int{4 << 10, 256 << 10} {
+		b.Run(fmt.Sprintf("size=%d", size), func(b *testing.B) {
+			benchmarkCompressed(b, size)
+		})
+	}
+}
+
+// compressiblePayload is size bytes of records with random numbers, which
+// deflate at level 1 to about half their size rather than to nothing.
+func compressiblePayload(size int) []byte {
+	r := rand.New(rand.NewPCG(1, 2))
+	p := make([]byte, 0, size+64)
+	for len(p) < size {
+		p = fmt.Appendf(p, `{"id":%d,"value":%d,"text":"hello world"}`, r.Uint32(), r.Uint32())
+	}
+	return p[:size]
+}
+
+func benchmarkCompressed(b *testing.B, size int) {
 	comp := &handshake.Compression{Level: flate.BestSpeed}
-	payload := bytes.Repeat([]byte("compressible payload "), 4096/21)
+	payload := compressiblePayload(size)
 	wire := func(role ws.Role) []byte {
 		var buf bytes.Buffer
 		c, err := ws.NewConn(struct {
@@ -1457,6 +1477,21 @@ func BenchmarkCompressed(b *testing.B) {
 			if err := c.Write(codec.Binary, payload); err != nil {
 				b.Fatal(err)
 			}
+		}
+	})
+	// A pooled compressor per message, its output copied into the queue arena.
+	b.Run("Send", func(b *testing.B) {
+		c, _ := ws.NewConn(discard{}, ws.Config{Role: ws.Server, Compression: comp, CompressionShared: true})
+		q := c.NewQueue(0)
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			if err := q.Send(codec.Binary, payload); err != nil {
+				b.Fatal(err)
+			}
+		}
+		if err := q.Wait(); err != nil {
+			b.Fatal(err)
 		}
 	})
 }
