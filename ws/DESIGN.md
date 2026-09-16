@@ -1,10 +1,12 @@
 # ws design
 
 Message I/O over an already-upgraded WebSocket transport, built on `codec`. The
-handshake and extension negotiation live elsewhere; `ws` receives the
-negotiated result through `Config`.
-
-Status: steps 1 to 3 implemented, with `handshake` and `transport`, which holds `Upgrade`, `Dial` and `Server`. The reactor is not planned; see Layering and Later.
+handshake and extension negotiation live in `handshake`, the connection comes
+from `transport`, and `ws` receives the negotiated result through `Config`.
+This document states how the library is built and, where a choice was
+measured, what the measurement said. Numbers are from the author's machines
+and dated in the benchmark results files; the ones here are kept for the
+reasoning, not as a scoreboard.
 
 ## Principles
 
@@ -37,7 +39,7 @@ fragmentation state, control-frame limits, close-code validation, and the
 close state machine. Text UTF-8 validation is not a frame rule: a chunk is not
 a string, so whoever assembles a message validates it once, in one pass. It emits frame-level
 events: a validated header, then unmasked payload chunks borrowed until the
-next call. This is the role the removed `protocol` receiver played; it returns
+next call. It returns
 as an internal package with frame-level output rather than a public API.
 
 `ws.Conn` is thin: each read method is a loop of "ask the core for the next
@@ -50,11 +52,14 @@ split: the core validates and encodes, the transport wrapper writes.
 type Role uint8 // Server, Client
 
 type Config struct {
-	Role           Role
-	ReadBufferSize int            // bytes per transport read; 0 = 4 KiB
-	MaxMessageSize int            // bound for ReadMessage; 0 = 8 MiB
-	Compression    *handshake.Compression // negotiated parameters, or nil
-	ControlHandler ControlHandler // nil: default ping, pong, and close behavior
+	Role              Role
+	ReadBufferSize    int  // bytes per transport read; 0 = 4 KiB
+	MaxMessageSize    int  // bound for ReadMessage and inflated chunked reads; 0 = 8 MiB
+	FragmentSize      int  // WriteFrom chunk and largest single frame it sends; 0 = 64 KiB
+	ValidateUTF8      bool // ReadMessage rejects invalid text with 1007; off by default
+	Compression       *handshake.Compression // negotiated parameters, or nil
+	CompressionShared bool // borrow a pooled compressor per message instead of attaching one
+	ControlHandler    ControlHandler // nil: default ping, pong, and close behavior
 }
 
 type Conn struct {
@@ -64,30 +69,34 @@ type Conn struct {
 
 func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error)
 
-// NextMessage returns the opcode of the next text or binary message.
-// Control frames are dispatched on the way. Any undrained payload of the
-// previous message is discarded first.
-func (c *Conn) NextMessage() (codec.Opcode, error)
+// Reading: one goroutine at a time. Three shapes over one core.
+func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) // whole message, borrowed until the next read
+func (c *Conn) NextMessage() (codec.Opcode, error)         // then Read until io.EOF
+func (c *Conn) Read(b []byte) (int, error)                 // chunks as frames arrive; compressed messages inflate as they stream
+func (c *Conn) WriteTo(w io.Writer) (int64, error)         // the rest of the message to w, frame by frame
 
-// Read copies payload bytes of the current message into b, spanning
-// continuation frames and dispatching interleaved control frames. It returns
-// 0, io.EOF at the end of the message and before NextMessage has been called.
-// Transport EOF mid-message is io.ErrUnexpectedEOF.
-func (c *Conn) Read(b []byte) (int, error)
-
-// ReadMessage returns the next complete message. The payload is borrowed until
-// the next read call. Messages over MaxMessageSize fail with 1009;
-// with ValidateUTF8, text that is not valid UTF-8 fails with 1007. Read
-// delivers text unvalidated.
-func (c *Conn) ReadMessage() (codec.Opcode, []byte, error)
-
-// Write sends one message as a single frame. payload is not retained after return.
+// Writing: any goroutine.
 func (c *Conn) Write(op codec.Opcode, payload []byte) error
+func (c *Conn) BeginMessage(op codec.Opcode) error // then WriteChunk per frame and EndMessage for FIN
+func (c *Conn) WriteChunk(payload []byte) error
+func (c *Conn) EndMessage() error
+func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) // fragments of FragmentSize as it reads
 func (c *Conn) Ping(payload []byte) error
 func (c *Conn) Pong(payload []byte) error
-// Close sends a close frame once. The transport stays open; reads deliver the peer's reply.
-func (c *Conn) Close(code uint16, reason string) error
+func (c *Conn) Close(code uint16, reason string) error // sends the frame once; the transport stays open
 func (c *Conn) CloseSent() bool
+
+// Fan-out and asynchronous sends.
+func Prepare(op codec.Opcode, payload []byte) (*Prepared, error) // encoded once, immutable, shared by reference
+func (c *Conn) WritePrepared(p *Prepared) error
+func (c *Conn) NewQueue(limit int) *Queue // one per connection; returns the existing one
+func (q *Queue) Send(op codec.Opcode, payload []byte) error // copies, returns before the write; ErrQueueFull past limit
+func (q *Queue) SendPrepared(p *Prepared) error
+func (q *Queue) Wait() error // until everything queued so far is written
+func (q *Queue) Err() error
+func (q *Queue) Pending() int
+
+func NetConn(c *Conn, op codec.Opcode) net.Conn // one message per Write, reads across messages
 
 // ControlHandler is called on the reading goroutine. Handlers may write but must
 // not read from c. An error terminates the connection.
@@ -99,25 +108,22 @@ type ControlHandler interface {
 
 type DefaultControlHandler struct{} // embed to override a single method
 
-type Error struct{ Code uint16; Err error }          // terminal protocol failure
+type Error struct{ Code uint16; Err error }          // terminal protocol failure; the close code was sent
 type CloseError struct{ Code uint16; Reason string } // peer's close, returned by reads
 
 var (
-	ErrClosing         // write after Close
-	ErrProtocol
-	ErrInvalidUTF8
-	ErrMessageTooLarge
-	ErrInvalidConfig
+	ErrClosing, ErrProtocol, ErrInvalidUTF8, ErrMessageTooLarge, ErrInvalidData,
+	ErrInvalidConfig, ErrMessageOpen, ErrNoMessage, ErrQueueFull, ErrUnexpectedType error
 )
 ```
 
 ## Transport
 
 `io.ReadWriter`, not `net.Conn`. Nothing inside needs deadlines or `Close`; the
-caller keeps the `net.Conn` for those. Writes go through
-`net.Buffers{header, payload}.WriteTo(rw)`, which is one writev on a `net.Conn`
-and a plain loop otherwise. This is why the encoder exposes header and payload
-separately: server data frames leave with zero copies.
+caller keeps the `net.Conn` for those, and `NetConn` hands them back when a
+`net.Conn` view is wanted. The encoder exposes header and payload separately
+so a server data frame can leave as one writev with no copy; the Write path
+below says what happens on transports without writev.
 
 ## Read path
 
@@ -129,9 +135,9 @@ gap at 16 KiB with 512 or more connections before pooling.
 
 ```go
 func (c *Conn) fill() error {
-	c.dec.Preserve() // at most a partial header is pending here
+	c.rx.Preserve() // at most a partial header is pending here
 	n, err := c.rw.Read(c.buf)
-	c.dec.Feed(c.buf[:n])
+	c.rx.Feed(c.buf[:n])
 	// n == 0 && err == nil: io.ErrNoProgress. EOF mid-frame: io.ErrUnexpectedEOF.
 }
 ```
@@ -162,6 +168,8 @@ frames as they come.
   continue.
 - Frame drained and final: return `0, io.EOF`. Data and EOF are never
   returned together, so a caller loop needs no special case.
+- Compressed message: the same loop feeds the inflater instead, one borrowed
+  frame chunk at a time, and `b` receives inflated bytes; see Compression.
 
 `ReadMessage` is `NextMessage` plus assembly with the size budget. When the
 first frame is final and its payload completes in a single core chunk, the
@@ -300,62 +308,62 @@ nc.Close()
 - `ReadMessage` payloads are borrowed until the next read; copy
   before handing them to another goroutine.
 
-## Roadmap
+## Compression
 
-1. This document: push core, `NextMessage`, `Read`, `ReadMessage`, `Write`,
-   `Ping`, `Pong`, `Close`, control handler, close state machine. No deflate.
-2. Compression on the blocking API, done. `Config.Compression` takes the
-   negotiated `handshake.Compression`. The core accepts RSV1 on a first data
-   frame when negotiated. `ReadMessage` assembles the compressed bytes through
-   FIN and calls `deflate.Decompress`, bounded by `MaxMessageSize`, so the
-   limit covers both wire and inflated size. `Read` and `WriteTo` stream:
-   `deflate` offers `Begin` and `Read` over a `ChunkSource`, and `ws`
-   supplies borrowed frame chunks straight from the core, filling from the
-   transport and dispatching control frames as it goes, while the inflater
-   writes into the caller's buffer. A chunked read of a compressed message
-   therefore holds one frame and the inflater's window, and its first bytes
-   come out when the first frame lands, as with gorilla and coder; gws
-   inflates whole. A transport error during a compressed message ends the
-   connection because the inflater cannot resume. This mode was removed
-   once as the most intricate code in the library and brought back two
-   days later, because the alternative held wire plus inflated size per
-   connection and waited for the last frame before the first byte; it costs
-   the whole-message paths nothing and the chunked path about 3 percent on
-   small messages, and the intricacy is now the price of the feature.
-   `Write` compresses when `len(payload) >=
-   MinSize`. Takeover state is a 32 KB `deflate.Window` per direction on the
-   connection; compressors and decompressors are pooled, one compressor pool
-   per flate level. Priming an encoder from a window costs about as much as
-   compressing 32 KB, so a connection with send takeover keeps a compressor
-   attached and continues its stream, about 800 KB. `CompressionShared`
-   never attaches: measured on a 20-thread machine with
-   a 24 MB cache, attached is 16 to 30 percent faster per message up to
-   about a thousand busy connections, and shared is 7 to 37 percent faster
-   at 2048, where cache misses on attached state outweigh the priming. No
-   automatic cap worked, since partial attachment gave no middle ground and
-   a cap needs a release path the API cannot guarantee, so the choice is
-   explicit. A
-   pooled decompressor stays attached until the next read so borrowed output
-   holds; its per-message dictionary copy is inherent to klauspost's reader.
-   Reduced windows are honored: a server accepts `server_max_window_bits`
-   and a client offers `client_max_window_bits`, and `handshake.Compression.
-   SendWindowBits` selects a pooled `deflate.NewCompressorWindow` encoder,
-   which fixes the level. Both windows are sized to the negotiated bits, the
-   receive side from the peer's declared window, so a 12-bit peer costs 4 KB
-   of history per direction and an eighth of the per-message dictionary
-   copy. Messages under `MinSize`, 128 bytes by default, go uncompressed:
-   flate encoders emit flushed blocks that small as literals, so compressing
-   them only adds bytes. This passes Autobahn 13.3.x and 13.5.x and
-   negotiates compression with a default gws server, whose windows are 12 bits.
-3. Fragmented send, done: `BeginMessage(op)`, `WriteChunk(b)` as non-final
-   frames, `EndMessage()` as the FIN frame, so the sender never needs to know
-   which chunk is last. Data writes from other callers get `ErrMessageOpen`
-   until the message ends; control frames interleave, as the protocol
-   allows. Compressed fragments continue one deflate stream through
-   `deflate.CompressChunk`: middle chunks keep their sync-flush tail, only
-   the last is trimmed, and the connection holds one compressor for the
-   message even in shared mode. The final compressed fragment carries the
-   one header byte of the trimmed block, which is inherent to the format.
+`Config.Compression` takes the negotiated `handshake.Compression`. The core
+accepts RSV1 on a first data frame when negotiated. `ReadMessage` assembles
+the compressed bytes through FIN and calls `deflate.Decompress`, bounded by
+`MaxMessageSize`, so the limit covers both wire and inflated size. `Read` and
+`WriteTo` stream: `deflate` offers `Begin` and `Read` over a `ChunkSource`,
+and `ws` supplies borrowed frame chunks straight from the core, filling from
+the transport and dispatching control frames as it goes, while the inflater
+writes into the caller's buffer. A chunked read of a compressed message
+therefore holds one frame and the inflater's window, and its first bytes come
+out when the first frame lands, as with gorilla and coder; gws inflates whole.
+A transport error during a compressed message ends the connection because the
+inflater cannot resume. This mode was removed once as the most intricate code
+in the library and brought back, because the alternative held wire plus
+inflated size per connection and waited for the last frame before the first
+byte; it costs the whole-message paths nothing and the chunked path about 3
+percent on small messages, and the intricacy is now the price of the feature.
+`Write` compresses when `len(payload) >= MinSize`. Takeover state is a 32 KB
+`deflate.Window` per direction on the connection; compressors and
+decompressors are pooled, one compressor pool per flate level. Priming an
+encoder from a window costs about as much as compressing 32 KB, so a
+connection with send takeover keeps a compressor attached and continues its
+stream, about 800 KB. `CompressionShared` never attaches. The crossover
+depends on message size as much as on connection count: attached is 15 to 30
+percent faster on messages of a few KB at every connection count measured, and
+shared is 20 to 60 percent faster on messages of 16 KiB and up once about a
+hundred connections compete for cache, where misses on attached state outweigh
+the priming. No automatic switch worked, since partial attachment gave no
+middle ground and a cap needs a release path the API cannot guarantee, so the
+choice is explicit. A pooled decompressor stays attached until the next read
+so borrowed output holds; its per-message dictionary copy is inherent to
+klauspost's reader. Reduced windows are honored: a server accepts
+`server_max_window_bits` and a client offers `client_max_window_bits`, and
+`handshake.Compression. SendWindowBits` selects a pooled
+`deflate.NewCompressorWindow` encoder, which fixes the level. Both windows are
+sized to the negotiated bits, the receive side from the peer's declared
+window, so a 12-bit peer costs 4 KB of history per direction and an eighth of
+the per-message dictionary copy. Messages under `MinSize`, 128 bytes by
+default, go uncompressed: flate encoders emit flushed blocks that small as
+literals, so compressing them only adds bytes. This passes Autobahn 13.3.x and
+13.5.x and negotiates compression with a default gws server, whose windows are
+12 bits.
+
+## Fragmented send
+
+Fragmented send is `BeginMessage(op)`, `WriteChunk(b)` as non-final
+frames, `EndMessage()` as the FIN frame, so the sender never needs to know
+which chunk is last. Data writes from other callers get `ErrMessageOpen`
+until the message ends; control frames interleave, as the protocol
+allows. Compressed fragments continue one deflate stream through
+`deflate.CompressChunk`: middle chunks keep their sync-flush tail, only
+the last is trimmed, and the connection holds one compressor for the
+message even in shared mode. The final compressed fragment carries the
+one header byte of the trimmed block, which is inherent to the format.
+
 ## Later
 
 - A cheaper per-connection mask key source than `crypto/rand` if profiling
@@ -388,19 +396,21 @@ state; `Server` keeps none of it, putting ews below gws on memory there
 and 13 percent ahead on accepts per second. `examples/echo` is the Autobahn
 target; the suite passes with 6.4.x non-strict by design.
 
-## Tests to port and add
+## Testing
 
-- Message round trips from the removed `protocol` package: roles, chunk sizes
-  1, 7, and 65536, through both `Read` and `ReadMessage`.
-- Fragmentation with interleaved control frames, read in caller buffers of
-  varying sizes, including the direct-to-buffer path for large frames.
-- Text validation through `ReadMessage`, including a rune broken across
-  frames, and unvalidated delivery through `Read`.
-- The invalid-frame table with expected close codes, including RSV1 while
-  compression is nil.
-- `NextMessage` discarding an undrained message.
-- Transport cases over `net.Pipe`: split reads, EOF mid-frame, close handshake
-  in both directions, concurrent writer during a read.
+Each package has external tests by default and internal ones only where a test
+needs unexported state, in their own `*_internal_test.go`. The protocol core
+is driven with hand-built frames: round trips across roles and chunk sizes,
+fragmentation with interleaved control frames, the invalid-frame table with
+its close codes, discard of undrained messages, and transport cases over
+`net.Pipe` for split reads, EOF mid-frame, and the close handshake in both
+directions. Fault-injecting transports cover the write, queue, fragment and
+read failure paths, including a transport dying inside an inflate. Fuzz
+targets run against the frame decoder, the encoder round trip, the receiver
+and the inflater. `examples/echo` is the Autobahn target and passes all 517
+cases, 6.4.x non-strict by design. `just check` runs vet and the race suite
+over both modules; statement coverage is about 94 percent, the remainder
+being error returns from flate operations that cannot fail on valid input.
 
 `net.Pipe` completes a write only when the peer reads it, so tests must keep a
 reader on the other end of every write, including close echoes and the

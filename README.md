@@ -141,7 +141,7 @@ server := &transport.Server{
 		c, err := ws.NewConn(conn, ws.Config{
 			Role:              ws.Server,
 			Compression:       res.Compression, // What was negotiated, or nil.
-			CompressionShared: true,            // Pool compressors: right from about a thousand connections.
+			CompressionShared: true,            // Pool compressors: for large messages at scale; see below.
 		})
 		// ...
 	},
@@ -235,6 +235,8 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 ```
 
+Headers set on the `ResponseWriter` before the call are sent with the 101 response, except those the upgrade owns. Origin checks belong to the caller, before `Upgrade` or in `Server.Accept`.
+
 The client side is `Dial`, which takes a ws or wss URL and returns the same pair:
 
 ```go
@@ -267,7 +269,7 @@ server := &transport.Server{
     },
 }
 log.Fatal(server.Serve(ln))
-``` Headers set on the `ResponseWriter` before the call are sent with the 101 response. Origin checks belong to the caller.
+```
 
 ## Development
 
