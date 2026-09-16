@@ -45,7 +45,13 @@ log.Fatal(server.Serve(ln))
 ```
 
 Inside an existing `net/http` handler, `transport.Upgrade(w, r, opts)` returns the
-same `conn, res` pair.
+same `conn, res` pair. The read loop above is what `ws.Serve` does:
+
+```go
+err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []byte) error {
+	return c.Write(op, payload) // Returns a *ws.CloseError when the peer closes.
+}))
+```
 
 ## Client
 

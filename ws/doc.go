@@ -6,7 +6,8 @@
 //
 // # Reading
 //
-// One goroutine reads at a time. ReadMessage returns whole messages, borrowed
+// One goroutine reads at a time. Serve runs the usual loop, handing each
+// message to a MessageHandler. ReadMessage returns whole messages, borrowed
 // until the next read call; NextMessage then Read delivers a message in chunks
 // as its frames arrive, with io.EOF at the end; WriteTo relays the rest of a
 // message to an io.Writer frame by frame. Compressed messages inflate as they
