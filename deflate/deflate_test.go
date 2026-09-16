@@ -247,52 +247,58 @@ func TestCompressedFragments(t *testing.T) {
 }
 
 func BenchmarkCompression(b *testing.B) {
-	for _, takeover := range []bool{false, true} {
-		b.Run(fmt.Sprintf("takeover=%t", takeover), func(b *testing.B) {
-			payload := bytes.Repeat([]byte(`{"type":"update","value":12345}`), 128)
-			c, err := deflate.NewCompressor(flate.BestSpeed)
-			if err != nil {
-				b.Fatal(err)
-			}
-			var cw, dw *deflate.Window
-			if takeover {
-				cw, dw = new(deflate.Window), new(deflate.Window)
-			}
-			var d deflate.Decompressor
-			// Prime both histories with one message, then measure a second.
-			compressed, err := c.Compress(payload, cw)
-			if err != nil {
-				b.Fatal(err)
-			}
-			if _, err := d.Decompress(bytes.Clone(compressed), len(payload), dw); err != nil {
-				b.Fatal(err)
-			}
-			compressed, err = c.Compress(payload, cw)
-			if err != nil {
-				b.Fatal(err)
-			}
-			compressed = bytes.Clone(compressed)
-			b.Run("compress", func(b *testing.B) {
-				b.ReportAllocs()
-				b.SetBytes(int64(len(payload)))
-				for b.Loop() {
-					if _, err := c.Compress(payload, cw); err != nil {
-						b.Fatal(err)
-					}
-				}
+	for _, size := range []int{4 << 10, 256 << 10} {
+		for _, takeover := range []bool{false, true} {
+			b.Run(fmt.Sprintf("size=%d/takeover=%t", size, takeover), func(b *testing.B) {
+				benchmarkCompression(b, size, takeover)
 			})
-			b.Run("decompress", func(b *testing.B) {
-				b.ReportAllocs()
-				b.SetBytes(int64(len(payload)))
-				for b.Loop() {
-					// The window keeps the same content as the payload repeats.
-					if _, err := d.Decompress(compressed, len(payload), dw); err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-		})
+		}
 	}
+}
+
+func benchmarkCompression(b *testing.B, size int, takeover bool) {
+	payload := bytes.Repeat([]byte(`{"type":"update","value":12345}`), size/32)
+	c, err := deflate.NewCompressor(flate.BestSpeed)
+	if err != nil {
+		b.Fatal(err)
+	}
+	var cw, dw *deflate.Window
+	if takeover {
+		cw, dw = new(deflate.Window), new(deflate.Window)
+	}
+	var d deflate.Decompressor
+	// Prime both histories with one message, then measure a second.
+	compressed, err := c.Compress(payload, cw)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if _, err := d.Decompress(bytes.Clone(compressed), len(payload), dw); err != nil {
+		b.Fatal(err)
+	}
+	compressed, err = c.Compress(payload, cw)
+	if err != nil {
+		b.Fatal(err)
+	}
+	compressed = bytes.Clone(compressed)
+	b.Run("compress", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			if _, err := c.Compress(payload, cw); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("decompress", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(payload)))
+		for b.Loop() {
+			// The window keeps the same content as the payload repeats.
+			if _, err := d.Decompress(compressed, len(payload), dw); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func TestContextTakeover(t *testing.T) {
