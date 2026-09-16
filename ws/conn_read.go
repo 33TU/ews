@@ -303,8 +303,17 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 	return op, payload, nil
 }
 
-// discard drains the rest of the current message.
+// discard drains the rest of the current message. A compressed message on a
+// connection with receive context takeover is inflated rather than skipped,
+// since the peer's next message may reference its content through the
+// shared history; without takeover, or once Read has inflated it, the wire
+// bytes are simply consumed.
 func (c *Conn) discard() error {
+	if c.inMessage && c.rx.MessageCompressed() && !c.decomp.inflated && c.decomp.window != nil {
+		if err := c.inflateWhole(); err != nil {
+			return err
+		}
+	}
 	c.decomp.rest, c.decomp.inflated = nil, false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()

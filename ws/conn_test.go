@@ -1411,6 +1411,40 @@ func TestNextMessageDiscardsCompressed(t *testing.T) {
 	wait()
 }
 
+// TestDiscardKeepsReceiveHistory skips a compressed message without reading a
+// byte of it. With receive context takeover the next message references the
+// skipped one's content, so discard must inflate rather than skip.
+func TestDiscardKeepsReceiveHistory(t *testing.T) {
+	server, client := compressionPair(t, true, true, 1)
+	client.ControlHandler = silentClose{}
+	first := bytes.Repeat([]byte("history-bearing text that the second message repeats "), 200)
+	second := first // Identical, so it compresses to back-references into the first.
+	wait := run(t, func() error {
+		if err := client.Write(codec.Text, first); err != nil {
+			return err
+		}
+		if err := client.Write(codec.Text, second); err != nil {
+			return err
+		}
+		_, p, err := client.ReadMessage() // Also lets a failing server deliver its close frame.
+		if err != nil || string(p) != "done" {
+			return fmt.Errorf("final message: %q %v", p, err)
+		}
+		return nil
+	})
+	if _, err := server.NextMessage(); err != nil { // Open the first, read nothing.
+		t.Fatal(err)
+	}
+	op, p, err := server.ReadMessage() // Discards the first, reads the second.
+	if err != nil || op != codec.Text || !bytes.Equal(p, second) {
+		t.Fatalf("second message after discarding the first: %v (%d bytes)", err, len(p))
+	}
+	if err := server.Write(codec.Text, []byte("done")); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+}
+
 func BenchmarkCompressed(b *testing.B) {
 	comp := &handshake.Compression{Level: flate.BestSpeed}
 	payload := bytes.Repeat([]byte("compressible payload "), 4096/21)
