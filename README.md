@@ -227,4 +227,5 @@ just bench-echo      # also bench-broadcast, bench-utf8, and -simd variants
 
 The benchmark recipes run at `GOMAXPROCS=8` so results from different
 machines measure the same shape; each results file records the thread count
-and library versions.
+and library versions. The committed tables were run pinned to the eight cores
+of one die (`taskset -c 0-7`), so the threads share one L3.

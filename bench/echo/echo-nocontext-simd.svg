@@ -19,237 +19,237 @@
     <text class="group" x="45" y="27">64 B messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
-    <rect x="207" y="68" width="81.2" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="296.2" y="81">12 MB/s · 0 allocs</text>
+    <rect x="207" y="68" width="80.7" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="295.7" y="81">11 MB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-stream</text>
-    <rect x="207" y="93" width="80.1" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="295.1" y="106">11 MB/s · 0 allocs</text>
+    <rect x="207" y="93" width="79.7" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="294.7" y="106">11 MB/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
     <rect x="207" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
     <text class="value" x="315.0" y="131">14 MB/s · 1 alloc</text>
     <text class="series" x="195" y="156" text-anchor="end">gws-stream</text>
-    <rect x="207" y="143" width="78.7" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="293.7" y="156">11 MB/s · 6 allocs</text>
+    <rect x="207" y="143" width="78.6" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="293.6" y="156">11 MB/s · 6 allocs</text>
     <text class="series" x="195" y="181" text-anchor="end">coder</text>
-    <rect x="207" y="168" width="64.1" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="279.1" y="181">9 MB/s · 13 allocs</text>
+    <rect x="207" y="168" width="63.6" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="278.6" y="181">9 MB/s · 13 allocs</text>
     <text class="series" x="195" y="206" text-anchor="end">coder-stream</text>
-    <rect x="207" y="193" width="52.9" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="267.9" y="206">8 MB/s · 32 allocs</text>
+    <rect x="207" y="193" width="53.1" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="268.1" y="206">7 MB/s · 32 allocs</text>
     <text class="series" x="195" y="231" text-anchor="end">gorilla</text>
-    <rect x="207" y="218" width="74.7" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="289.7" y="231">11 MB/s · 9 allocs</text>
+    <rect x="207" y="218" width="75.0" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="290.0" y="231">10 MB/s · 9 allocs</text>
     <text class="series" x="195" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="207" y="243" width="76.2" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="291.2" y="256">11 MB/s · 8 allocs</text>
+    <rect x="207" y="243" width="77.1" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="292.1" y="256">11 MB/s · 8 allocs</text>
     <text class="contract" x="515" y="53">128 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
-    <rect x="677" y="68" width="82.3" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="767.3" y="81">80 MB/s · 0 allocs</text>
+    <rect x="677" y="68" width="80.7" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="765.7" y="81">76 MB/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-stream</text>
-    <rect x="677" y="93" width="81.7" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="766.7" y="106">79 MB/s · 0 allocs</text>
+    <rect x="677" y="93" width="80.1" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="765.1" y="106">75 MB/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
     <rect x="677" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="785.0" y="131">97 MB/s · 1 alloc</text>
+    <text class="value" x="785.0" y="131">94 MB/s · 1 alloc</text>
     <text class="series" x="665" y="156" text-anchor="end">gws-stream</text>
-    <rect x="677" y="143" width="77.8" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="762.8" y="156">75 MB/s · 6 allocs</text>
+    <rect x="677" y="143" width="78.9" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="763.9" y="156">74 MB/s · 6 allocs</text>
     <text class="series" x="665" y="181" text-anchor="end">coder</text>
     <rect x="677" y="168" width="64.9" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="749.9" y="181">63 MB/s · 13 allocs</text>
+    <text class="value" x="749.9" y="181">61 MB/s · 13 allocs</text>
     <text class="series" x="665" y="206" text-anchor="end">coder-stream</text>
-    <rect x="677" y="193" width="54.4" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="739.4" y="206">53 MB/s · 32 allocs</text>
+    <rect x="677" y="193" width="54.8" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="739.8" y="206">52 MB/s · 32 allocs</text>
     <text class="series" x="665" y="231" text-anchor="end">gorilla</text>
     <rect x="677" y="218" width="75.5" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="760.5" y="231">73 MB/s · 9 allocs</text>
+    <text class="value" x="760.5" y="231">71 MB/s · 9 allocs</text>
     <text class="series" x="665" y="256" text-anchor="end">gorilla-stream</text>
     <rect x="677" y="243" width="77.6" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="762.6" y="256">75 MB/s · 8 allocs</text>
+    <text class="value" x="762.6" y="256">73 MB/s · 8 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
-    <rect x="1147" y="68" width="78.1" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1233.1" y="81">67 MB/s · 0 allocs</text>
+    <rect x="1147" y="68" width="82.7" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="1237.7" y="81">78 MB/s · 0 allocs</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-stream</text>
-    <rect x="1147" y="93" width="78.0" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="1233.0" y="106">67 MB/s · 0 allocs</text>
+    <rect x="1147" y="93" width="81.6" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="1236.6" y="106">76 MB/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
     <rect x="1147" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1255.0" y="131">86 MB/s · 1 alloc</text>
+    <text class="value" x="1255.0" y="131">94 MB/s · 1 alloc</text>
     <text class="series" x="1135" y="156" text-anchor="end">gws-stream</text>
-    <rect x="1147" y="143" width="76.7" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="1231.7" y="156">66 MB/s · 6 allocs</text>
+    <rect x="1147" y="143" width="80.4" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="1235.4" y="156">75 MB/s · 6 allocs</text>
     <text class="series" x="1135" y="181" text-anchor="end">coder</text>
-    <rect x="1147" y="168" width="52.4" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1207.4" y="181">45 MB/s · 13 allocs</text>
+    <rect x="1147" y="168" width="63.2" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="1218.2" y="181">59 MB/s · 13 allocs</text>
     <text class="series" x="1135" y="206" text-anchor="end">coder-stream</text>
-    <rect x="1147" y="193" width="47.1" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="1202.1" y="206">40 MB/s · 32 allocs</text>
+    <rect x="1147" y="193" width="54.4" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="1209.4" y="206">51 MB/s · 32 allocs</text>
     <text class="series" x="1135" y="231" text-anchor="end">gorilla</text>
-    <rect x="1147" y="218" width="66.7" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1221.7" y="231">57 MB/s · 9 allocs</text>
+    <rect x="1147" y="218" width="75.0" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1230.0" y="231">70 MB/s · 9 allocs</text>
     <text class="series" x="1135" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="1147" y="243" width="70.5" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="1225.5" y="256">61 MB/s · 8 allocs</text>
+    <rect x="1147" y="243" width="78.4" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="1233.4" y="256">73 MB/s · 8 allocs</text>
   </g>
   <g transform="translate(0,444)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">1 KiB messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
-    <rect x="207" y="68" width="99.1" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="314.1" y="81">133 MB/s · 0 allocs</text>
+    <rect x="207" y="68" width="97.7" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="312.7" y="81">126 MB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-stream</text>
-    <rect x="207" y="93" width="98.5" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="313.5" y="106">133 MB/s · 0 allocs</text>
+    <rect x="207" y="93" width="97.1" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="312.1" y="106">126 MB/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
     <rect x="207" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="315.0" y="131">135 MB/s · 1 alloc</text>
+    <text class="value" x="315.0" y="131">129 MB/s · 1 alloc</text>
     <text class="series" x="195" y="156" text-anchor="end">gws-stream</text>
-    <rect x="207" y="143" width="97.1" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="312.1" y="156">131 MB/s · 6 allocs</text>
+    <rect x="207" y="143" width="96.6" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="311.6" y="156">125 MB/s · 6 allocs</text>
     <text class="series" x="195" y="181" text-anchor="end">coder</text>
-    <rect x="207" y="168" width="75.4" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="290.4" y="181">101 MB/s · 16 allocs</text>
+    <rect x="207" y="168" width="76.7" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="291.7" y="181">99 MB/s · 16 allocs</text>
     <text class="series" x="195" y="206" text-anchor="end">coder-stream</text>
-    <rect x="207" y="193" width="76.7" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="291.7" y="206">103 MB/s · 20 allocs</text>
+    <rect x="207" y="193" width="76.9" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="291.9" y="206">99 MB/s · 20 allocs</text>
     <text class="series" x="195" y="231" text-anchor="end">gorilla</text>
-    <rect x="207" y="218" width="86.5" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="301.5" y="231">116 MB/s · 12 allocs</text>
+    <rect x="207" y="218" width="87.2" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="302.2" y="231">113 MB/s · 12 allocs</text>
     <text class="series" x="195" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="207" y="243" width="92.8" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="307.8" y="256">125 MB/s · 8 allocs</text>
+    <rect x="207" y="243" width="92.6" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="307.6" y="256">120 MB/s · 8 allocs</text>
     <text class="contract" x="515" y="53">128 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
-    <rect x="677" y="68" width="99.9" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="784.9" y="81">931 MB/s · 0 allocs</text>
+    <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="785.0" y="81">900 MB/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-stream</text>
-    <rect x="677" y="93" width="99.9" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="784.9" y="106">932 MB/s · 0 allocs</text>
+    <rect x="677" y="93" width="99.1" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="784.1" y="106">892 MB/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="785.0" y="131">933 MB/s · 1 alloc</text>
+    <rect x="677" y="118" width="99.8" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="784.8" y="131">898 MB/s · 1 alloc</text>
     <text class="series" x="665" y="156" text-anchor="end">gws-stream</text>
-    <rect x="677" y="143" width="98.7" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="783.7" y="156">921 MB/s · 6 allocs</text>
+    <rect x="677" y="143" width="98.4" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="783.4" y="156">886 MB/s · 6 allocs</text>
     <text class="series" x="665" y="181" text-anchor="end">coder</text>
-    <rect x="677" y="168" width="77.2" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="762.2" y="181">720 MB/s · 16 allocs</text>
+    <rect x="677" y="168" width="76.9" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="761.9" y="181">692 MB/s · 16 allocs</text>
     <text class="series" x="665" y="206" text-anchor="end">coder-stream</text>
-    <rect x="677" y="193" width="78.4" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="763.4" y="206">731 MB/s · 20 allocs</text>
+    <rect x="677" y="193" width="78.9" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="763.9" y="206">710 MB/s · 20 allocs</text>
     <text class="series" x="665" y="231" text-anchor="end">gorilla</text>
-    <rect x="677" y="218" width="86.2" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="771.2" y="231">804 MB/s · 12 allocs</text>
+    <rect x="677" y="218" width="88.1" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="773.1" y="231">793 MB/s · 12 allocs</text>
     <text class="series" x="665" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="677" y="243" width="94.5" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="779.5" y="256">881 MB/s · 8 allocs</text>
+    <rect x="677" y="243" width="95.2" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="780.2" y="256">856 MB/s · 8 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">842 MB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">908 MB/s · 0 allocs</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-stream</text>
-    <rect x="1147" y="93" width="98.9" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="1253.9" y="106">832 MB/s · 0 allocs</text>
+    <rect x="1147" y="93" width="99.0" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="1254.0" y="106">898 MB/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="96.5" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1251.5" y="131">812 MB/s · 1 alloc</text>
+    <rect x="1147" y="118" width="99.6" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1254.6" y="131">904 MB/s · 1 alloc</text>
     <text class="series" x="1135" y="156" text-anchor="end">gws-stream</text>
-    <rect x="1147" y="143" width="97.3" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="1252.3" y="156">819 MB/s · 6 allocs</text>
+    <rect x="1147" y="143" width="97.4" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="1252.4" y="156">884 MB/s · 6 allocs</text>
     <text class="series" x="1135" y="181" text-anchor="end">coder</text>
-    <rect x="1147" y="168" width="64.9" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1219.9" y="181">547 MB/s · 16 allocs</text>
+    <rect x="1147" y="168" width="74.3" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="1229.3" y="181">675 MB/s · 16 allocs</text>
     <text class="series" x="1135" y="206" text-anchor="end">coder-stream</text>
-    <rect x="1147" y="193" width="68.2" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="1223.2" y="206">574 MB/s · 20 allocs</text>
+    <rect x="1147" y="193" width="77.4" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="1232.4" y="206">703 MB/s · 20 allocs</text>
     <text class="series" x="1135" y="231" text-anchor="end">gorilla</text>
-    <rect x="1147" y="218" width="78.0" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1233.0" y="231">657 MB/s · 12 allocs</text>
+    <rect x="1147" y="218" width="85.3" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1240.3" y="231">775 MB/s · 12 allocs</text>
     <text class="series" x="1135" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="1147" y="243" width="87.1" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="1242.1" y="256">733 MB/s · 8 allocs</text>
+    <rect x="1147" y="243" width="95.1" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="1250.1" y="256">863 MB/s · 8 allocs</text>
   </g>
   <g transform="translate(0,743)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">16 KiB messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
-    <rect x="207" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="315.0" y="81">1.1 GB/s · 0 allocs</text>
+    <rect x="207" y="68" width="99.2" height="17" rx="4" fill="#50c878"/>
+    <text class="value" x="314.2" y="81">1.0 GB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-stream</text>
-    <rect x="207" y="93" width="98.6" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="313.6" y="106">1.1 GB/s · 0 allocs</text>
+    <rect x="207" y="93" width="97.5" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="312.5" y="106">1.0 GB/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
-    <rect x="207" y="118" width="99.9" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="314.9" y="131">1.1 GB/s · 1 alloc</text>
+    <rect x="207" y="118" width="100.0" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="315.0" y="131">1.0 GB/s · 1 alloc</text>
     <text class="series" x="195" y="156" text-anchor="end">gws-stream</text>
-    <rect x="207" y="143" width="98.3" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="313.3" y="156">1.1 GB/s · 6 allocs</text>
+    <rect x="207" y="143" width="97.8" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="312.8" y="156">1.0 GB/s · 6 allocs</text>
     <text class="series" x="195" y="181" text-anchor="end">coder</text>
-    <rect x="207" y="168" width="63.6" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="278.6" y="181">695 MB/s · 26 allocs</text>
+    <rect x="207" y="168" width="65.8" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="280.8" y="181">679 MB/s · 26 allocs</text>
     <text class="series" x="195" y="206" text-anchor="end">coder-stream</text>
-    <rect x="207" y="193" width="85.5" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="300.5" y="206">935 MB/s · 20 allocs</text>
+    <rect x="207" y="193" width="86.1" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="301.1" y="206">889 MB/s · 20 allocs</text>
     <text class="series" x="195" y="231" text-anchor="end">gorilla</text>
-    <rect x="207" y="218" width="69.3" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="284.3" y="231">757 MB/s · 21 allocs</text>
+    <rect x="207" y="218" width="72.4" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="287.4" y="231">747 MB/s · 21 allocs</text>
     <text class="series" x="195" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="207" y="243" width="94.3" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="309.3" y="256">1.0 GB/s · 8 allocs</text>
+    <rect x="207" y="243" width="95.7" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="310.7" y="256">987 MB/s · 8 allocs</text>
     <text class="contract" x="515" y="53">128 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
     <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="785.0" y="81">8.0 GB/s · 0 allocs</text>
+    <text class="value" x="785.0" y="81">7.6 GB/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-stream</text>
-    <rect x="677" y="93" width="98.9" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="783.9" y="106">7.9 GB/s · 0 allocs</text>
+    <rect x="677" y="93" width="99.1" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="784.1" y="106">7.5 GB/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="97.6" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="782.6" y="131">7.8 GB/s · 1 alloc</text>
+    <rect x="677" y="118" width="99.7" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="784.7" y="131">7.5 GB/s · 1 alloc</text>
     <text class="series" x="665" y="156" text-anchor="end">gws-stream</text>
-    <rect x="677" y="143" width="97.6" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="782.6" y="156">7.8 GB/s · 6 allocs</text>
+    <rect x="677" y="143" width="97.2" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="782.2" y="156">7.4 GB/s · 6 allocs</text>
     <text class="series" x="665" y="181" text-anchor="end">coder</text>
-    <rect x="677" y="168" width="56.9" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="741.9" y="181">4.5 GB/s · 25 allocs</text>
+    <rect x="677" y="168" width="58.1" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="743.1" y="181">4.4 GB/s · 25 allocs</text>
     <text class="series" x="665" y="206" text-anchor="end">coder-stream</text>
-    <rect x="677" y="193" width="84.6" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="769.6" y="206">6.7 GB/s · 20 allocs</text>
+    <rect x="677" y="193" width="86.9" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="771.9" y="206">6.6 GB/s · 20 allocs</text>
     <text class="series" x="665" y="231" text-anchor="end">gorilla</text>
-    <rect x="677" y="218" width="60.9" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="745.9" y="231">4.9 GB/s · 21 allocs</text>
+    <rect x="677" y="218" width="61.2" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="746.2" y="231">4.6 GB/s · 21 allocs</text>
     <text class="series" x="665" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="677" y="243" width="94.1" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="779.1" y="256">7.5 GB/s · 8 allocs</text>
+    <rect x="677" y="243" width="96.7" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="781.7" y="256">7.3 GB/s · 8 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">7.4 GB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">7.7 GB/s · 0 allocs</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-stream</text>
-    <rect x="1147" y="93" width="98.9" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="1253.9" y="106">7.3 GB/s · 0 allocs</text>
+    <rect x="1147" y="93" width="98.6" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="1253.6" y="106">7.6 GB/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="95.0" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1250.0" y="131">7.1 GB/s · 1 alloc</text>
+    <rect x="1147" y="118" width="98.3" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1253.3" y="131">7.6 GB/s · 1 alloc</text>
     <text class="series" x="1135" y="156" text-anchor="end">gws-stream</text>
-    <rect x="1147" y="143" width="95.6" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="1250.6" y="156">7.1 GB/s · 6 allocs</text>
+    <rect x="1147" y="143" width="98.3" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="1253.3" y="156">7.5 GB/s · 6 allocs</text>
     <text class="series" x="1135" y="181" text-anchor="end">coder</text>
-    <rect x="1147" y="168" width="44.9" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1199.9" y="181">3.3 GB/s · 25 allocs</text>
+    <rect x="1147" y="168" width="49.6" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="1204.6" y="181">3.8 GB/s · 25 allocs</text>
     <text class="series" x="1135" y="206" text-anchor="end">coder-stream</text>
-    <rect x="1147" y="193" width="73.9" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="1228.9" y="206">5.5 GB/s · 20 allocs</text>
+    <rect x="1147" y="193" width="82.6" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="1237.6" y="206">6.3 GB/s · 20 allocs</text>
     <text class="series" x="1135" y="231" text-anchor="end">gorilla</text>
-    <rect x="1147" y="218" width="49.8" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1204.8" y="231">3.7 GB/s · 21 allocs</text>
+    <rect x="1147" y="218" width="56.1" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1211.1" y="231">4.3 GB/s · 21 allocs</text>
     <text class="series" x="1135" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="1147" y="243" width="85.7" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="1240.7" y="256">6.4 GB/s · 8 allocs</text>
+    <rect x="1147" y="243" width="93.1" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="1248.1" y="256">7.2 GB/s · 8 allocs</text>
   </g>
   <g transform="translate(0,1042)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
@@ -257,77 +257,77 @@
     <text class="contract" x="45" y="53">1 connection</text>
     <text class="series" x="195" y="81" text-anchor="end">ews</text>
     <rect x="207" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="315.0" y="81">3.1 GB/s · 0 allocs</text>
+    <text class="value" x="315.0" y="81">2.9 GB/s · 0 allocs</text>
     <text class="series" x="195" y="106" text-anchor="end">ews-stream</text>
-    <rect x="207" y="93" width="83.1" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="298.1" y="106">2.6 GB/s · 0 allocs</text>
+    <rect x="207" y="93" width="84.1" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="299.1" y="106">2.5 GB/s · 0 allocs</text>
     <text class="series" x="195" y="131" text-anchor="end">gws</text>
-    <rect x="207" y="118" width="59.9" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="274.9" y="131">1.9 GB/s · 20 allocs</text>
+    <rect x="207" y="118" width="62.8" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="277.8" y="131">1.8 GB/s · 20 allocs</text>
     <text class="series" x="195" y="156" text-anchor="end">gws-stream</text>
-    <rect x="207" y="143" width="60.9" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="275.9" y="156">1.9 GB/s · 23 allocs</text>
+    <rect x="207" y="143" width="63.5" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="278.5" y="156">1.9 GB/s · 23 allocs</text>
     <text class="series" x="195" y="181" text-anchor="end">coder</text>
-    <rect x="207" y="168" width="41.7" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="256.7" y="181">1.3 GB/s · 54 allocs</text>
+    <rect x="207" y="168" width="43.1" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="258.1" y="181">1.3 GB/s · 54 allocs</text>
     <text class="series" x="195" y="206" text-anchor="end">coder-stream</text>
-    <rect x="207" y="193" width="85.9" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="300.9" y="206">2.7 GB/s · 56 allocs</text>
+    <rect x="207" y="193" width="86.3" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="301.3" y="206">2.5 GB/s · 56 allocs</text>
     <text class="series" x="195" y="231" text-anchor="end">gorilla</text>
-    <rect x="207" y="218" width="42.9" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="257.9" y="231">1.3 GB/s · 48 allocs</text>
+    <rect x="207" y="218" width="44.7" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="259.7" y="231">1.3 GB/s · 47 allocs</text>
     <text class="series" x="195" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="207" y="243" width="91.5" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="306.5" y="256">2.8 GB/s · 8 allocs</text>
+    <rect x="207" y="243" width="92.6" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="307.6" y="256">2.7 GB/s · 8 allocs</text>
     <text class="contract" x="515" y="53">128 connections</text>
     <text class="series" x="665" y="81" text-anchor="end">ews</text>
     <rect x="677" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="785.0" y="81">23.2 GB/s · 0 allocs</text>
+    <text class="value" x="785.0" y="81">22.5 GB/s · 0 allocs</text>
     <text class="series" x="665" y="106" text-anchor="end">ews-stream</text>
-    <rect x="677" y="93" width="85.2" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="770.2" y="106">19.7 GB/s · 0 allocs</text>
+    <rect x="677" y="93" width="84.8" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="769.8" y="106">19.1 GB/s · 0 allocs</text>
     <text class="series" x="665" y="131" text-anchor="end">gws</text>
-    <rect x="677" y="118" width="20.5" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="705.5" y="131">4.8 GB/s · 18 allocs</text>
+    <rect x="677" y="118" width="31.7" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="716.7" y="131">7.1 GB/s · 18 allocs</text>
     <text class="series" x="665" y="156" text-anchor="end">gws-stream</text>
-    <rect x="677" y="143" width="21.7" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="706.7" y="156">5.0 GB/s · 21 allocs</text>
+    <rect x="677" y="143" width="33.3" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="718.3" y="156">7.5 GB/s · 22 allocs</text>
     <text class="series" x="665" y="181" text-anchor="end">coder</text>
-    <rect x="677" y="168" width="34.1" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="719.1" y="181">7.9 GB/s · 35 allocs</text>
+    <rect x="677" y="168" width="44.0" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="729.0" y="181">9.9 GB/s · 35 allocs</text>
     <text class="series" x="665" y="206" text-anchor="end">coder-stream</text>
-    <rect x="677" y="193" width="86.7" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="771.7" y="206">20.1 GB/s · 56 allocs</text>
+    <rect x="677" y="193" width="87.5" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="772.5" y="206">19.7 GB/s · 56 allocs</text>
     <text class="series" x="665" y="231" text-anchor="end">gorilla</text>
-    <rect x="677" y="218" width="34.2" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="719.2" y="231">7.9 GB/s · 31 allocs</text>
+    <rect x="677" y="218" width="43.4" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="728.4" y="231">9.7 GB/s · 31 allocs</text>
     <text class="series" x="665" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="677" y="243" width="93.4" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="778.4" y="256">21.6 GB/s · 8 allocs</text>
+    <rect x="677" y="243" width="94.1" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="779.1" y="256">21.1 GB/s · 8 allocs</text>
     <text class="contract" x="985" y="53">2048 connections</text>
     <text class="series" x="1135" y="81" text-anchor="end">ews</text>
     <rect x="1147" y="68" width="100.0" height="17" rx="4" fill="#50c878"/>
-    <text class="value" x="1255.0" y="81">22.5 GB/s · 0 allocs</text>
+    <text class="value" x="1255.0" y="81">22.4 GB/s · 0 allocs</text>
     <text class="series" x="1135" y="106" text-anchor="end">ews-stream</text>
-    <rect x="1147" y="93" width="84.6" height="17" rx="4" fill="#a3e4b0"/>
-    <text class="value" x="1239.6" y="106">19.0 GB/s · 0 allocs</text>
+    <rect x="1147" y="93" width="84.9" height="17" rx="4" fill="#a3e4b0"/>
+    <text class="value" x="1239.9" y="106">19.0 GB/s · 0 allocs</text>
     <text class="series" x="1135" y="131" text-anchor="end">gws</text>
-    <rect x="1147" y="118" width="20.7" height="17" rx="4" fill="#ef8354"/>
-    <text class="value" x="1175.7" y="131">4.7 GB/s · 18 allocs</text>
+    <rect x="1147" y="118" width="22.0" height="17" rx="4" fill="#ef8354"/>
+    <text class="value" x="1177.0" y="131">4.9 GB/s · 18 allocs</text>
     <text class="series" x="1135" y="156" text-anchor="end">gws-stream</text>
-    <rect x="1147" y="143" width="18.9" height="17" rx="4" fill="#f2c14e"/>
-    <text class="value" x="1173.9" y="156">4.2 GB/s · 23 allocs</text>
+    <rect x="1147" y="143" width="20.7" height="17" rx="4" fill="#f2c14e"/>
+    <text class="value" x="1175.7" y="156">4.6 GB/s · 23 allocs</text>
     <text class="series" x="1135" y="181" text-anchor="end">coder</text>
-    <rect x="1147" y="168" width="27.8" height="17" rx="4" fill="#b388eb"/>
-    <text class="value" x="1182.8" y="181">6.2 GB/s · 34 allocs</text>
+    <rect x="1147" y="168" width="33.1" height="17" rx="4" fill="#b388eb"/>
+    <text class="value" x="1188.1" y="181">7.4 GB/s · 34 allocs</text>
     <text class="series" x="1135" y="206" text-anchor="end">coder-stream</text>
-    <rect x="1147" y="193" width="85.2" height="17" rx="4" fill="#e76f9a"/>
-    <text class="value" x="1240.2" y="206">19.1 GB/s · 56 allocs</text>
+    <rect x="1147" y="193" width="85.9" height="17" rx="4" fill="#e76f9a"/>
+    <text class="value" x="1240.9" y="206">19.2 GB/s · 56 allocs</text>
     <text class="series" x="1135" y="231" text-anchor="end">gorilla</text>
-    <rect x="1147" y="218" width="28.4" height="17" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1183.4" y="231">6.4 GB/s · 30 allocs</text>
+    <rect x="1147" y="218" width="33.4" height="17" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1188.4" y="231">7.5 GB/s · 30 allocs</text>
     <text class="series" x="1135" y="256" text-anchor="end">gorilla-stream</text>
-    <rect x="1147" y="243" width="92.1" height="17" rx="4" fill="#e8d5a3"/>
-    <text class="value" x="1247.1" y="256">20.7 GB/s · 8 allocs</text>
+    <rect x="1147" y="243" width="92.0" height="17" rx="4" fill="#e8d5a3"/>
+    <text class="value" x="1247.0" y="256">20.6 GB/s · 8 allocs</text>
   </g>
 </svg>

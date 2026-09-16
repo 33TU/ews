@@ -1,6 +1,6 @@
 # Text validation benchmark results
 
-Generated 2026-09-16 from `go test -run '^$' -bench UTF8 -benchtime 2s | go run ../cmd/results` at ews commit `fa0e5e3`.
+Generated 2026-09-17 from `go test -run '^$' -bench UTF8 -benchtime 2s | go run ../cmd/results` at ews commit `3cd8627`.
 
 ![utf8-1conn](utf8-1conn.svg)
 
@@ -11,7 +11,7 @@ Generated 2026-09-16 from `go test -run '^$' -bench UTF8 -benchtime 2s | go run 
 - CPU: AMD Ryzen 9 9950X3D 16-Core Processor
 - Kernel: 7.2.2-1-cachyos
 - Go: go1.27.1-X:nodwarf5, default build: SWAR masking and the shift-based UTF-8 validator
-- GOMAXPROCS: 32
+- GOMAXPROCS: 8
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3
@@ -28,18 +28,18 @@ Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese pr
 
 | Kind | Size | Conns | ews | gws | coder | allocs/op ews / gws / coder |
 |---|---|---|---|---|---|---|
-| ascii | 1 KiB | 1 | 293 MB/s | 287 MB/s | 185 MB/s | 0 / 1 / 24 (2 KB) |
-| ascii | 1 KiB | 128 | 1.9 GB/s | 1.9 GB/s | 1.1 GB/s | 0 / 1 / 24 (2 KB) |
-| ascii | 16 KiB | 1 | 3.0 GB/s | 2.9 GB/s | 1.2 GB/s | 0 / 1 / 61 (40 KB) |
-| ascii | 16 KiB | 128 | 19.7 GB/s | 18.8 GB/s | 5.1 GB/s | 0 / 1 / 61 (39 KB) |
-| mixed | 1 KiB | 1 | 283 MB/s | 253 MB/s | 185 MB/s | 0 / 1 / 24 (2 KB) |
-| mixed | 1 KiB | 128 | 1.8 GB/s | 1.7 GB/s | 1.1 GB/s | 0 / 1 / 24 (2 KB) |
-| mixed | 16 KiB | 1 | 2.3 GB/s | 1.3 GB/s | 1.2 GB/s | 0 / 1 / 61 (40 KB) |
-| mixed | 16 KiB | 128 | 15.6 GB/s | 8.9 GB/s | 5.0 GB/s | 0 / 1 / 61 (39 KB) |
-| multibyte | 1 KiB | 1 | 278 MB/s | 240 MB/s | 185 MB/s | 0 / 1 / 24 (2 KB) |
-| multibyte | 1 KiB | 128 | 1.8 GB/s | 1.6 GB/s | 1.1 GB/s | 0 / 1 / 24 (2 KB) |
-| multibyte | 16 KiB | 1 | 2.0 GB/s | 991 MB/s | 1.2 GB/s | 0 / 1 / 61 (40 KB) |
-| multibyte | 16 KiB | 128 | 13.7 GB/s | 7.1 GB/s | 5.1 GB/s | 0 / 1 / 61 (39 KB) |
+| ascii | 1 KiB | 1 | 288 MB/s | 281 MB/s | 186 MB/s | 0 / 1 / 24 (2 KB) |
+| ascii | 1 KiB | 128 | 1.8 GB/s | 1.8 GB/s | 981 MB/s | 0 / 1 / 24 (2 KB) |
+| ascii | 16 KiB | 1 | 2.9 GB/s | 2.7 GB/s | 1.1 GB/s | 0 / 1 / 61 (40 KB) |
+| ascii | 16 KiB | 128 | 19.0 GB/s | 18.3 GB/s | 4.6 GB/s | 0 / 1 / 61 (39 KB) |
+| mixed | 1 KiB | 1 | 278 MB/s | 249 MB/s | 182 MB/s | 0 / 1 / 24 (2 KB) |
+| mixed | 1 KiB | 128 | 1.8 GB/s | 1.6 GB/s | 985 MB/s | 0 / 1 / 24 (2 KB) |
+| mixed | 16 KiB | 1 | 2.2 GB/s | 1.2 GB/s | 1.1 GB/s | 0 / 1 / 61 (40 KB) |
+| mixed | 16 KiB | 128 | 15.2 GB/s | 8.7 GB/s | 4.7 GB/s | 0 / 1 / 61 (39 KB) |
+| multibyte | 1 KiB | 1 | 273 MB/s | 234 MB/s | 183 MB/s | 0 / 1 / 24 (2 KB) |
+| multibyte | 1 KiB | 128 | 1.7 GB/s | 1.5 GB/s | 990 MB/s | 0 / 1 / 24 (2 KB) |
+| multibyte | 16 KiB | 1 | 1.9 GB/s | 948 MB/s | 1.1 GB/s | 0 / 1 / 61 (40 KB) |
+| multibyte | 16 KiB | 128 | 13.2 GB/s | 6.9 GB/s | 4.7 GB/s | 0 / 1 / 61 (39 KB) |
 
 ## Reading the numbers
 
