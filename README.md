@@ -84,6 +84,98 @@ Pings are answered and close frames echoed by the default `ControlHandler`.
 Deadlines, keepalive and closing belong to the `net.Conn` you were given;
 `examples/broadcast` shows a hub with a read deadline and one ping ticker.
 
+## Examples
+
+Read a message in chunks:
+
+```go
+op, err := c.NextMessage()
+buf := make([]byte, 32<<10)
+for {
+	n, err := c.Read(buf) // Compressed messages inflate as frames arrive.
+	if err == io.EOF {
+		break
+	}
+	handle(op, buf[:n])
+}
+```
+
+Relay a message without a buffer of your own:
+
+```go
+if _, err := c.NextMessage(); err == nil {
+	_, err = io.Copy(file, c) // Uses WriteTo, frame by frame.
+}
+```
+
+Send from a reader, fragmented as it is read:
+
+```go
+_, err := c.WriteFrom(codec.Binary, file)
+```
+
+Send a burst asynchronously; a client more than 1 MiB behind is dropped:
+
+```go
+q := c.NewQueue(1 << 20)
+for _, event := range events {
+	if err := q.Send(codec.Text, event); err != nil { // ErrQueueFull past the limit.
+		conn.Close()
+		return
+	}
+}
+```
+
+Broadcast one message to every connection, encoded once:
+
+```go
+p, _ := ws.Prepare(codec.Text, payload)
+for _, q := range queues {
+	q.SendPrepared(p) // Shared bytes; compressed once per configuration.
+}
+```
+
+Tunnel another protocol over the connection:
+
+```go
+nc := ws.NetConn(c, codec.Binary) // A net.Conn: one message per Write.
+go io.Copy(nc, upstream)
+io.Copy(upstream, nc)
+```
+
+Keepalive with one read deadline and no timer per connection:
+
+```go
+type keepalive struct {
+	ws.DefaultControlHandler
+	conn net.Conn
+}
+
+func (k keepalive) OnPong(*ws.Conn, []byte) error {
+	return k.conn.SetReadDeadline(time.Now().Add(time.Minute))
+}
+
+c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, ControlHandler: keepalive{conn}})
+// Refresh the deadline before each read; ping all connections from one ticker.
+```
+
+Reject invalid UTF-8 in text messages with close code 1007:
+
+```go
+c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, ValidateUTF8: true})
+```
+
+Route and check origins before the handshake completes:
+
+```go
+server.Accept = func(req *transport.Request) int {
+	if req.Path != "/socket" || req.Header["Origin"] != "https://example.com" {
+		return 403 // Any HTTP status refuses; zero accepts.
+	}
+	return 0
+}
+```
+
 ## Compression
 
 Pass the negotiated `res.Compression` into `ws.Config` and messages of at
