@@ -1,0 +1,107 @@
+Code review and performance ideas
+================================
+
+Keep the slice-based codec and the io.Reader/io.Writer transport layer separate.
+The existing borrowed-buffer, direct-read, prepared-message, and batching paths
+are a good foundation. A reader/writer-centric codec rewrite is not justified
+without measurements showing a benefit. The ideas below are not measured gains.
+
+1. Correctness and benchmark reliability
+---------------------------------------
+
+[ ] Fix discarding an unread compressed message with receive context takeover.
+    ws/conn_read.go: discard currently skips wire bytes without inflating them,
+    so the receive dictionary does not advance. Reproduced: reading two dependent
+    compressed messages succeeds; skipping the first makes the second fail.
+    Drain through the inflater when history must be preserved, respecting limits.
+    Add a regression that consumes ZERO bytes of the first message before
+    NextMessage, and whose second message actually references the first's history.
+
+[ ] Close benchmark transports and stop/join reader goroutines between cases.
+    bench/internal/harness/harness.go: register socket cleanup after dialing,
+    including handshake-failure paths. Closing an HTTP test server does not close
+    upgraded connections. Broadcast readers currently have no explicit cleanup.
+    Make receive waits terminate on reader failure instead of hanging.
+    Rerun affected comparisons before interpreting small performance differences.
+
+2. First performance experiments
+-------------------------------
+
+[ ] Reduce receive-side compression-history copies.
+    deflate/decompressor.go: history is updated after every output chunk even
+    though only the final window survives a large message. Investigate updating
+    at message completion and at internal DEFLATE restarts that need history.
+    Preserve prior history for short messages, negotiated window sizes, limits,
+    and error/reset behavior. Benchmark small and large takeover messages.
+
+[ ] Remove the intermediate shared-compressor output copy for queues/batches.
+    ws/conn_write.go: encodeData copies borrowed output into connection scratch;
+    queue/batch paths copy it again. Keep the compressor borrowed until the
+    destination has copied its output, then return it before blocking network I/O.
+    Preserve ownership, ordering, and error cleanup; benchmark both send roles.
+
+[ ] Avoid copying payload bytes when completing a split frame header.
+    codec/decoder.go: Feed concatenates all new input when bytes are pending.
+    A partial header can therefore cause the following payload to be copied too.
+    Investigate fixed-size header scratch while borrowing the remaining input.
+    Preserve general Feed semantics, partial payload handling, and buffer lifetimes.
+    Benchmark every header split as well as the common unsplit path.
+
+[ ] Explore encoding directly into destination-owned storage.
+    codec/encoder.go: client masking uses encoder scratch, which may subsequently
+    be copied into queue, batch, or transport-coalescing storage. An internal
+    encode-into-buffer path could mask directly into that final destination.
+    Keep the existing borrowed, unmasked server path and do not mutate caller data.
+
+3. Memory and high-concurrency behavior
+-------------------------------------
+
+[ ] Bound oversized buffer retention or introduce useful pool size classes.
+    Review message buffers, decompressor output, WriteFrom chunks, batch arenas,
+    and non-vectored queue coalescing buffers. Some retain their largest capacity.
+    Use the existing queue-arena size cap as a precedent, not a universal setting.
+    Measure heap/RSS after large-message bursts followed by small-message traffic;
+    zero allocations per operation does not imply low retained memory.
+
+[ ] Compare attached and shared compression across realistic connection counts.
+    Existing echo results favor shared compression for some larger-message,
+    high-concurrency cases, but attached compression wins on smaller messages.
+    Confirm after benchmark cleanup and profile memory/cache effects. Keep both
+    choices; do not change the default or add automatic switching from one result.
+
+[ ] Profile queue scheduling, contention, and batching under bursts and TLS.
+    Measure messages per transport write, queued bytes, throughput, and tail
+    latency. Test bounded flush sizes and slow-reader behavior if profiles warrant
+    it. Any deliberate batching delay must justify its latency cost.
+    Preserve prepared-message sharing and bounded backpressure.
+
+4. Larger streaming work / API ergonomics
+----------------------------------------
+
+[ ] Investigate incremental decompression for streaming reads.
+    Compressed Read/WriteTo currently assemble and inflate the whole message.
+    A frame-aware inflater input could reduce peak memory, copying, and time to
+    first output. Preserve fragmentation, interleaved controls, takeover, discard,
+    size limits, and borrowed-output semantics. Keep the efficient ReadMessage path.
+    Throughput improvement is a hypothesis, not a guarantee.
+
+[ ] Consider a message-scoped io.Writer finalized by Close if users need it.
+    Conn already has Read, WriteTo, and WriteFrom. Add adapters at the message/I/O
+    layer rather than making the codec own the transport. Define message boundaries,
+    failure cleanup, and concurrent-write rules explicitly. This is primarily an
+    ergonomics feature, not an assumed performance optimization.
+
+5. Validation approach
+----------------------
+
+[ ] Fix correctness and benchmark isolation first, then change one hot path at a
+    time. Start performance experiments with history updates and shared-output
+    copies; use profiles to decide whether deeper codec/streaming work is worthwhile.
+[ ] Use repeated focused before/after benchmarks, CPU and heap profiles, and
+    allocation measurements. Cover TCP and TLS, both masking roles, compression
+    modes, message sizes, fragmented input, bursts, and many connections.
+[ ] Run tests and race tests in both the root and bench modules; add regression
+    and fuzz coverage for changed state machines and ownership boundaries.
+    Existing race suites passed during review but missed the discard regression.
+[ ] Avoid custom event loops, broad rewrites, or more assembly unless profiling
+    identifies a bottleneck they would actually address.
