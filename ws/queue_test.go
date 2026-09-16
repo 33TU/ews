@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/ws"
@@ -153,5 +154,33 @@ func TestQueue(t *testing.T) {
 	}
 	if err := q.Send(codec.Binary, []byte("y")); err != boom {
 		t.Fatalf("send after failure: %v", err)
+	}
+}
+
+// TestNewQueueAdjustsLimit checks that calling NewQueue again returns the same
+// queue, keeps its limit for zero, and adjusts it for a nonzero value.
+func TestNewQueueAdjustsLimit(t *testing.T) {
+	server, _ := pair(t, ws.Config{}, ws.Config{})
+	q := server.NewQueue(100)
+	if server.NewQueue(0) != q || server.NewQueue(50) != q {
+		t.Fatal("NewQueue made a second queue")
+	}
+	// The peer never reads, so the writer blocks on the first frame and
+	// everything after it stays queued, where the limit applies.
+	if err := q.Send(codec.Binary, make([]byte, 40)); err != nil {
+		t.Fatal(err)
+	}
+	for q.Pending() != 0 {
+		time.Sleep(time.Millisecond) // The writer has taken the first frame.
+	}
+	if err := q.Send(codec.Binary, make([]byte, 40)); err != nil {
+		t.Fatal("an empty queue accepts any message:", err)
+	}
+	if err := q.Send(codec.Binary, make([]byte, 40)); err != ws.ErrQueueFull {
+		t.Fatalf("limit not adjusted down to 50: %v", err)
+	}
+	server.NewQueue(1000)
+	if err := q.Send(codec.Binary, make([]byte, 40)); err != nil {
+		t.Fatalf("limit not adjusted up: %v", err)
 	}
 }
