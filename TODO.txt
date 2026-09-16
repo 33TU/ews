@@ -9,7 +9,7 @@ without measurements showing a benefit. The ideas below are not measured gains.
 1. Correctness and benchmark reliability
 ---------------------------------------
 
-[ ] Fix discarding an unread compressed message with receive context takeover.
+[x] Fix discarding an unread compressed message with receive context takeover.
     ws/conn_read.go: discard currently skips wire bytes without inflating them,
     so the receive dictionary does not advance. Reproduced: reading two dependent
     compressed messages succeeds; skipping the first makes the second fail.
@@ -17,7 +17,7 @@ without measurements showing a benefit. The ideas below are not measured gains.
     Add a regression that consumes ZERO bytes of the first message before
     NextMessage, and whose second message actually references the first's history.
 
-[ ] Close benchmark transports and stop/join reader goroutines between cases.
+[x] Close benchmark transports and stop/join reader goroutines between cases.
     bench/internal/harness/harness.go: register socket cleanup after dialing,
     including handshake-failure paths. Closing an HTTP test server does not close
     upgraded connections. Broadcast readers currently have no explicit cleanup.
