@@ -1,4 +1,4 @@
-package ews_test
+package transport_test
 
 import (
 	"bufio"
@@ -12,22 +12,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/klauspost/compress/flate"
 )
 
 // startServer runs an echo Server on a fresh listener and returns its ws URL.
-func startServer(t *testing.T, s *ews.Server) string {
+func startServer(t *testing.T, s *transport.Server) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s.Handler == nil {
-		s.Handler = func(conn net.Conn, res handshake.Result, req *ews.Request) {
+		s.Handler = func(conn net.Conn, res handshake.Result, req *transport.Request) {
 			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 			if err != nil {
 				return
@@ -49,10 +49,10 @@ func startServer(t *testing.T, s *ews.Server) string {
 }
 
 func TestServe(t *testing.T) {
-	var seen *ews.Request
-	s := &ews.Server{
+	var seen *transport.Request
+	s := &transport.Server{
 		Handshake: handshake.Options{Protocols: []string{"echo"}, Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
-		Accept: func(req *ews.Request) int {
+		Accept: func(req *transport.Request) int {
 			seen = req
 			if req.Path != "/socket" {
 				return 404
@@ -63,7 +63,7 @@ func TestServe(t *testing.T) {
 	url := startServer(t, s)
 
 	opts := handshake.Options{Protocols: []string{"echo"}, Compression: &handshake.Compress{Level: flate.BestSpeed}}
-	conn, res, err := ews.Dial(context.Background(), url+"/socket", ews.DialOptions{Handshake: opts, Header: http.Header{"Origin": {"http://example.com"}}})
+	conn, res, err := transport.Dial(context.Background(), url+"/socket", transport.DialOptions{Handshake: opts, Header: http.Header{"Origin": {"http://example.com"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,8 +86,8 @@ func TestServe(t *testing.T) {
 	}
 
 	// Accept can refuse with a status.
-	_, _, err = ews.Dial(context.Background(), url+"/elsewhere", ews.DialOptions{})
-	var he *ews.HandshakeError
+	_, _, err = transport.Dial(context.Background(), url+"/elsewhere", transport.DialOptions{})
+	var he *transport.HandshakeError
 	if !errors.As(err, &he) || he.Status != 404 {
 		t.Fatalf("refused path: %v", err)
 	}
@@ -114,7 +114,7 @@ func rawRequest(t *testing.T, url, request string) string {
 }
 
 func TestServeRejects(t *testing.T) {
-	url := startServer(t, &ews.Server{HandshakeTimeout: 2 * time.Second, MaxHeaderBytes: 512})
+	url := startServer(t, &transport.Server{HandshakeTimeout: 2 * time.Second, MaxHeaderBytes: 512})
 	key := handshake.NewKey()
 	upgrade := "Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\n"
 	tests := []struct {
@@ -153,7 +153,7 @@ func TestServeRejects(t *testing.T) {
 
 // TestServeBufferedInput sends a frame in the same write as the request.
 func TestServeBufferedInput(t *testing.T) {
-	url := startServer(t, &ews.Server{})
+	url := startServer(t, &transport.Server{})
 	nc, err := net.Dial("tcp", strings.TrimPrefix(url, "ws://"))
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +187,7 @@ func TestServeClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &ews.Server{Handler: func(net.Conn, handshake.Result, *ews.Request) {}}
+	s := &transport.Server{Handler: func(net.Conn, handshake.Result, *transport.Request) {}}
 	done := make(chan error, 1)
 	go func() { done <- s.Serve(ln) }()
 	time.Sleep(20 * time.Millisecond)
@@ -205,7 +205,7 @@ func TestServeClose(t *testing.T) {
 	if err := s.Serve(ln); !errors.Is(err, net.ErrClosed) {
 		t.Fatalf("Serve on a closed server: %v", err)
 	}
-	if err := (&ews.Server{}).Serve(ln); err == nil {
+	if err := (&transport.Server{}).Serve(ln); err == nil {
 		t.Fatal("nil handler accepted")
 	}
 }

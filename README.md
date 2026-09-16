@@ -4,7 +4,7 @@ A lightweight WebSocket frame encoder and decoder for Go, built around plain `[]
 
 **Work in progress.** The API is still taking shape.
 
-The frame API lives in `github.com/33TU/ews/codec`, message compression in `github.com/33TU/ews/deflate`, connections in `github.com/33TU/ews/ws`, handshake rules in `github.com/33TU/ews/handshake`, and the `net/http` glue, `Upgrade` and `Dial`, in the root package.
+The frame API lives in `github.com/33TU/ews/codec`, message compression in `github.com/33TU/ews/deflate`, connections in `github.com/33TU/ews/ws`, handshake rules in `github.com/33TU/ews/handshake`, and the transports, `Upgrade`, `Dial` and `Server`, in `github.com/33TU/ews/transport`. The module root holds no Go files.
 
 ## Design
 
@@ -131,13 +131,13 @@ With `ws`, compression is a matter of passing the negotiated parameters through:
 The whole recipe for a compressed server, from negotiation to connection:
 
 ```go
-server := &ews.Server{
+server := &transport.Server{
 	Handshake: handshake.Options{Compression: &handshake.Compress{
 		Level:           flate.BestSpeed, // Level 1: the fastest, and what the benchmarks use.
 		MinSize:         256,             // Smaller messages go uncompressed; default 128.
 		ContextTakeover: true,            // Offer takeover in both directions; peers may decline.
 	}},
-	Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
+	Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
 		c, err := ws.NewConn(conn, ws.Config{
 			Role:              ws.Server,
 			Compression:       res.Compression, // What was negotiated, or nil.
@@ -148,7 +148,7 @@ server := &ews.Server{
 }
 ```
 
-`res.Compression` carries the negotiated parameters, so the connection configuration never repeats what the handshake decided; a client gets the same from `ews.Dial`. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/echo/RESULTS.md` has the measurements behind this.
+`res.Compression` carries the negotiated parameters, so the connection configuration never repeats what the handshake decided; a client gets the same from `transport.Dial`. Decompressors are shared across connections. So are compressors, except that a connection with send context takeover keeps one attached, about 800 KB, so its messages continue one stream at full speed. Servers with thousands of compressed connections set `Config.CompressionShared` to borrow a pooled compressor per message instead, trading some CPU per message for almost no memory per connection. As a guideline, keep the default for clients and servers with up to a few hundred compressed connections and use `CompressionShared` from about a thousand; `bench/echo/RESULTS.md` has the measurements behind this.
 
 `EncodeCompressed` takes already-compressed bytes. It sets RSV1 on text/binary frames, leaves it clear on continuation frames, and rejects control frames. To fragment a compressed message, split the compressed bytes and encode the pieces with their own masking keys.
 
@@ -224,10 +224,10 @@ For sending without blocking on a slow peer, `q := c.NewQueue(limit)` gives an a
 
 ## Handshake and upgrade
 
-`handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation including window sizes, and subprotocol selection. The root package connects it to `net/http`:
+`handshake` implements the opening handshake rules over header values without I/O: accept keys, request and response validation, `permessage-deflate` negotiation including window sizes, and subprotocol selection. The `transport` package connects it to `net/http` and to sockets:
 
 ```go
-conn, res, err := ews.Upgrade(w, r, handshake.Options{Protocols: []string{"chat"}})
+conn, res, err := transport.Upgrade(w, r, handshake.Options{Protocols: []string{"chat"}})
 if err != nil {
     return // An HTTP error has been written.
 }
@@ -238,11 +238,11 @@ c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compressi
 The client side is `Dial`, which takes a ws or wss URL and returns the same pair:
 
 ```go
-conn, res, err := ews.Dial(ctx, "wss://example.com/socket", ews.DialOptions{
+conn, res, err := transport.Dial(ctx, "wss://example.com/socket", transport.DialOptions{
     Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed}},
 })
 if err != nil {
-    return err // A *ews.HandshakeError carries the status and headers of a refusal.
+    return err // A *transport.HandshakeError carries the status and headers of a refusal.
 }
 defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
@@ -250,18 +250,18 @@ c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compressi
 
 Both return the raw connection; the caller keeps it for deadlines and closing.
 
-A server that does not need `net/http` for anything else can skip it: `ews.Server` runs an accept loop on a listener, parses only the upgrade request, and calls a handler per connection with the negotiated result. It keeps none of the roughly 10 KB of buffers `net/http` holds for the life of a hijacked connection, which was most of the per-connection memory difference to servers with their own HTTP parsing:
+A server that does not need `net/http` for anything else can skip it: `transport.Server` runs an accept loop on a listener, parses only the upgrade request, and calls a handler per connection with the negotiated result. It keeps none of the roughly 10 KB of buffers `net/http` holds for the life of a hijacked connection, which was most of the per-connection memory difference to servers with their own HTTP parsing:
 
 ```go
-server := &ews.Server{
+server := &transport.Server{
     Handshake: handshake.Options{Protocols: []string{"chat"}},
-    Accept: func(req *ews.Request) int {
+    Accept: func(req *transport.Request) int {
         if req.Path != "/socket" {
             return 404 // Refuse with an HTTP status; zero accepts.
         }
         return 0
     },
-    Handler: func(conn net.Conn, res handshake.Result, req *ews.Request) {
+    Handler: func(conn net.Conn, res handshake.Result, req *transport.Request) {
         c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
         // ... read and write; the connection is closed when the handler returns.
     },

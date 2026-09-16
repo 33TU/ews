@@ -4,7 +4,7 @@ Message I/O over an already-upgraded WebSocket transport, built on `codec`. The
 handshake and extension negotiation live elsewhere; `ws` receives the
 negotiated result through `Config`.
 
-Status: steps 1 to 3 implemented, with `handshake`, the root `Upgrade`, `Dial` and `Server`. The reactor is not planned; see Layering and Later.
+Status: steps 1 to 3 implemented, with `handshake` and `transport`, which holds `Upgrade`, `Dial` and `Server`. The reactor is not planned; see Layering and Later.
 
 ## Principles
 
@@ -369,7 +369,7 @@ nc.Close()
 `handshake` holds the opening handshake rules as pure functions over header
 values, so a `net/http` server, a client, and any other transport share them.
 The negotiated `handshake.Compression` is what `ws.Config` takes; `ws`
-depends on `handshake`, never the reverse. The root `ews` package is the only
+depends on `handshake`, never the reverse. The `transport` package is the only
 place `net/http` appears: `Upgrade` validates, hijacks, writes the 101, and
 returns the raw connection for `ws.NewConn`; `Dial` opens TCP or TLS, writes
 the request, reads the response, confirms it, and returns the same pair, with

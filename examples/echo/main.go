@@ -1,6 +1,6 @@
 // Command echo serves a WebSocket echo endpoint, the shape the Autobahn test
 // suite expects: go run ./examples/echo, then point wstest at ws://host:9001.
-// It uses ews.Server, the accept loop without net/http.
+// It uses transport.Server, the accept loop without net/http.
 package main
 
 import (
@@ -10,8 +10,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/klauspost/compress/flate"
 )
@@ -25,9 +25,9 @@ func main() {
 	if *compress {
 		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
 	}
-	server := &ews.Server{
+	server := &transport.Server{
 		Handshake: opts,
-		Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
+		Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
 			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, MaxMessageSize: 32 << 20, Compression: res.Compression, ValidateUTF8: true})
 			if err != nil {
 				log.Print(err)

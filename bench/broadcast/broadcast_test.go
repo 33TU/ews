@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	gorilla "github.com/gorilla/websocket"
 	"github.com/klauspost/compress/flate"
@@ -80,7 +80,7 @@ func BenchmarkBroadcast(b *testing.B) {
 						} else {
 							opts := mode.Options()
 							srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-								conn, res, err := ews.Upgrade(w, r, opts)
+								conn, res, err := transport.Upgrade(w, r, opts)
 								if err != nil {
 									return
 								}

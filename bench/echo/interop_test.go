@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/klauspost/compress/flate"
 	"github.com/lxzan/gws"
@@ -31,7 +31,7 @@ func TestGwsDefaultInterop(t *testing.T) {
 	defer srv.Close()
 
 	opts := handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}}
-	conn, res, err := ews.Dial(context.Background(), "ws"+strings.TrimPrefix(srv.URL, "http"), ews.DialOptions{Handshake: opts})
+	conn, res, err := transport.Dial(context.Background(), "ws"+strings.TrimPrefix(srv.URL, "http"), transport.DialOptions{Handshake: opts})
 	if err != nil {
 		t.Fatal(err)
 	}

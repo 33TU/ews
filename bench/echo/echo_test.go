@@ -15,9 +15,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/coder/websocket"
 	gorilla "github.com/gorilla/websocket"
@@ -40,7 +40,7 @@ func ewsStreamServer(mode harness.Mode) *httptest.Server { return ewsServerWith(
 func ewsServerWith(mode harness.Mode, shared, stream bool) *httptest.Server {
 	opts := mode.Options()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, res, err := ews.Upgrade(w, r, opts)
+		conn, res, err := transport.Upgrade(w, r, opts)
 		if err != nil {
 			return
 		}

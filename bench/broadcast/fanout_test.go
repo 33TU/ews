@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 )
 
@@ -29,7 +29,7 @@ func BenchmarkFanout(b *testing.B) {
 			}
 			b.Run(name, func(b *testing.B) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					conn, _, err := ews.Upgrade(w, r, handshake.Options{})
+					conn, _, err := transport.Upgrade(w, r, handshake.Options{})
 					if err != nil {
 						return
 					}

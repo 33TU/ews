@@ -1,4 +1,4 @@
-package ews_test
+package transport_test
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/klauspost/compress/flate"
 )
@@ -38,7 +38,7 @@ func exchange(t *testing.T, conn net.Conn, res handshake.Result) {
 
 func TestDial(t *testing.T) {
 	srv := echoServer(t, handshake.Options{Protocols: []string{"echo"}, Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}})
-	conn, res, err := ews.Dial(context.Background(), wsURL(srv), ews.DialOptions{
+	conn, res, err := transport.Dial(context.Background(), wsURL(srv), transport.DialOptions{
 		Handshake: handshake.Options{Protocols: []string{"echo"}, Compression: &handshake.Compress{Level: flate.BestSpeed}},
 		Header:    http.Header{"Origin": {"http://example.com"}},
 	})
@@ -54,7 +54,7 @@ func TestDial(t *testing.T) {
 
 func TestDialTLS(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, res, err := ews.Upgrade(w, r, handshake.Options{})
+		conn, res, err := transport.Upgrade(w, r, handshake.Options{})
 		if err != nil {
 			return
 		}
@@ -67,7 +67,7 @@ func TestDialTLS(t *testing.T) {
 	}))
 	defer srv.Close()
 	cfg := srv.Client().Transport.(*http.Transport).TLSClientConfig
-	conn, res, err := ews.Dial(context.Background(), "wss"+strings.TrimPrefix(srv.URL, "https"), ews.DialOptions{TLSConfig: cfg})
+	conn, res, err := transport.Dial(context.Background(), "wss"+strings.TrimPrefix(srv.URL, "https"), transport.DialOptions{TLSConfig: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,13 +81,13 @@ func TestDialErrors(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer plain.Close()
-	_, _, err := ews.Dial(context.Background(), wsURL(plain), ews.DialOptions{})
-	var he *ews.HandshakeError
+	_, _, err := transport.Dial(context.Background(), wsURL(plain), transport.DialOptions{})
+	var he *transport.HandshakeError
 	if !errors.As(err, &he) || he.Status != 403 || he.Header.Get("X-Reason") != "nope" || !errors.Is(err, handshake.ErrBadStatus) {
 		t.Fatalf("plain HTTP: %v", err)
 	}
 
-	if _, _, err := ews.Dial(context.Background(), "ftp://example.com", ews.DialOptions{}); err == nil {
+	if _, _, err := transport.Dial(context.Background(), "ftp://example.com", transport.DialOptions{}); err == nil {
 		t.Fatal("bad scheme accepted")
 	}
 
@@ -100,7 +100,7 @@ func TestDialErrors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	_, _, err = ews.Dial(ctx, "ws://"+ln.Addr().String(), ews.DialOptions{})
+	_, _, err = transport.Dial(ctx, "ws://"+ln.Addr().String(), transport.DialOptions{})
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > 5*time.Second {
 		t.Fatalf("silent server: %v after %v", err, time.Since(start))
 	}

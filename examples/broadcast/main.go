@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/klauspost/compress/flate"
 )
@@ -54,9 +54,9 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	flag.Parse()
 
-	server := &ews.Server{
+	server := &transport.Server{
 		Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
-		Handler: func(conn net.Conn, res handshake.Result, _ *ews.Request) {
+		Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
 			c, err := ws.NewConn(conn, ws.Config{
 				Role:              ws.Server,
 				Compression:       res.Compression,

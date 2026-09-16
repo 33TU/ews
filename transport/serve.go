@@ -1,4 +1,4 @@
-package ews
+package transport
 
 import (
 	"bufio"

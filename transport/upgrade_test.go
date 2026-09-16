@@ -1,4 +1,4 @@
-package ews_test
+package transport_test
 
 import (
 	"bufio"
@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/33TU/ews"
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/handshake"
+	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 )
 
@@ -22,7 +22,7 @@ func echoServer(t *testing.T, opts handshake.Options) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Set-Cookie", "session=1")
-		conn, res, err := ews.Upgrade(w, r, opts)
+		conn, res, err := transport.Upgrade(w, r, opts)
 		if err != nil {
 			return
 		}
