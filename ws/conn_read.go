@@ -32,9 +32,9 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
 // the end of the message and before NextMessage has been called. Transport EOF
 // mid-message is io.ErrUnexpectedEOF. Text read in chunks is never UTF-8
-// validated; only complete messages are. A compressed message is assembled
-// and inflated whole on the first Read, within Config.MaxMessageSize as for
-// ReadMessage, and delivered from that buffer.
+// validated; only complete messages are. Compressed messages are inflated as
+// they stream, holding one frame at a time; a transport error during one
+// ends the connection, since the inflater cannot resume.
 func (c *Conn) Read(b []byte) (int, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -46,7 +46,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 		return 0, nil
 	}
 	if c.rx.MessageCompressed() {
-		return c.readInflated(b)
+		return c.inflate(b)
 	}
 	for {
 		chunk, done, err := c.rx.PayloadN(len(b))
@@ -84,8 +84,9 @@ func (c *Conn) Read(b []byte) (int, error) {
 // a message without a buffer of its own. Plain frames go to w as they arrive:
 // what the read buffer holds is borrowed, and a longer remainder is read from
 // the transport into the pooled message buffer in pieces of up to
-// Config.FragmentSize. A compressed message is inflated whole and written in
-// one call. It returns nil at the end of the message and writes nothing when
+// Config.FragmentSize. A compressed message is inflated as it streams into
+// the message buffer, FragmentSize at a time, and each piece written. It
+// returns nil at the end of the message and writes nothing when
 // no message is open. An error from w is returned as is and leaves the rest
 // of the message unread; NextMessage discards it.
 func (c *Conn) WriteTo(w io.Writer) (int64, error) {
@@ -95,19 +96,27 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 	if !c.inMessage {
 		return 0, nil
 	}
-	if c.rx.MessageCompressed() {
-		if err := c.inflateWhole(); err != nil {
-			return 0, err
-		}
-		rest := c.decomp.rest
-		c.decomp.rest, c.decomp.inflated, c.inMessage = nil, false, false
-		if len(rest) == 0 {
-			return 0, nil
-		}
-		n, err := w.Write(rest)
-		return int64(n), err
-	}
 	var total int64
+	if c.rx.MessageCompressed() {
+		buf := c.staging()
+		for {
+			n, err := c.inflate(buf)
+			if err == io.EOF {
+				return total, nil
+			}
+			if err != nil {
+				return total, err
+			}
+			m, err := w.Write(buf[:n])
+			total += int64(m)
+			if err != nil {
+				return total, err
+			}
+			if m != n {
+				return total, io.ErrShortWrite
+			}
+		}
+	}
 	for {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -153,6 +162,16 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 			return total, err
 		}
 	}
+}
+
+// staging returns the pooled message buffer sized to FragmentSize, for
+// inflating or relaying a message in pieces without holding it whole.
+func (c *Conn) staging() []byte {
+	var msg []byte
+	if c.msg != nil {
+		msg = c.msg.b[:0]
+	}
+	return c.growMsg(msg, c.fragmentSize)[:c.fragmentSize]
 }
 
 // readInto reads up to n bytes of the open frame's payload from the transport
@@ -305,15 +324,21 @@ func (c *Conn) finishMessage(op codec.Opcode, payload []byte) (codec.Opcode, []b
 // discard drains the rest of the current message. A compressed message on a
 // connection with receive context takeover is inflated rather than skipped,
 // since the peer's next message may reference its content through the
-// shared history; without takeover, or once Read has inflated it, the wire
-// bytes are simply consumed.
+// shared history; without takeover the wire bytes are simply consumed and
+// any inflate in progress is abandoned.
 func (c *Conn) discard() error {
-	if c.inMessage && c.rx.MessageCompressed() && !c.decomp.inflated && c.decomp.window != nil {
-		if err := c.inflateWhole(); err != nil {
-			return err
+	if c.inMessage && c.rx.MessageCompressed() && c.decomp.window != nil {
+		buf := c.staging()
+		for {
+			if _, err := c.inflate(buf); err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
 		}
 	}
-	c.decomp.rest, c.decomp.inflated = nil, false
+	c.decomp.streaming = false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -410,7 +435,7 @@ func (c *Conn) handleControl() error {
 		}
 	}
 	if err != nil {
-		c.readErr, c.inMessage = err, false
+		c.readErr, c.inMessage, c.decomp.streaming = err, false, false
 	}
 	return err
 }
@@ -420,6 +445,6 @@ func (c *Conn) fail(err error) error {
 	if pe, ok := err.(*Error); ok {
 		c.sendClose(pe.Code)
 	}
-	c.readErr, c.inMessage = err, false
+	c.readErr, c.inMessage, c.decomp.streaming = err, false, false
 	return err
 }

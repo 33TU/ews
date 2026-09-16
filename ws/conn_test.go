@@ -1328,6 +1328,51 @@ func TestNextMessageDiscardsCompressed(t *testing.T) {
 // TestDiscardKeepsReceiveHistory skips a compressed message without reading a
 // byte of it. With receive context takeover the next message references the
 // skipped one's content, so discard must inflate rather than skip.
+// TestCompressedReadStreams shows a chunked read of a compressed message
+// delivering the first fragment's bytes before the second fragment has been
+// sent: over net.Pipe the client's second WriteChunk cannot even start until
+// the server has read the first.
+func TestCompressedReadStreams(t *testing.T) {
+	server, client := compressionPair(t, true, true, 1)
+	first := bytes.Repeat([]byte("first fragment "), 300)
+	second := bytes.Repeat([]byte("second fragment "), 300)
+	sentSecond := make(chan struct{})
+	wait := run(t, func() error {
+		if err := client.BeginMessage(codec.Text); err != nil {
+			return err
+		}
+		if err := client.WriteChunk(first); err != nil {
+			return err
+		}
+		<-sentSecond // The server has the first fragment's bytes by now.
+		if err := client.WriteChunk(second); err != nil {
+			return err
+		}
+		return client.EndMessage()
+	})
+	if _, err := server.NextMessage(); err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	buf := make([]byte, 1000)
+	for len(got) < len(first) {
+		n, err := server.Read(buf)
+		if err != nil {
+			t.Fatalf("first fragment: %v after %d bytes", err, len(got))
+		}
+		got = append(got, buf[:n]...)
+	}
+	if !bytes.Equal(got[:len(first)], first) {
+		t.Fatal("first fragment mismatch")
+	}
+	close(sentSecond)
+	rest, err := io.ReadAll(server)
+	if err != nil || !bytes.Equal(append(got[len(first):], rest...), second) {
+		t.Fatalf("second fragment: %v", err)
+	}
+	wait()
+}
+
 func TestDiscardKeepsReceiveHistory(t *testing.T) {
 	server, client := compressionPair(t, true, true, 1)
 	client.ControlHandler = silentClose{}

@@ -126,7 +126,7 @@ if err := enc.EncodeCompressed(true, codec.Text, compressed, nil); err != nil {
 // Send enc.HeaderBytes(), then enc.PayloadBytes().
 ```
 
-With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` on a compressed message inflates it whole on the first call and hands out chunks of the result.
+With `ws`, compression is a matter of passing the negotiated parameters through: `ws.Config{Compression: res.Compression}` from the handshake result. `Write` then compresses messages of at least `MinSize` bytes, 128 by default since flate emits literals only for smaller blocks, `ReadMessage` decompresses within `MaxMessageSize`, and `Read` inflates as the message streams, holding one frame at a time.
 
 The whole recipe for a compressed server, from negotiation to connection:
 
@@ -173,7 +173,7 @@ compressed, err := compressor.Compress(payload, &send)
 message, err := decompressor.Decompress(compressed, 8<<20, &recv)
 ```
 
-A peer may negotiate a smaller window for this endpoint's messages; `NewCompressorWindow(bits)` builds a compressor that never reaches further back, at the encoder's fixed level. Set `Window.Bits` to the negotiated size in each direction so only that much history is kept and copied; `ws` does this from the handshake result. Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches.
+A peer may negotiate a smaller window for this endpoint's messages; `NewCompressorWindow(bits)` builds a compressor that never reaches further back, at the encoder's fixed level. Set `Window.Bits` to the negotiated size in each direction so only that much history is kept and copied; `ws` does this from the handshake result. Streaming decompression is available through `Begin` and `Read` over a `ChunkSource`. Process compressed messages in order. Uncompressed messages bypass the helpers and don't change the window. A decode error clears the window, since the peers' histories have diverged. Priming an encoder from a window costs about as much as compressing 32 KB, so a compressor that keeps serving the same window continues its stream instead and pays nothing; a compressor shared between connections primes when it switches.
 
 ## Connections
 

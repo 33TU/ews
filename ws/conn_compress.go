@@ -37,10 +37,10 @@ const pendingHistory = 8
 
 // decompressorContext is the receive side. Used by the reading goroutine only.
 type decompressorContext struct {
-	dec      *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
-	window   *deflate.Window       // Receive-direction history when takeover is negotiated.
-	rest     []byte                // Inflated bytes of the current message Read has not delivered.
-	inflated bool                  // Read has inflated the current message.
+	dec       *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
+	window    *deflate.Window       // Receive-direction history when takeover is negotiated.
+	streaming bool                  // Read is streaming the current message through the inflater.
+	srcErr    error                 // Transport error raised while feeding the inflater.
 }
 
 // Context takeover state is a 32 KB window per direction on the connection.
@@ -190,37 +190,69 @@ func (c *Conn) decompress(payload []byte) ([]byte, error) {
 	return out, nil
 }
 
-// inflateWhole assembles and inflates the current compressed message on the
-// first call for it, leaving the result in decomp.rest.
-func (c *Conn) inflateWhole() error {
-	if c.decomp.inflated {
-		return nil
+// inflate serves Read for a compressed message by streaming frame payload
+// through the inflater as it arrives, so a chunked read holds one frame and
+// the inflater's window rather than the whole message. A transport error
+// mid-message ends the connection, since the inflater cannot resume.
+func (c *Conn) inflate(b []byte) (int, error) {
+	d := c.acquireDecompressor()
+	if !c.decomp.streaming {
+		if err := d.Begin(chunkSource{c}, c.decomp.window); err != nil {
+			return 0, c.fail(&Error{Code: 1007, Err: ErrInvalidData})
+		}
+		c.decomp.streaming = true
 	}
-	payload, err := c.assemble()
-	if err != nil {
-		return err
+	n, err := d.Read(b)
+	switch {
+	case err == nil:
+		return n, nil
+	case err == io.EOF:
+		c.decomp.streaming, c.inMessage = false, false
+		return 0, io.EOF
+	case c.readErr != nil:
+		// The source hit a protocol failure or the peer's close; both already recorded.
+		return 0, c.readErr
+	case err == c.decomp.srcErr:
+		c.readErr, c.inMessage, c.decomp.streaming = err, false, false
+		return 0, err
+	default:
+		return 0, c.fail(&Error{Code: 1007, Err: ErrInvalidData})
 	}
-	out, err := c.decompress(payload)
-	if err != nil {
-		return err
-	}
-	c.decomp.rest, c.decomp.inflated = out, true
-	return nil
 }
 
-// readInflated serves Read for a compressed message. The inflater is
-// pull-only and cannot resume after a short read, so the first call assembles
-// and inflates the message whole, within MaxMessageSize as ReadMessage does,
-// and later calls deliver chunks of the result.
-func (c *Conn) readInflated(b []byte) (int, error) {
-	if err := c.inflateWhole(); err != nil {
-		return 0, err
+// chunkSource feeds the inflater borrowed frame payload straight from the core.
+type chunkSource struct{ c *Conn }
+
+func (s chunkSource) NextChunk() ([]byte, error) {
+	chunk, err := s.c.nextChunk()
+	if err != nil && err != io.EOF {
+		s.c.decomp.srcErr = err
 	}
-	if len(c.decomp.rest) == 0 {
-		c.decomp.rest, c.decomp.inflated, c.inMessage = nil, false, false
-		return 0, io.EOF
+	return chunk, err
+}
+
+// nextChunk returns the next borrowed payload chunk of the current message,
+// spanning frames and dispatching control frames, or io.EOF at its end.
+func (c *Conn) nextChunk() ([]byte, error) {
+	for {
+		chunk, done, err := c.rx.Payload()
+		if err != nil {
+			return nil, c.fail(err)
+		}
+		if len(chunk) != 0 {
+			return chunk, nil
+		}
+		if !done {
+			if err := c.fill(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if !c.rx.MessageOpen() {
+			return nil, io.EOF
+		}
+		if err := c.nextFrame(); err != nil {
+			return nil, err
+		}
 	}
-	n := copy(b, c.decomp.rest)
-	c.decomp.rest = c.decomp.rest[n:]
-	return n, nil
 }

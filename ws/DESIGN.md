@@ -308,24 +308,20 @@ nc.Close()
    negotiated `handshake.Compression`. The core accepts RSV1 on a first data
    frame when negotiated. `ReadMessage` assembles the compressed bytes through
    FIN and calls `deflate.Decompress`, bounded by `MaxMessageSize`, so the
-   limit covers both wire and inflated size. `Read` on a compressed message
-   assembles and inflates it whole on the first call, then delivers chunks
-   of the result, so memory during a chunked read is bounded by
-   `MaxMessageSize` as it is for `ReadMessage`. A streaming mode that fed
-   the inflater borrowed chunks straight from the core existed and worked,
-   and was removed as the most intricate code in the library: keeping
-   chunks borrowed, dispatching control frames mid-message, sharing one
-   decompressor between whole and streaming use, and failing cleanly when
-   the transport died inside an inflate doubled the decompressor. gorilla
-   and coder do stream, by wrapping a blocking frame reader in the inflater
-   and copying as they go; gws inflates whole as ews now does. The trade is
-   peak memory and time to first byte on large compressed messages read
-   through `Read`, `WriteTo` or `NetConn`, which no current consumer has.
-   What would bring it back is such a consumer, and the shape would be
-   gorilla's, about eighty lines: a frame-pulling reader handed to the
-   inflater, `ReadMessage` untouched, and a transport error mid-message
-   ending the connection. It costs the other paths nothing and the chunked
-   path about 3 percent on small messages.
+   limit covers both wire and inflated size. `Read` and `WriteTo` stream:
+   `deflate` offers `Begin` and `Read` over a `ChunkSource`, and `ws`
+   supplies borrowed frame chunks straight from the core, filling from the
+   transport and dispatching control frames as it goes, while the inflater
+   writes into the caller's buffer. A chunked read of a compressed message
+   therefore holds one frame and the inflater's window, and its first bytes
+   come out when the first frame lands, as with gorilla and coder; gws
+   inflates whole. A transport error during a compressed message ends the
+   connection because the inflater cannot resume. This mode was removed
+   once as the most intricate code in the library and brought back two
+   days later, because the alternative held wire plus inflated size per
+   connection and waited for the last frame before the first byte; it costs
+   the whole-message paths nothing and the chunked path about 3 percent on
+   small messages, and the intricacy is now the price of the feature.
    `Write` compresses when `len(payload) >=
    MinSize`. Takeover state is a 32 KB `deflate.Window` per direction on the
    connection; compressors and decompressors are pooled, one compressor pool
