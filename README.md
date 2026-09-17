@@ -251,7 +251,10 @@ ews holds a message only until the next read and returns the buffer to a
 pool bounded at 1 MiB per buffer, so its memory follows what is in flight
 rather than the connection count. gws allocates a frame per message above
 its largest pooled buffer class, which a 256 KiB payload just exceeds; at
-128 KiB the two tie completely.
+128 KiB the two tie completely. Over TLS the record buffers level the
+memory column and encryption takes a quarter off everyone's echo rate; ews
+and gws then tie within three percent at 1 KiB, and ews still moves 256 KiB
+messages on the least CPU. The fork has the TLS results.
 
 ## Development
 
