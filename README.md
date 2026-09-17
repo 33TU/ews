@@ -230,10 +230,14 @@ is the CPU it takes to do so:
 | gws_std | 5,809 | 343% |
 | gws | 5,687 | 350% |
 
-At 256 KiB payloads every server is bound by loopback bandwidth and moves
-the same 4.2 GB/s; ews does it on 180 percent CPU where gws needs 300,
-since a frame that size is larger than gws's largest pooled buffer and is
-allocated per message.
+At 256 KiB payloads the link is the ceiling and the differences are CPU
+and memory. With 1,000 connections ews moves the same 4.2 GB/s as gws on
+180 percent CPU where gws needs 300, since a frame that size is larger than
+gws's largest pooled buffer and is allocated per message. With 10,000
+connections, one message in flight on each, ews holds the ceiling on 175
+percent CPU and 147 MB; gws falls below it on 408 percent and 310 MB, and
+most other libraries hold 4 to 10 GB, a buffer the size of the message per
+connection.
 
 ## Development
 
