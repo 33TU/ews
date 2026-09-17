@@ -144,10 +144,10 @@ for _, q := range queues {
 ```
 
 `Prepare` copies the payload, so the result is immutable: send it from any
-goroutine, as often as you like, and let it go when you are done. A hub that
-wants no garbage per broadcast marshals into a pooled buffer, calls
-`Prepare`, and returns the buffer to the pool at once; the copy is what makes
-that safe.
+goroutine, as often as you like, and let it go when you are done. The copy
+is one allocation per message, the frame every recipient shares, and it is
+what lets a hub marshal into a pooled buffer, call `Prepare`, and return the
+buffer to the pool at once. Sending costs nothing per recipient.
 
 Tunnel another protocol over the connection:
 
