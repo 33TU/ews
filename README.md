@@ -207,6 +207,8 @@ nothing.
 
 ![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
 
+![Text validation, 128 connections](bench/utf8/utf8-128conn.svg)
+
 Build with `GOEXPERIMENT=simd` for SIMD masking and UTF-8 validation;
 results for that build are beside the default ones.
 
