@@ -1,6 +1,6 @@
 # Echo benchmark results
 
-Generated 2026-09-17 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `622145e`.
+Generated 2026-09-17 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `8494966`.
 
 ![echo-plain](echo-plain.svg)
 
