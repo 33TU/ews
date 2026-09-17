@@ -214,7 +214,10 @@ ews is also wired into a fork of lxzan's
 [go-websocket-benchmark](https://github.com/33TU/go-websocket-benchmark),
 the harness behind gws's published chart, with current library versions and
 [results](https://github.com/33TU/go-websocket-benchmark/tree/main/results)
-from its echo and rate tests at 10k connections.
+from its echo and rate tests at 10k connections. Echo ties there; in the
+rate test ews takes the whole offered load with no drops at 1.8 to 2.5
+times gws's echoes per CPU point, because the Queue coalesces each
+connection's backlog into one writev.
 
 ## Development
 
