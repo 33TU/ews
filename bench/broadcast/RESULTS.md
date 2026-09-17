@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-17 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `8494966`.
+Generated 2026-09-17 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `955c34d`.
 
 ![broadcast-plain](broadcast-plain.svg)
 

@@ -1,6 +1,6 @@
 # Text validation benchmark results
 
-Generated 2026-09-17 from `go test -run '^$' -bench UTF8 -benchtime 2s | go run ../cmd/results` at ews commit `8494966`.
+Generated 2026-09-17 from `go test -run '^$' -bench UTF8 -benchtime 2s | go run ../cmd/results` at ews commit `955c34d`.
 
 ![utf8-1conn](utf8-1conn.svg)
 

@@ -38,9 +38,9 @@ var charts = map[string][]chartSpec{
 		{file: "echo-nocontext", title: "Echo, compressed without context takeover", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "nocontext"}},
 	},
 	"Broadcast": {
-		{file: "broadcast-plain", title: "Broadcast, one message to every connection, uncompressed", panel: "size", column: "conns", columns: []string{"128", "512", "2048"}, fixed: map[string]string{"compress": "false"}},
-		{file: "broadcast-compressed", title: "Broadcast, one message to every connection, compressed", panel: "size", column: "conns", columns: []string{"128", "512", "2048"}, fixed: map[string]string{"compress": "true"}},
-		{file: "broadcast-nocontext", title: "Broadcast, one message to every connection, compressed without context takeover", panel: "size", column: "conns", columns: []string{"128", "512", "2048"}, fixed: map[string]string{"compress": "nocontext"}},
+		{file: "broadcast-plain", title: "Broadcast, one message to every connection, uncompressed", panel: "size", column: "conns", columns: []string{"128", "2048", "8192"}, fixed: map[string]string{"compress": "false"}},
+		{file: "broadcast-compressed", title: "Broadcast, one message to every connection, compressed", panel: "size", column: "conns", columns: []string{"128", "2048", "8192"}, fixed: map[string]string{"compress": "true"}},
+		{file: "broadcast-nocontext", title: "Broadcast, one message to every connection, compressed without context takeover", panel: "size", column: "conns", columns: []string{"128", "2048", "8192"}, fixed: map[string]string{"compress": "nocontext"}},
 	},
 	"UTF8": {
 		{file: "utf8-1conn", title: "Text echo with UTF-8 validation, one connection", panel: "kind", column: "size", columns: []string{"1024", "16384"}, fixed: map[string]string{"conns": "1"}},
