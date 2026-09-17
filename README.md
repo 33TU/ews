@@ -230,14 +230,28 @@ is the CPU it takes to do so:
 | gws_std | 5,809 | 343% |
 | gws | 5,687 | 350% |
 
-At 256 KiB payloads the link is the ceiling and the differences are CPU
-and memory. With 1,000 connections ews moves the same 4.2 GB/s as gws on
-180 percent CPU where gws needs 300, since a frame that size is larger than
-gws's largest pooled buffer and is allocated per message. With 10,000
-connections, one message in flight on each, ews holds the ceiling on 175
-percent CPU and 147 MB; gws falls below it on 408 percent and 310 MB, and
-most other libraries hold 4 to 10 GB, a buffer the size of the message per
-connection.
+At 256 KiB payloads the loopback link is the ceiling, about 4.2 GB/s each
+way, and the libraries separate on what it costs them to reach it. With
+10,000 connections and one message in flight on each:
+
+| server | echoes/s | median round trip | CPU | memory |
+|---|---|---|---|---|
+| ews | 16,384 | 10.1 ms | 175% | 147 MB |
+| ews_sync | 16,786 | 6.5 ms | 146% | 156 MB |
+| nbio_std | 16,706 | 9.9 ms | 177% | 331 MB |
+| nbio_blocking | 16,638 | 10.7 ms | 172% | 220 MB |
+| gws | 13,294 | 16.6 ms | 408% | 310 MB |
+| gws_std | 12,516 | 17.1 ms | 398% | 264 MB |
+| gorilla | 14,874 | 8.3 ms | 111% | 4.99 GB |
+| fasthttp | 15,444 | 8.4 ms | 159% | 4.62 GB |
+| quickws | 14,202 | 14.5 ms | 231% | 5.35 GB |
+| nettyws | 12,995 | 14.5 ms | 208% | 9.99 GB |
+
+ews holds a message only until the next read and returns the buffer to a
+pool bounded at 1 MiB per buffer, so its memory follows what is in flight
+rather than the connection count. gws allocates a frame per message above
+its largest pooled buffer class, which a 256 KiB payload just exceeds; at
+128 KiB the two tie completely.
 
 ## Development
 
