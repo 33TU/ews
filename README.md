@@ -230,6 +230,11 @@ is the CPU it takes to do so:
 | gws_std | 5,809 | 343% |
 | gws | 5,687 | 350% |
 
+At 256 KiB payloads every server is bound by loopback bandwidth and moves
+the same 4.2 GB/s; ews does it on 180 percent CPU where gws needs 300,
+since a frame that size is larger than gws's largest pooled buffer and is
+allocated per message.
+
 ## Development
 
 ```sh
