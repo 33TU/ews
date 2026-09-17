@@ -229,9 +229,13 @@ nothing.
 
 ![Echo, compressed](bench/echo/echo-compressed.svg)
 
+![Echo, compressed without context takeover](bench/echo/echo-nocontext.svg)
+
 ![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
 
 ![Text validation, 128 connections](bench/utf8/utf8-128conn.svg)
+
+![Text validation, 128 connections, built with GOEXPERIMENT=simd](bench/utf8/utf8-128conn-simd.svg)
 
 Build with `GOEXPERIMENT=simd` for SIMD masking and UTF-8 validation;
 results for that build are beside the default ones.
