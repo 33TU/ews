@@ -28,7 +28,7 @@ import (
 func BenchmarkBroadcast(b *testing.B) {
 	rng := rand.New(rand.NewPCG(7, 11))
 	for _, mode := range []harness.Mode{harness.Plain, harness.Takeover, harness.NoTakeover} {
-		for _, size := range []int{256, 4 << 10, 64 << 10} {
+		for _, size := range []int{256, 4 << 10, 64 << 10, 256 << 10} {
 			for _, conns := range []int{128, 512, 2048} {
 				libs := []string{"ews", "ews-sync", "gws", "gorilla"}
 				if mode == harness.Takeover {
