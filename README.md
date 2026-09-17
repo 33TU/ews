@@ -217,7 +217,18 @@ the harness behind gws's published chart, with current library versions and
 from its echo and rate tests at 10k connections. Echo ties there; in the
 rate test ews takes the whole offered load with no drops at 1.8 times
 gws's echoes per CPU point, because the Queue coalesces each connection's
-backlog into one writev.
+backlog into one writev. The rate test at 10k connections on a 9950X3D,
+where every server below takes the whole offered load and the difference
+is the CPU it takes to do so:
+
+| server | echoes per second per CPU percent | CPU |
+|---|---|---|
+| ews | 10,222 | 195% |
+| ews_sync | 6,079 | 327% |
+| quickws | 5,897 | 337% |
+| nbio_std | 5,851 | 341% |
+| gws_std | 5,809 | 343% |
+| gws | 5,687 | 350% |
 
 ## Development
 
