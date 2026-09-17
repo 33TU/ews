@@ -149,6 +149,17 @@ is one allocation per message, the frame every recipient shares, and it is
 what lets a hub marshal into a pooled buffer, call `Prepare`, and return the
 buffer to the pool at once. Sending costs nothing per recipient.
 
+Give every connection its own `Queue` when you broadcast. A slow or dead
+client then blocks only its own writer, and the queue's limit turns a
+backlog into `ErrQueueFull` on that connection instead of a stall, so the hub
+decides what to do with a client that cannot keep up without waiting for it.
+Below the machine's bandwidth ceiling this costs less CPU per delivery than
+writing in a loop. At the ceiling, large frames to thousands of clients at
+once, it costs more, because thousands of writers wait on memory together;
+that is the price of never letting one client slow another. A loop of
+`WritePrepared` over the connections is cheaper there only by giving that
+isolation up: it stalls on the first slow socket.
+
 Tunnel another protocol over the connection:
 
 ```go
