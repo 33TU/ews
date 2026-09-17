@@ -11,7 +11,9 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/33TU/ews/handshake"
 	"github.com/33TU/ews/ws"
@@ -140,4 +142,16 @@ func GwsUpgrader(mode Mode, handler gws.Event) *gws.Upgrader {
 			Level:                 flate.BestSpeed,
 		},
 	})
+}
+
+// CPUTime is the process's user plus system CPU time so far, for reporting
+// CPU per message beside throughput. Server and clients share the process
+// in these benchmarks and the clients are the same ews reader for every
+// server, so differences between servers are the servers'.
+func CPUTime() time.Duration {
+	var ru syscall.Rusage
+	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &ru); err != nil {
+		return 0
+	}
+	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
 }

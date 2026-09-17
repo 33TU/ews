@@ -176,11 +176,15 @@ func BenchmarkBroadcast(b *testing.B) {
 						b.ReportAllocs()
 						b.SetBytes(int64(size * conns))
 						b.ResetTimer()
+						cpu := harness.CPUTime()
 						for b.Loop() {
 							round()
 						}
 						b.StopTimer()
-						b.ReportMetric(float64(b.N)*float64(conns)/b.Elapsed().Seconds(), "msgs/s")
+						cpu = harness.CPUTime() - cpu
+						delivered := float64(b.N) * float64(conns)
+						b.ReportMetric(delivered/b.Elapsed().Seconds(), "msgs/s")
+						b.ReportMetric(float64(cpu.Nanoseconds())/delivered, "cpu-ns/msg")
 					})
 				}
 			}

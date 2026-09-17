@@ -30,6 +30,7 @@ type key struct {
 
 type result struct {
 	ns, mbs, msgs float64
+	cpu           float64 // CPU nanoseconds per message, process-wide; zero when not reported.
 	bytes, allocs int
 }
 
@@ -81,7 +82,7 @@ Payloads are JSON-like ASCII, JSON with Japanese values (mixed), and Japanese pr
 	},
 	"Broadcast": {
 		title: "Broadcast benchmark results",
-		setup: `One message of 256 bytes, 4 KiB, 64 KiB or 256 KiB delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second; allocations are process-wide per round, so ews's few are the ` + "`Prepared`" + ` made once per round, not per recipient.
+		setup: `One message of 256 bytes, 4 KiB, 64 KiB or 256 KiB delivered to every connected client, timed until all clients have received it. Servers run behind ` + "`httptest`" + ` on loopback TCP and every client is the same ews reader, so the read side costs the same for all servers and differences come from the broadcast path. Throughput is in messages delivered per second. CPU per message is the process's user and system time over the timed rounds divided by messages delivered; it includes the clients' reads, which are the same for every server, so differences between columns are the servers'. Allocations are process-wide per round, so ews's few are the ` + "`Prepared`" + ` made once per round, not per recipient.
 
 - ` + "`ews`" + `: ` + "`Prepare`" + ` once, then ` + "`SendPrepared`" + ` on each connection's ` + "`Queue`" + `, returning before the writes complete.
 - ` + "`ews-sync`" + `: ` + "`Prepare`" + ` once, then ` + "`WritePrepared`" + ` on each connection in a loop, waiting for each write.
@@ -94,6 +95,7 @@ Compression is permessage-deflate at flate level 1 with 15-bit windows, with and
 - A synchronous loop serializes every write on one goroutine, so it trails the queued paths by several times as connections grow.
 - Compressed with takeover, the message is compressed once in both libraries and only the per-connection history update and the clients' decompression remain. gws copies the payload into each connection's window in its worker; ews defers that copy until the connection next compresses a message of its own, which a broadcast-only recipient never does, so the sender's loop stays short at every payload size.
 - Without takeover there is no history to update, and ews and gws tie at the write floor again; gorilla's synchronous prepared write sits with ews-sync, a little behind it on allocations.
+- The CPU column separates what the throughput tie hides. Below the bandwidth ceiling the asynchronous paths cost a fifth less CPU per delivery than the synchronous ones. At the ceiling, 64 KiB and 256 KiB to 2048 clients, they cost two to four times more for the same throughput: two thousand writers copying at once turn memory stalls into CPU time, where one goroutine writing in turn does not. With takeover, gws's per-recipient window copy shows as up to 1.8 times ews's CPU per message at 2048 clients.
 `,
 	},
 }
@@ -146,6 +148,7 @@ func main() {
 		r.ns, _ = strconv.ParseFloat(ns, 64)
 		r.mbs = metric(rest, "MB/s")
 		r.msgs = metric(rest, "msgs/s")
+		r.cpu = metric(rest, "cpu-ns/msg")
 		r.bytes = int(metric(rest, "B/op"))
 		r.allocs = int(metric(rest, "allocs/op"))
 		rows[k] = r
@@ -235,25 +238,42 @@ func main() {
 			for i, d := range dimOrder[fam] {
 				heads[i] = strings.ToUpper(d[:1]) + d[1:]
 			}
-			fmt.Fprintf(w, "## %s\n\n| %s | %s | allocs/op %s |\n|%s%s---|\n", title, strings.Join(heads, " | "), strings.Join(libs, " | "), strings.Join(libs, " / "), strings.Repeat("---|", len(heads)), strings.Repeat("---|", len(libs)))
 			labels := rowLabels[fc]
 			sort.SliceStable(labels, func(i, j int) bool { return dimLess(labels[i], labels[j]) })
+			hasCPU := false
 			for _, label := range labels {
-				var cells, allocs []string
+				for _, lib := range libs {
+					if rows[key{fam, label, comp, lib}].cpu > 0 {
+						hasCPU = true
+					}
+				}
+			}
+			cpuHead := ""
+			if hasCPU {
+				cpuHead = fmt.Sprintf(" CPU/msg %s |", strings.Join(libs, " / "))
+			}
+			fmt.Fprintf(w, "## %s\n\n| %s | %s |%s allocs/op %s |\n|%s%s%s---|\n", title, strings.Join(heads, " | "), strings.Join(libs, " | "), cpuHead, strings.Join(libs, " / "), strings.Repeat("---|", len(heads)), strings.Repeat("---|", len(libs)), map[bool]string{true: "---|", false: ""}[hasCPU])
+			for _, label := range labels {
+				var cells, cpus, allocs []string
 				for _, lib := range libs {
 					r, ok := rows[key{fam, label, comp, lib}]
 					if !ok {
-						cells, allocs = append(cells, "n/a"), append(allocs, "n/a")
+						cells, cpus, allocs = append(cells, "n/a"), append(cpus, "n/a"), append(allocs, "n/a")
 						continue
 					}
 					cells = append(cells, throughput(r))
+					cpus = append(cpus, cpuPerMsg(r))
 					a := strconv.Itoa(r.allocs)
 					if r.bytes >= 1024 {
 						a += fmt.Sprintf(" (%d KB)", r.bytes/1024)
 					}
 					allocs = append(allocs, a)
 				}
-				fmt.Fprintf(w, "| %s | %s | %s |\n", rowCells(label), strings.Join(cells, " | "), strings.Join(allocs, " / "))
+				cpuCell := ""
+				if hasCPU {
+					cpuCell = " " + strings.Join(cpus, " / ") + " |"
+				}
+				fmt.Fprintf(w, "| %s | %s |%s %s |\n", rowCells(label), strings.Join(cells, " | "), cpuCell, strings.Join(allocs, " / "))
 			}
 			fmt.Fprintln(w)
 		}
@@ -270,6 +290,18 @@ func metric(rest, unit string) float64 {
 	}
 	v, _ := strconv.ParseFloat(m[1], 64)
 	return v
+}
+
+// cpuPerMsg renders process CPU time per message.
+func cpuPerMsg(r result) string {
+	switch {
+	case r.cpu <= 0:
+		return "n/a"
+	case r.cpu >= 1000:
+		return fmt.Sprintf("%.1f µs", r.cpu/1000)
+	default:
+		return fmt.Sprintf("%.0f ns", r.cpu)
+	}
 }
 
 // throughput prefers the benchmark's own metric, messages per second, over

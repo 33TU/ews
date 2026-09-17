@@ -2,137 +2,137 @@ goos: linux
 goarch: amd64
 pkg: github.com/33TU/ews/bench/broadcast
 cpu: AMD Ryzen 9 9950X3D 16-Core Processor
-BenchmarkBroadcast/compress=false/size=256/conns=128/gorilla-8         	    6270	    191212 ns/op	 171.37 MB/s	    669413 msgs/s	   11761 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=128/ews-8             	   15153	     79242 ns/op	 413.52 MB/s	   1615310 msgs/s	     386 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=128/ews-sync-8        	    6526	    180426 ns/op	 181.61 MB/s	    709433 msgs/s	     384 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=128/gws-8             	   14958	     80151 ns/op	 408.83 MB/s	   1596980 msgs/s	    9384 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=512/ews-8             	    4738	    256660 ns/op	 510.68 MB/s	   1994860 msgs/s	     391 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=512/gws-8             	    4706	    257580 ns/op	 508.86 MB/s	   1987733 msgs/s	   37033 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=512/gorilla-8         	    1640	    732489 ns/op	 178.94 MB/s	    698986 msgs/s	   11760 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=512/ews-sync-8        	    1742	    690719 ns/op	 189.76 MB/s	    741256 msgs/s	     384 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=2048/gws-8            	    1311	    951956 ns/op	 550.75 MB/s	   2151361 msgs/s	  147875 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=2048/ews-sync-8       	     446	   2676561 ns/op	 195.88 MB/s	    765161 msgs/s	     384 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=2048/gorilla-8        	     422	   2837961 ns/op	 184.74 MB/s	    721645 msgs/s	   11760 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=256/conns=2048/ews-8            	    1292	    953894 ns/op	 549.63 MB/s	   2146989 msgs/s	     384 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=128/gws-8            	   13441	     89155 ns/op	5880.66 MB/s	   1435709 msgs/s	    9416 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=128/gorilla-8        	    5656	    209848 ns/op	2498.41 MB/s	    609964 msgs/s	   20928 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=128/ews-8            	   13783	     87040 ns/op	6023.50 MB/s	   1470581 msgs/s	    4961 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=128/ews-sync-8       	    5974	    197943 ns/op	2648.69 MB/s	    646652 msgs/s	    4963 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=512/ews-8            	    4167	    289673 ns/op	7239.71 MB/s	   1767507 msgs/s	    4962 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=512/ews-sync-8       	    1618	    740471 ns/op	2832.19 MB/s	    691452 msgs/s	    4960 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=512/gorilla-8        	    1528	    785449 ns/op	2670.01 MB/s	    651857 msgs/s	   20916 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=512/gws-8            	    4140	    288667 ns/op	7264.94 MB/s	   1773667 msgs/s	   37103 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=2048/ews-sync-8      	     406	   2934943 ns/op	2858.18 MB/s	    697799 msgs/s	    4974 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=2048/ews-8           	    1149	   1058423 ns/op	7925.57 MB/s	   1934954 msgs/s	    4960 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=2048/gws-8           	    1117	   1061895 ns/op	7899.66 MB/s	   1928628 msgs/s	  147731 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=false/size=4096/conns=2048/gorilla-8       	     382	   3110274 ns/op	2697.06 MB/s	    658463 msgs/s	   20937 B/op	      15 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=128/gws-8           	    7405	    166924 ns/op	50254.01 MB/s	    766815 msgs/s	    9748 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=128/gorilla-8       	    1588	    739028 ns/op	11350.86 MB/s	    173200 msgs/s	  172054 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=128/ews-8           	    7101	    168720 ns/op	49719.18 MB/s	    758654 msgs/s	   74498 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=128/ews-sync-8      	    1646	    726899 ns/op	11540.26 MB/s	    176090 msgs/s	   74980 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=512/gws-8           	    2336	    517990 ns/op	64778.12 MB/s	    988436 msgs/s	   37854 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=512/ews-8           	    2254	    515732 ns/op	65061.73 MB/s	    992763 msgs/s	   74234 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=512/ews-sync-8      	     441	   2711258 ns/op	12375.97 MB/s	    188842 msgs/s	   73830 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=512/gorilla-8       	     453	   2683740 ns/op	12502.86 MB/s	    190779 msgs/s	  169910 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=2048/gorilla-8      	     100	  11433765 ns/op	11738.72 MB/s	    179119 msgs/s	  169212 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=2048/ews-sync-8     	     100	  11353241 ns/op	11821.98 MB/s	    180389 msgs/s	   74520 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=2048/ews-8          	     238	   4961828 ns/op	27050.05 MB/s	    412751 msgs/s	   73824 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=65536/conns=2048/gws-8          	     241	   4919365 ns/op	27283.55 MB/s	    416314 msgs/s	  149560 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=128/gorilla-8      	     670	   1739887 ns/op	19285.41 MB/s	     73568 msgs/s	  646908 B/op	      22 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=128/ews-8          	    3026	    396188 ns/op	84693.18 MB/s	    323079 msgs/s	  278856 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=128/ews-sync-8     	     708	   1700102 ns/op	19736.72 MB/s	     75290 msgs/s	  297950 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=128/gws-8          	    2982	    400030 ns/op	83879.78 MB/s	    319976 msgs/s	  287327 B/op	     261 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=512/ews-8          	     458	   2680329 ns/op	50075.10 MB/s	    191021 msgs/s	  273954 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=512/ews-sync-8     	     168	   7198159 ns/op	18646.12 MB/s	     71129 msgs/s	  278381 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=512/gws-8          	     435	   2683548 ns/op	50015.03 MB/s	    190792 msgs/s	  316018 B/op	    1029 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=512/gorilla-8      	     168	   7104523 ns/op	18891.87 MB/s	     72067 msgs/s	  577634 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=2048/gorilla-8     	      39	  29314734 ns/op	18314.03 MB/s	     69862 msgs/s	  561737 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=2048/gws-8         	      44	  26743913 ns/op	20074.51 MB/s	     76578 msgs/s	  418438 B/op	    4101 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=2048/ews-8         	      44	  26670379 ns/op	20129.86 MB/s	     76789 msgs/s	  270432 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=false/size=262144/conns=2048/ews-sync-8    	      40	  29774512 ns/op	18031.22 MB/s	     68784 msgs/s	  270436 B/op	       2 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=128/ews-sync-8         	    6408	    182396 ns/op	 179.65 MB/s	    701770 msgs/s	    1131 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=128/gws-8              	   10000	    109034 ns/op	 300.53 MB/s	   1173948 msgs/s	    9401 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=128/ews-8              	   10000	    101785 ns/op	 321.93 MB/s	   1257547 msgs/s	     658 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=512/gws-8              	    3901	    352220 ns/op	 372.13 MB/s	   1453637 msgs/s	   37208 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=512/ews-sync-8         	    1796	    676311 ns/op	 193.80 MB/s	    757048 msgs/s	    3667 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=512/ews-8              	    3859	    331234 ns/op	 395.71 MB/s	   1545733 msgs/s	     917 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=2048/ews-8             	     996	   1409939 ns/op	 371.85 MB/s	   1452545 msgs/s	    1313 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=2048/gws-8             	     985	   2383347 ns/op	 219.98 MB/s	    859296 msgs/s	  147624 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=true/size=256/conns=2048/ews-sync-8        	     439	   2944584 ns/op	 178.05 MB/s	    695514 msgs/s	    9765 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=128/gws-8             	    8983	    129421 ns/op	4051.03 MB/s	    989020 msgs/s	    9382 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=128/ews-sync-8        	    6340	    181421 ns/op	2889.90 MB/s	    705542 msgs/s	    5217 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=128/ews-8             	    9618	    123335 ns/op	4250.91 MB/s	   1037820 msgs/s	    5151 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=512/ews-sync-8        	    1771	    672667 ns/op	3117.67 MB/s	    761149 msgs/s	    8305 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=512/gws-8             	    2732	    439533 ns/op	4771.32 MB/s	   1164874 msgs/s	   37046 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=512/ews-8             	    2853	    415687 ns/op	5045.03 MB/s	   1231696 msgs/s	    5088 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=2048/gws-8            	     404	   2910639 ns/op	2882.05 MB/s	    703626 msgs/s	  147671 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=2048/ews-8            	     646	   1872021 ns/op	4481.04 MB/s	   1094005 msgs/s	    6348 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=4096/conns=2048/ews-sync-8       	     412	   2903615 ns/op	2889.02 MB/s	    705328 msgs/s	   11015 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=128/gws-8            	    5337	    215737 ns/op	38883.58 MB/s	    593316 msgs/s	    9962 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=128/ews-8            	    5473	    212431 ns/op	39488.69 MB/s	    602550 msgs/s	   75598 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=128/ews-sync-8       	    5686	    208798 ns/op	40175.62 MB/s	    613031 msgs/s	   76772 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=512/gws-8            	    1576	    756876 ns/op	44332.82 MB/s	    676465 msgs/s	   39335 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=512/ews-sync-8       	    1628	    733052 ns/op	45773.59 MB/s	    698450 msgs/s	   76577 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=512/ews-8            	    1633	    729730 ns/op	45982.00 MB/s	    701630 msgs/s	   76231 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=2048/gws-8           	     272	   4394840 ns/op	30539.84 MB/s	    466001 msgs/s	  148582 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=2048/ews-8           	     398	   3022367 ns/op	44408.15 MB/s	    677615 msgs/s	   93074 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=65536/conns=2048/ews-sync-8      	     384	   3124524 ns/op	42956.22 MB/s	    655460 msgs/s	   80532 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=128/ews-8           	    2419	    506582 ns/op	66236.90 MB/s	    252674 msgs/s	  477599 B/op	       6 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=128/gws-8           	    2360	    492743 ns/op	68097.27 MB/s	    259770 msgs/s	  314365 B/op	     261 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=128/ews-sync-8      	    2289	    517755 ns/op	64807.60 MB/s	    247221 msgs/s	  443313 B/op	       6 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=512/ews-8           	     685	   1783646 ns/op	75249.07 MB/s	    287052 msgs/s	  338203 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=512/gws-8           	     667	   1819082 ns/op	73783.24 MB/s	    281461 msgs/s	  534021 B/op	    1031 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=512/ews-sync-8      	     646	   1809492 ns/op	74174.26 MB/s	    282952 msgs/s	  402906 B/op	       5 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=2048/ews-8          	     168	   7252607 ns/op	74024.55 MB/s	    282381 msgs/s	  281085 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=2048/ews-sync-8     	     170	   7057131 ns/op	76074.95 MB/s	    290203 msgs/s	  276173 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=true/size=262144/conns=2048/gws-8          	     141	   8543990 ns/op	62836.09 MB/s	    239701 msgs/s	  418000 B/op	    4101 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=128/ews-sync-8    	    6418	    185585 ns/op	 176.57 MB/s	    689711 msgs/s	    1003 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=128/gws-8         	   14726	     81577 ns/op	 401.68 MB/s	   1569076 msgs/s	    9377 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=128/ews-8         	   13137	     91357 ns/op	 358.68 MB/s	   1401104 msgs/s	     647 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=128/gorilla-8     	    5838	    198853 ns/op	 164.79 MB/s	    643692 msgs/s	   13178 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=512/ews-sync-8    	    1725	    691373 ns/op	 189.58 MB/s	    740555 msgs/s	    5215 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=512/gorilla-8     	    1624	    735364 ns/op	 178.24 MB/s	    696253 msgs/s	   18237 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=512/ews-8         	    4057	    291330 ns/op	 449.91 MB/s	   1757457 msgs/s	     496 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=512/gws-8         	    4648	    262268 ns/op	 499.76 MB/s	   1952202 msgs/s	   37028 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/gorilla-8    	     418	   2842433 ns/op	 184.45 MB/s	    720509 msgs/s	   28067 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/ews-sync-8   	     450	   2654516 ns/op	 197.51 MB/s	    771515 msgs/s	    7730 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/gws-8        	    1246	    967471 ns/op	 541.92 MB/s	   2116859 msgs/s	  147624 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/ews-8        	    1140	   1054747 ns/op	 497.07 MB/s	   1941698 msgs/s	    1209 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/ews-sync-8   	    6025	    192637 ns/op	2721.64 MB/s	    664462 msgs/s	    5088 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/ews-8        	   10000	    112360 ns/op	4666.13 MB/s	   1139191 msgs/s	    5113 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/gorilla-8    	    5721	    202691 ns/op	2586.63 MB/s	    631503 msgs/s	   17156 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/gws-8        	   10000	    112004 ns/op	4680.99 MB/s	   1142821 msgs/s	    9480 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/gorilla-8    	    1616	    739541 ns/op	2835.75 MB/s	    692321 msgs/s	   20486 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/gws-8        	    3295	    374869 ns/op	5594.36 MB/s	   1365810 msgs/s	   37536 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/ews-sync-8   	    1694	    693161 ns/op	3025.49 MB/s	    738645 msgs/s	    8185 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/ews-8        	    3298	    369216 ns/op	5680.01 MB/s	   1386722 msgs/s	    5554 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/ews-sync-8  	     447	   2669302 ns/op	3142.62 MB/s	    767242 msgs/s	   14193 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/gorilla-8   	     418	   2849839 ns/op	2943.54 MB/s	    718637 msgs/s	   24018 B/op	      18 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/gws-8       	     878	   1375643 ns/op	6097.95 MB/s	   1488758 msgs/s	  149590 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/ews-8       	     884	   1370274 ns/op	6121.85 MB/s	   1494592 msgs/s	    5088 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/ews-8       	    5589	    200185 ns/op	41904.37 MB/s	    639410 msgs/s	   77655 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/gorilla-8   	    5228	    217056 ns/op	38647.19 MB/s	    589709 msgs/s	   95623 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/ews-sync-8  	    5791	    206701 ns/op	40583.33 MB/s	    619253 msgs/s	   78565 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/gws-8       	    6132	    195612 ns/op	42884.01 MB/s	    654358 msgs/s	    9696 B/op	     259 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/ews-sync-8  	    1621	    727221 ns/op	46140.61 MB/s	    704050 msgs/s	   80615 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/gorilla-8   	    1538	    762634 ns/op	43998.10 MB/s	    671358 msgs/s	   96078 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/gws-8       	    1789	    682439 ns/op	49168.37 MB/s	    750250 msgs/s	   40156 B/op	    1027 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/ews-8       	    1713	    689784 ns/op	48644.85 MB/s	    742262 msgs/s	   81157 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/gws-8      	     460	   2574265 ns/op	52138.28 MB/s	    795567 msgs/s	  150739 B/op	    4099 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/ews-8      	     465	   2581232 ns/op	51997.55 MB/s	    793420 msgs/s	   78070 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/gorilla-8  	     421	   2870131 ns/op	46763.63 MB/s	    713556 msgs/s	   97892 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/ews-sync-8 	     435	   2741040 ns/op	48965.99 MB/s	    747162 msgs/s	   86428 B/op	       4 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/ews-sync-8 	    2239	    513721 ns/op	65316.51 MB/s	    249163 msgs/s	  536557 B/op	       7 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/ews-8      	    2461	    497519 ns/op	67443.56 MB/s	    257277 msgs/s	  543866 B/op	       8 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/gorilla-8  	    2181	    522180 ns/op	64258.40 MB/s	    245126 msgs/s	  437628 B/op	      23 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/gws-8      	    2527	    475412 ns/op	70579.64 MB/s	    269240 msgs/s	  325619 B/op	     261 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/gws-8      	     696	   1709259 ns/op	78523.95 MB/s	    299545 msgs/s	  381933 B/op	    1030 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/ews-sync-8 	     681	   1752928 ns/op	76567.73 MB/s	    292083 msgs/s	  367990 B/op	       5 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/ews-8      	     700	   1743179 ns/op	76995.97 MB/s	    293716 msgs/s	  785167 B/op	      11 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/gorilla-8  	     668	   1780667 ns/op	75374.95 MB/s	    287533 msgs/s	  527608 B/op	      24 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/ews-8     	     177	   6715575 ns/op	79944.14 MB/s	    304963 msgs/s	  508247 B/op	       7 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/gws-8     	     180	   6652802 ns/op	80698.47 MB/s	    307840 msgs/s	  626402 B/op	    4103 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/gorilla-8 	     181	   6672173 ns/op	80464.18 MB/s	    306946 msgs/s	  287456 B/op	      21 allocs/op
-BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/ews-sync-8         	     181	   6608877 ns/op	81234.81 MB/s	    309886 msgs/s	  442080 B/op	       6 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=128/gorilla-8         	    6246	    192089 ns/op	 170.59 MB/s	      3263 cpu-ns/msg	    666357 msgs/s	   11761 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=128/ews-8             	   15228	     78933 ns/op	 415.13 MB/s	      2485 cpu-ns/msg	   1621619 msgs/s	     384 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=128/ews-sync-8        	    6524	    181331 ns/op	 180.71 MB/s	      3141 cpu-ns/msg	    705890 msgs/s	     384 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=128/gws-8             	   14918	     80363 ns/op	 407.75 MB/s	      2533 cpu-ns/msg	   1592768 msgs/s	    9384 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=512/ews-8             	    4852	    253382 ns/op	 517.29 MB/s	      2356 cpu-ns/msg	   2020662 msgs/s	     391 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=512/gws-8             	    4664	    254401 ns/op	 515.22 MB/s	      2381 cpu-ns/msg	   2012570 msgs/s	   37032 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=512/gorilla-8         	    1624	    733900 ns/op	 178.60 MB/s	      3225 cpu-ns/msg	    697643 msgs/s	   11760 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=512/ews-sync-8        	    1744	    689296 ns/op	 190.15 MB/s	      3111 cpu-ns/msg	    742787 msgs/s	     384 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=2048/gws-8            	    1257	    949834 ns/op	 551.98 MB/s	      2347 cpu-ns/msg	   2156165 msgs/s	  147831 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=2048/ews-sync-8       	     446	   2681211 ns/op	 195.54 MB/s	      3080 cpu-ns/msg	    763834 msgs/s	     384 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=2048/gorilla-8        	     423	   2833091 ns/op	 185.06 MB/s	      3153 cpu-ns/msg	    722885 msgs/s	   11760 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=256/conns=2048/ews-8            	    1296	    944078 ns/op	 555.34 MB/s	      2353 cpu-ns/msg	   2169312 msgs/s	     384 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=128/gws-8            	   13700	     87656 ns/op	5981.17 MB/s	      2912 cpu-ns/msg	   1460246 msgs/s	    9412 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=128/gorilla-8        	    5590	    210505 ns/op	2490.63 MB/s	      3709 cpu-ns/msg	    608063 msgs/s	   20923 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=128/ews-8            	   13783	     87092 ns/op	6019.96 MB/s	      2898 cpu-ns/msg	   1469717 msgs/s	    4962 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=128/ews-sync-8       	    6060	    197212 ns/op	2658.51 MB/s	      3519 cpu-ns/msg	    649049 msgs/s	    4966 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=512/ews-8            	    4237	    286413 ns/op	7322.12 MB/s	      2736 cpu-ns/msg	   1787627 msgs/s	    4968 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=512/ews-sync-8       	    1611	    738571 ns/op	2839.47 MB/s	      3434 cpu-ns/msg	    693231 msgs/s	    4979 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=512/gorilla-8        	    1515	    786787 ns/op	2665.46 MB/s	      3586 cpu-ns/msg	    650748 msgs/s	   20925 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=512/gws-8            	    4274	    283901 ns/op	7386.91 MB/s	      2754 cpu-ns/msg	   1803446 msgs/s	   37121 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=2048/ews-sync-8      	     410	   2920543 ns/op	2872.28 MB/s	      3422 cpu-ns/msg	    701240 msgs/s	    4960 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=2048/ews-8           	    1138	   1074930 ns/op	7803.86 MB/s	      2730 cpu-ns/msg	   1905240 msgs/s	    4961 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=2048/gws-8           	    1112	   1068396 ns/op	7851.59 MB/s	      2784 cpu-ns/msg	   1916892 msgs/s	  147698 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=false/size=4096/conns=2048/gorilla-8       	     384	   3108556 ns/op	2698.55 MB/s	      3611 cpu-ns/msg	    658827 msgs/s	   20916 B/op	      15 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=128/gws-8           	    7054	    165947 ns/op	50550.01 MB/s	      5924 cpu-ns/msg	    771332 msgs/s	    9915 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=128/gorilla-8       	    1592	    731801 ns/op	11462.97 MB/s	      7720 cpu-ns/msg	    174911 msgs/s	  171167 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=128/ews-8           	    7144	    171129 ns/op	49019.28 MB/s	      6033 cpu-ns/msg	    747975 msgs/s	   74536 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=128/ews-sync-8      	    1636	    716010 ns/op	11715.76 MB/s	      7365 cpu-ns/msg	    178768 msgs/s	   74944 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=512/gws-8           	    2372	    521698 ns/op	64317.70 MB/s	      5190 cpu-ns/msg	    981410 msgs/s	   38157 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=512/ews-8           	    2330	    516746 ns/op	64934.08 MB/s	      5212 cpu-ns/msg	    990815 msgs/s	   74191 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=512/ews-sync-8      	     450	   2681011 ns/op	12515.59 MB/s	      7133 cpu-ns/msg	    190973 msgs/s	   74913 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=512/gorilla-8       	     452	   2639692 ns/op	12711.50 MB/s	      7157 cpu-ns/msg	    193962 msgs/s	  169760 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=2048/gorilla-8      	     100	  11530548 ns/op	11640.19 MB/s	      7380 cpu-ns/msg	    177615 msgs/s	  168513 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=2048/ews-sync-8     	     100	  11551320 ns/op	11619.25 MB/s	      7333 cpu-ns/msg	    177296 msgs/s	   73827 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=2048/ews-8          	     240	   4937749 ns/op	27181.97 MB/s	     14612 cpu-ns/msg	    414764 msgs/s	   73824 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=65536/conns=2048/gws-8          	     242	   4918167 ns/op	27290.19 MB/s	     14675 cpu-ns/msg	    416415 msgs/s	  148467 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=128/gorilla-8      	     685	   1730657 ns/op	19388.27 MB/s	     21877 cpu-ns/msg	     73960 msgs/s	  634558 B/op	      22 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=128/ews-8          	    2942	    396369 ns/op	84654.57 MB/s	     16720 cpu-ns/msg	    322932 msgs/s	  278644 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=128/ews-sync-8     	     706	   1695460 ns/op	19790.75 MB/s	     20887 cpu-ns/msg	     75496 msgs/s	  298403 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=128/gws-8          	    2850	    401531 ns/op	83566.29 MB/s	     16878 cpu-ns/msg	    318780 msgs/s	  290289 B/op	     261 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=512/ews-8          	     459	   2667939 ns/op	50307.64 MB/s	     33791 cpu-ns/msg	    191908 msgs/s	  273373 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=512/ews-sync-8     	     166	   7176327 ns/op	18702.84 MB/s	     21708 cpu-ns/msg	     71346 msgs/s	  283291 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=512/gws-8          	     469	   2667808 ns/op	50310.11 MB/s	     33865 cpu-ns/msg	    191918 msgs/s	  316524 B/op	    1029 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=512/gorilla-8      	     165	   7224550 ns/op	18578.01 MB/s	     22069 cpu-ns/msg	     70869 msgs/s	  585997 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=2048/gorilla-8     	      40	  29714788 ns/op	18067.47 MB/s	     22223 cpu-ns/msg	     68922 msgs/s	  561792 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=2048/gws-8         	      44	  26770409 ns/op	20054.64 MB/s	     93796 cpu-ns/msg	     76502 msgs/s	  424051 B/op	    4101 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=2048/ews-8         	      44	  26650276 ns/op	20145.04 MB/s	     94019 cpu-ns/msg	     76847 msgs/s	  276483 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=false/size=262144/conns=2048/ews-sync-8    	      38	  30072222 ns/op	17852.72 MB/s	     22379 cpu-ns/msg	     68103 msgs/s	  277438 B/op	       2 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=128/ews-sync-8         	    6582	    181599 ns/op	 180.44 MB/s	      3808 cpu-ns/msg	    704850 msgs/s	     990 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=128/gws-8              	   10000	    109006 ns/op	 300.61 MB/s	      3855 cpu-ns/msg	   1174244 msgs/s	    9377 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=128/ews-8              	   10000	    101604 ns/op	 322.51 MB/s	      3467 cpu-ns/msg	   1259796 msgs/s	     577 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=512/gws-8              	    3699	    355611 ns/op	 368.58 MB/s	      3659 cpu-ns/msg	   1439777 msgs/s	   37219 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=512/ews-sync-8         	    1801	    678330 ns/op	 193.23 MB/s	      3797 cpu-ns/msg	    754794 msgs/s	    3659 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=512/ews-8              	    3828	    332098 ns/op	 394.68 MB/s	      3316 cpu-ns/msg	   1541716 msgs/s	     921 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=2048/ews-8             	    1002	   1407819 ns/op	 372.41 MB/s	      3990 cpu-ns/msg	   1454733 msgs/s	    1308 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=2048/gws-8             	     924	   2392836 ns/op	 219.11 MB/s	      7242 cpu-ns/msg	    855888 msgs/s	  147617 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=true/size=256/conns=2048/ews-sync-8        	     445	   2897714 ns/op	 180.93 MB/s	      3925 cpu-ns/msg	    706764 msgs/s	   11469 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=128/gws-8             	    8770	    129193 ns/op	4058.16 MB/s	      5071 cpu-ns/msg	    990762 msgs/s	    9398 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=128/ews-sync-8        	    6531	    183369 ns/op	2859.19 MB/s	      4836 cpu-ns/msg	    698045 msgs/s	    5337 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=128/ews-8             	   10000	    123725 ns/op	4237.52 MB/s	      4725 cpu-ns/msg	   1034552 msgs/s	    5194 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=512/ews-sync-8        	    1759	    676842 ns/op	3098.43 MB/s	      4943 cpu-ns/msg	    756454 msgs/s	    7403 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=512/gws-8             	    2742	    438191 ns/op	4785.93 MB/s	      4876 cpu-ns/msg	   1168440 msgs/s	   37034 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=512/ews-8             	    2852	    417194 ns/op	5026.80 MB/s	      4582 cpu-ns/msg	   1227246 msgs/s	    5088 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=2048/gws-8            	     399	   2975696 ns/op	2819.04 MB/s	      9308 cpu-ns/msg	    688242 msgs/s	  147659 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=2048/ews-8            	     628	   1890264 ns/op	4437.80 MB/s	      5831 cpu-ns/msg	   1083446 msgs/s	    5088 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=4096/conns=2048/ews-sync-8       	     404	   2944147 ns/op	2849.25 MB/s	      5585 cpu-ns/msg	    695618 msgs/s	   15162 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=128/gws-8            	    5380	    216382 ns/op	38767.50 MB/s	      9984 cpu-ns/msg	    591545 msgs/s	    9837 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=128/ews-8            	    5500	    212276 ns/op	39517.47 MB/s	      9598 cpu-ns/msg	    602989 msgs/s	   77378 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=128/ews-sync-8       	    5595	    206831 ns/op	40557.83 MB/s	      9266 cpu-ns/msg	    618863 msgs/s	   77390 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=512/gws-8            	    1591	    751892 ns/op	44626.67 MB/s	      9763 cpu-ns/msg	    680949 msgs/s	   37274 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=512/ews-sync-8       	    1621	    732228 ns/op	45825.13 MB/s	      8911 cpu-ns/msg	    699236 msgs/s	   77913 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=512/ews-8            	    1677	    720611 ns/op	46563.89 MB/s	      9282 cpu-ns/msg	    710509 msgs/s	   76199 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=2048/gws-8           	     268	   4442617 ns/op	30211.41 MB/s	     14501 cpu-ns/msg	    460990 msgs/s	  148603 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=2048/ews-8           	     403	   2983670 ns/op	44984.11 MB/s	      9934 cpu-ns/msg	    686403 msgs/s	   76181 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=65536/conns=2048/ews-sync-8      	     390	   3104688 ns/op	43230.67 MB/s	      9274 cpu-ns/msg	    659648 msgs/s	   78337 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=128/ews-8           	    2396	    503437 ns/op	66650.69 MB/s	     25709 cpu-ns/msg	    254252 msgs/s	  384116 B/op	       5 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=128/gws-8           	    2311	    500725 ns/op	67011.68 MB/s	     25925 cpu-ns/msg	    255629 msgs/s	  315100 B/op	     261 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=128/ews-sync-8      	    2282	    522090 ns/op	64269.39 MB/s	     25390 cpu-ns/msg	    245168 msgs/s	  394839 B/op	       5 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=512/ews-8           	     676	   1779338 ns/op	75431.28 MB/s	     25055 cpu-ns/msg	    287747 msgs/s	  393098 B/op	       5 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=512/gws-8           	     661	   1801627 ns/op	74498.08 MB/s	     25419 cpu-ns/msg	    284188 msgs/s	  334123 B/op	    1029 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=512/ews-sync-8      	     656	   1797441 ns/op	74671.55 MB/s	     24540 cpu-ns/msg	    284849 msgs/s	  345623 B/op	       5 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=2048/ews-8          	     165	   7216110 ns/op	74398.94 MB/s	     25589 cpu-ns/msg	    283809 msgs/s	  271376 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=2048/ews-sync-8     	     166	   7137082 ns/op	75222.75 MB/s	     25019 cpu-ns/msg	    286952 msgs/s	  281202 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=true/size=262144/conns=2048/gws-8          	     140	   8455745 ns/op	63491.85 MB/s	     29472 cpu-ns/msg	    242202 msgs/s	  418000 B/op	    4101 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=128/ews-sync-8    	    6309	    186803 ns/op	 175.42 MB/s	      3344 cpu-ns/msg	    685215 msgs/s	    1011 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=128/gws-8         	   14872	     80525 ns/op	 406.93 MB/s	      2531 cpu-ns/msg	   1589576 msgs/s	    9377 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=128/ews-8         	   13168	     91167 ns/op	 359.43 MB/s	      2899 cpu-ns/msg	   1404011 msgs/s	     646 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=128/gorilla-8     	    5919	    199945 ns/op	 163.89 MB/s	      3526 cpu-ns/msg	    640177 msgs/s	   12154 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=512/ews-sync-8    	    1713	    691511 ns/op	 189.54 MB/s	      3194 cpu-ns/msg	    740407 msgs/s	    5930 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=512/gorilla-8     	    1632	    735847 ns/op	 178.12 MB/s	      3378 cpu-ns/msg	    695797 msgs/s	   16773 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=512/ews-8         	    4128	    288081 ns/op	 454.98 MB/s	      2741 cpu-ns/msg	   1777277 msgs/s	     496 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=512/gws-8         	    4674	    256677 ns/op	 510.65 MB/s	      2391 cpu-ns/msg	   1994722 msgs/s	   37028 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/gorilla-8    	     423	   2825979 ns/op	 185.52 MB/s	      3270 cpu-ns/msg	    724705 msgs/s	   21258 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/ews-sync-8   	     452	   2632992 ns/op	 199.12 MB/s	      3065 cpu-ns/msg	    777822 msgs/s	    9498 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/gws-8        	    1228	    958455 ns/op	 547.01 MB/s	      2393 cpu-ns/msg	   2136771 msgs/s	  147626 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=256/conns=2048/ews-8        	    1152	   1058576 ns/op	 495.28 MB/s	      2734 cpu-ns/msg	   1934675 msgs/s	    1213 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/ews-sync-8   	    6162	    191071 ns/op	2743.94 MB/s	      4554 cpu-ns/msg	    669907 msgs/s	    5205 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/ews-8        	   10000	    112692 ns/op	4652.40 MB/s	      4112 cpu-ns/msg	   1135839 msgs/s	    5209 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/gorilla-8    	    5823	    203410 ns/op	2577.50 MB/s	      4713 cpu-ns/msg	    629272 msgs/s	   17202 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=128/gws-8        	   10000	    111772 ns/op	4690.69 MB/s	      4082 cpu-ns/msg	   1145187 msgs/s	    9556 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/gorilla-8    	    1629	    736771 ns/op	2846.41 MB/s	      4525 cpu-ns/msg	    694924 msgs/s	   19748 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/gws-8        	    3093	    377873 ns/op	5549.88 MB/s	      3971 cpu-ns/msg	   1354951 msgs/s	   37639 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/ews-sync-8   	    1722	    697384 ns/op	3007.17 MB/s	      4379 cpu-ns/msg	    734172 msgs/s	    7872 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=512/ews-8        	    3237	    372344 ns/op	5632.30 MB/s	      3916 cpu-ns/msg	   1375073 msgs/s	    5674 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/ews-sync-8  	     444	   2688626 ns/op	3120.03 MB/s	      4271 cpu-ns/msg	    761727 msgs/s	   14254 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/gorilla-8   	     420	   2847002 ns/op	2946.47 MB/s	      4433 cpu-ns/msg	    719353 msgs/s	   25918 B/op	      18 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/gws-8       	     888	   1384203 ns/op	6060.24 MB/s	      3971 cpu-ns/msg	   1479552 msgs/s	  149311 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=4096/conns=2048/ews-8       	     877	   1380835 ns/op	6075.03 MB/s	      3924 cpu-ns/msg	   1483161 msgs/s	    6944 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/ews-8       	    5787	    200487 ns/op	41841.10 MB/s	      8857 cpu-ns/msg	    638444 msgs/s	   78125 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/gorilla-8   	    5332	    215887 ns/op	38856.50 MB/s	      8845 cpu-ns/msg	    592903 msgs/s	   94858 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/ews-sync-8  	    5830	    206023 ns/op	40716.76 MB/s	      8649 cpu-ns/msg	    621289 msgs/s	   80296 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=128/gws-8       	    6199	    195698 ns/op	42865.04 MB/s	      8747 cpu-ns/msg	    654069 msgs/s	    9650 B/op	     259 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/ews-sync-8  	    1588	    729381 ns/op	46004.01 MB/s	      8258 cpu-ns/msg	    701965 msgs/s	   77973 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/gorilla-8   	    1592	    756068 ns/op	44380.16 MB/s	      8403 cpu-ns/msg	    677188 msgs/s	   95535 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/gws-8       	    1765	    684327 ns/op	49032.78 MB/s	      8593 cpu-ns/msg	    748181 msgs/s	   38652 B/op	    1027 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=512/ews-8       	    1753	    683347 ns/op	49103.07 MB/s	      8583 cpu-ns/msg	    749253 msgs/s	   79350 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/gws-8      	     470	   2559317 ns/op	52442.79 MB/s	      8515 cpu-ns/msg	    800214 msgs/s	  150949 B/op	    4099 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/ews-8      	     462	   2586539 ns/op	51890.85 MB/s	      8546 cpu-ns/msg	    791792 msgs/s	   76974 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/gorilla-8  	     412	   2896959 ns/op	46330.55 MB/s	      8221 cpu-ns/msg	    706948 msgs/s	  101294 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=65536/conns=2048/ews-sync-8 	     436	   2763349 ns/op	48570.67 MB/s	      8101 cpu-ns/msg	    741130 msgs/s	   85127 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/ews-sync-8 	    2325	    514266 ns/op	65247.18 MB/s	     24785 cpu-ns/msg	    248898 msgs/s	  539053 B/op	       8 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/ews-8      	    2388	    494256 ns/op	67888.77 MB/s	     25046 cpu-ns/msg	    258975 msgs/s	  462933 B/op	       6 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/gorilla-8  	    2258	    538284 ns/op	62335.90 MB/s	     25232 cpu-ns/msg	    237793 msgs/s	  691171 B/op	      26 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=128/gws-8      	    2490	    483939 ns/op	69336.01 MB/s	     24842 cpu-ns/msg	    264496 msgs/s	  383461 B/op	     262 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/gws-8      	     692	   1723988 ns/op	77853.04 MB/s	     24229 cpu-ns/msg	    296986 msgs/s	  412656 B/op	    1030 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/ews-sync-8 	     679	   1765151 ns/op	76037.54 MB/s	     23949 cpu-ns/msg	    290060 msgs/s	  409962 B/op	       6 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/ews-8      	     696	   1747301 ns/op	76814.30 MB/s	     24452 cpu-ns/msg	    293023 msgs/s	  615334 B/op	       8 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=512/gorilla-8  	     666	   1801849 ns/op	74488.89 MB/s	     24094 cpu-ns/msg	    284153 msgs/s	  592149 B/op	      25 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/ews-8     	     180	   6655657 ns/op	80663.85 MB/s	     23931 cpu-ns/msg	    307708 msgs/s	  271393 B/op	       4 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/gws-8     	     180	   6662022 ns/op	80586.78 MB/s	     24044 cpu-ns/msg	    307414 msgs/s	  608028 B/op	    4103 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/gorilla-8 	     178	   6671080 ns/op	80477.36 MB/s	     23695 cpu-ns/msg	    306997 msgs/s	  330860 B/op	      21 allocs/op
+BenchmarkBroadcast/compress=nocontext/size=262144/conns=2048/ews-sync-8         	     180	   6651761 ns/op	80711.09 MB/s	     23735 cpu-ns/msg	    307888 msgs/s	  369458 B/op	       5 allocs/op
 PASS
-ok  	github.com/33TU/ews/bench/broadcast	170.206s
+ok  	github.com/33TU/ews/bench/broadcast	170.230s

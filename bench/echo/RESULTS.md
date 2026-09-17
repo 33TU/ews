@@ -1,6 +1,6 @@
 # Echo benchmark results
 
-Generated 2026-09-17 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `3cd8627`.
+Generated 2026-09-17 from `go test -run '^$' -bench Echo -benchtime 1s | go run ../cmd/results` at ews commit `5ae144b`.
 
 ![echo-plain](echo-plain.svg)
 
@@ -13,7 +13,7 @@ Generated 2026-09-17 from `go test -run '^$' -bench Echo -benchtime 1s | go run 
 - CPU: AMD Ryzen 9 9950X3D 16-Core Processor
 - Kernel: 7.2.2-1-cachyos
 - Go: go1.27.1-X:nodwarf5, default build: SWAR masking and the shift-based UTF-8 validator
-- GOMAXPROCS: 8
+- GOMAXPROCS: 32
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3
