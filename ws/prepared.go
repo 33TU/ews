@@ -45,6 +45,36 @@ func Prepare(op codec.Opcode, payload []byte) (*Prepared, error) {
 	return p, nil
 }
 
+// PrepareAppend is Prepare for an encoder that appends: fill appends the
+// payload to dst and returns the result, so a protobuf MarshalAppend or a
+// JSON append marshals straight into the frame, one allocation and no copy.
+// size is a capacity hint for the payload, such as proto.Size; with zero
+// the frame grows as the encoder appends. A fill error is returned as is.
+func PrepareAppend(op codec.Opcode, size int, fill func(dst []byte) ([]byte, error)) (*Prepared, error) {
+	if op != codec.Text && op != codec.Binary {
+		return nil, ErrProtocol
+	}
+	buf := make([]byte, codec.MaxHeaderSize, codec.MaxHeaderSize+max(size, 0))
+	buf, err := fill(buf)
+	if err != nil {
+		return nil, err
+	}
+	if len(buf) < codec.MaxHeaderSize {
+		return nil, ErrProtocol
+	}
+	payload := buf[codec.MaxHeaderSize:]
+	var enc codec.Encoder
+	if err := enc.Encode(true, op, payload, nil); err != nil {
+		return nil, err
+	}
+	header := enc.HeaderBytes()
+	start := codec.MaxHeaderSize - len(header)
+	copy(buf[start:codec.MaxHeaderSize], header)
+	p := &Prepared{op: op, frame: buf[start:]}
+	p.payload = p.frame[len(header):]
+	return p, nil
+}
+
 // Opcode returns the message type.
 func (p *Prepared) Opcode() codec.Opcode { return p.op }
 

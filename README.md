@@ -85,7 +85,8 @@ Writing from any goroutine:
   one write and refuses with `ErrQueueFull` past its limit instead of
   blocking on a slow peer.
 - `Prepare(op, p)` encodes a message once for every recipient; hand it to
-  `WritePrepared` or a queue's `SendPrepared`.
+  `WritePrepared` or a queue's `SendPrepared`. `PrepareAppend` lets an
+  encoder marshal straight into the frame.
 - `NetConn(c, op)` turns the connection into a `net.Conn` for tunneling.
 
 Pings are answered and close frames echoed by the default `ControlHandler`.
@@ -145,9 +146,15 @@ for _, q := range queues {
 
 `Prepare` copies the payload, so the result is immutable: send it from any
 goroutine, as often as you like, and let it go when you are done. The copy
-is one allocation per message, the frame every recipient shares, and it is
-what lets a hub marshal into a pooled buffer, call `Prepare`, and return the
-buffer to the pool at once. Sending costs nothing per recipient.
+is one allocation per message, the frame every recipient shares, and
+sending costs nothing per recipient. Dynamic content skips the copy by
+marshaling straight into the frame:
+
+```go
+p, err := ws.PrepareAppend(codec.Binary, proto.Size(msg), func(dst []byte) ([]byte, error) {
+	return proto.MarshalOptions{}.MarshalAppend(dst, msg)
+})
+```
 
 Give every connection its own `Queue` when you broadcast. A slow or dead
 client then blocks only its own writer, and the queue's limit turns a

@@ -2,6 +2,7 @@ package ws_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -146,4 +147,47 @@ func TestPreparedTakeoverHistory(t *testing.T) {
 		}
 	}
 	wait()
+}
+
+// PrepareAppend hands the encoder the frame itself: the payload lands after
+// the header with no copy, with or without a size hint, and goes out as the
+// same frame Prepare would have built.
+func TestPrepareAppend(t *testing.T) {
+	payload := bytes.Repeat([]byte("appended in place "), 200)
+	fill := func(dst []byte) ([]byte, error) { return append(dst, payload...), nil }
+	for _, hint := range []int{0, len(payload)} {
+		p, err := ws.PrepareAppend(codec.Text, hint, fill)
+		if err != nil || p.Opcode() != codec.Text || !bytes.Equal(p.Payload(), payload) {
+			t.Fatalf("hint %d: %v", hint, err)
+		}
+		server, peer := raw(t, ws.Config{})
+		wait := run(t, func() error {
+			h, frame := readFrame(t, peer)
+			if h.Opcode() != codec.Text || !h.Final() || !bytes.Equal(frame, payload) {
+				return fmt.Errorf("hint %d: header %x, %d bytes", hint, h.Bytes(), len(frame))
+			}
+			return nil
+		})
+		if err := server.WritePrepared(p); err != nil {
+			t.Fatal(err)
+		}
+		wait()
+	}
+	if n := testing.AllocsPerRun(20, func() { ws.PrepareAppend(codec.Binary, len(payload), fill) }); n > 2 {
+		t.Fatalf("PrepareAppend allocates %.0f times, want the frame and the Prepared", n)
+	}
+	empty, err := ws.PrepareAppend(codec.Binary, 0, func(dst []byte) ([]byte, error) { return dst, nil })
+	if err != nil || len(empty.Payload()) != 0 {
+		t.Fatal("empty payload", err)
+	}
+	if _, err := ws.PrepareAppend(codec.Ping, 0, fill); err != ws.ErrProtocol {
+		t.Fatal("control frame prepared")
+	}
+	fail := errors.New("encoder failed")
+	if _, err := ws.PrepareAppend(codec.Binary, 0, func([]byte) ([]byte, error) { return nil, fail }); err != fail {
+		t.Fatalf("fill error not returned: %v", err)
+	}
+	if _, err := ws.PrepareAppend(codec.Binary, 0, func([]byte) ([]byte, error) { return []byte("x"), nil }); err != ws.ErrProtocol {
+		t.Fatal("a fill that drops dst was accepted")
+	}
 }
