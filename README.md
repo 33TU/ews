@@ -143,6 +143,12 @@ for _, q := range queues {
 }
 ```
 
+`Prepare` copies the payload, so the result is immutable: send it from any
+goroutine, as often as you like, and let it go when you are done. A hub that
+wants no garbage per broadcast marshals into a pooled buffer, calls
+`Prepare`, and returns the buffer to the pool at once; the copy is what makes
+that safe.
+
 Tunnel another protocol over the connection:
 
 ```go
