@@ -140,6 +140,7 @@ func GwsUpgrader(mode Mode, handler gws.Event) *gws.Upgrader {
 			ServerMaxWindowBits:   15, // Match the 32 KB window ews uses.
 			ClientMaxWindowBits:   15,
 			Level:                 flate.BestSpeed,
+			Threshold:             1, // Compress every message, as ews and coder do here.
 		},
 	})
 }
