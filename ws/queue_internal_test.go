@@ -22,11 +22,11 @@ func TestQueueHoldsNoIdleArena(t *testing.T) {
 	}
 	q := c.NewQueue(0)
 	big := bytes.Repeat([]byte("x"), 8<<10)
-	for round := 0; round < 3; round++ {
+	for round := range 3 {
 		if err := q.Send(codec.Binary, []byte("small")); err != nil {
 			t.Fatal(err)
 		}
-		for i := 0; i < 16; i++ {
+		for range 16 {
 			if err := q.Send(codec.Binary, big); err != nil {
 				t.Fatal(err)
 			}

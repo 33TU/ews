@@ -62,7 +62,7 @@ func TestCompressorWindow(t *testing.T) {
 	cw.Add(history)
 	dw.Add(history)
 	message := bytes.Repeat([]byte("history "), 40)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		compressed := bytes.Clone(compressWith(t, c, message, &cw))
 		if got, err := d.Decompress(compressed, len(message), &dw); err != nil || !bytes.Equal(got, message) {
 			t.Fatalf("message %d: %v", i, err)

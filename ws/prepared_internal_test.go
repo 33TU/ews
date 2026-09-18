@@ -25,7 +25,7 @@ func TestPendingHistory(t *testing.T) {
 	for i := range small {
 		small[i], _ = Prepare(codec.Binary, make([]byte, 4<<10))
 	}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if err := c.WritePrepared(small[i]); err != nil {
 			t.Fatal(err)
 		}

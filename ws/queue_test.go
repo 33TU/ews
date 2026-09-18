@@ -37,7 +37,7 @@ func TestQueue(t *testing.T) {
 	server, client := compressionPair(t, true, true, 1)
 	const n = 50
 	wait := run(t, func() error {
-		for i := 0; i < 2*n; i++ {
+		for i := range 2 * n {
 			_, got, err := client.ReadMessage()
 			if err != nil {
 				return fmt.Errorf("message %d: %v", i, err)
@@ -53,7 +53,7 @@ func TestQueue(t *testing.T) {
 		return nil
 	})
 	q := server.NewQueue(0)
-	for i := 0; i < 2*n; i++ {
+	for i := range 2 * n {
 		var err error
 		if i%2 == 0 {
 			err = q.Send(codec.Text, fmt.Appendf(nil, "message %d", i))
@@ -72,7 +72,7 @@ func TestQueue(t *testing.T) {
 	// Direct writes join the queue in submission order and return once
 	// written, so both styles mix, under compression with takeover.
 	wait = run(t, func() error {
-		for i := 0; i < 3*n; i++ {
+		for i := range 3 * n {
 			_, got, err := client.ReadMessage()
 			if err != nil {
 				return fmt.Errorf("mixed %d: %v", i, err)
@@ -92,7 +92,7 @@ func TestQueue(t *testing.T) {
 		}
 		return nil
 	})
-	for i := 0; i < 3*n; i++ {
+	for i := range 3 * n {
 		var err error
 		switch i % 3 {
 		case 0:

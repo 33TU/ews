@@ -462,7 +462,7 @@ func TestWriteTo(t *testing.T) {
 		if err := client.BeginMessage(codec.Binary); err != nil {
 			return err
 		}
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			if err := client.WriteChunk(bytes.Repeat([]byte{byte('a' + i)}, 5000)); err != nil {
 				return err
 			}
@@ -513,7 +513,7 @@ func TestWriteTo(t *testing.T) {
 	if n, err := server.WriteTo(&buf); err != nil || n != 15000 {
 		t.Fatal(n, err)
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if !bytes.Equal(buf.Bytes()[i*5000:(i+1)*5000], bytes.Repeat([]byte{byte('a' + i)}, 5000)) {
 			t.Fatalf("fragment %d corrupted", i)
 		}
@@ -608,7 +608,7 @@ func TestConcurrentWriters(t *testing.T) {
 	server, client := pair(t, ws.Config{}, ws.Config{})
 	const writers, each = 4, 50
 	waitServer := run(t, func() error {
-		for i := 0; i < writers*each; i++ {
+		for range writers * each {
 			if _, _, err := server.ReadMessage(); err != nil {
 				return err
 			}
@@ -616,7 +616,7 @@ func TestConcurrentWriters(t *testing.T) {
 		return nil
 	})
 	waitClient := run(t, func() error {
-		for i := 0; i < writers*each; i++ {
+		for range writers * each {
 			if _, _, err := client.ReadMessage(); err != nil {
 				return err
 			}
@@ -624,10 +624,10 @@ func TestConcurrentWriters(t *testing.T) {
 		return nil
 	})
 	var waits []func()
-	for w := 0; w < writers; w++ {
+	for w := range writers {
 		payload := bytes.Repeat([]byte{byte(w)}, 100+w)
 		waits = append(waits, run(t, func() error {
-			for i := 0; i < each; i++ {
+			for range each {
 				if err := client.Write(codec.Binary, payload); err != nil {
 					return err
 				}
@@ -867,7 +867,7 @@ func TestCompressedRoundTrip(t *testing.T) {
 							src, dst = server, client
 						}
 						wait := run(t, func() error {
-							for round := 0; round < 2; round++ { // Takeover history spans messages.
+							for range 2 { // Takeover history spans messages.
 								for _, m := range msgs {
 									if err := src.Write(m.op, m.payload); err != nil {
 										return err
@@ -877,7 +877,7 @@ func TestCompressedRoundTrip(t *testing.T) {
 							return nil
 						})
 						buf := make([]byte, bufSize)
-						for round := 0; round < 2; round++ {
+						for round := range 2 {
 							for i, m := range msgs {
 								var op codec.Opcode
 								var got []byte
@@ -1045,14 +1045,14 @@ func TestCompressionShared(t *testing.T) {
 	server, client := pair(t, ws.Config{Compression: sc, CompressionShared: true}, ws.Config{Compression: cc})
 	payload := bytes.Repeat([]byte("shared compressor, private window "), 200)
 	wait := run(t, func() error {
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, payload) {
 				return fmt.Errorf("message %d: %v", i, err)
 			}
 		}
 		return nil
 	})
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := server.Write(codec.Text, payload); err != nil {
 			t.Fatal(err)
 		}
@@ -1069,14 +1069,14 @@ func TestSmallWindow(t *testing.T) {
 		server, client := pair(t, ws.Config{Compression: sc, CompressionShared: shared}, ws.Config{Compression: cc})
 		payload := bytes.Repeat([]byte("a 512 byte window still compresses repeats "), 400)
 		wait := run(t, func() error {
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, payload) {
 					return fmt.Errorf("message %d: %v", i, err)
 				}
 			}
 			return nil
 		})
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			if err := server.Write(codec.Binary, payload); err != nil {
 				t.Fatal(err)
 			}
@@ -1167,14 +1167,14 @@ func TestFragmentedSend(t *testing.T) {
 	// Through a real peer connection, across takeover history, as whole messages read.
 	server, client := compressionPair(t, true, true, 1<<20)
 	wait := run(t, func() error {
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			if _, p, err := client.ReadMessage(); err != nil || !bytes.Equal(p, whole) {
 				return fmt.Errorf("message %d: %v", i, err)
 			}
 		}
 		return nil
 	})
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if err := server.BeginMessage(codec.Binary); err != nil {
 			t.Fatal(err)
 		}

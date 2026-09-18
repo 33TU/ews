@@ -47,7 +47,7 @@ func TestRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			var d deflate.Decompressor
-			for round := 0; round < 2; round++ {
+			for range 2 {
 				for _, message := range messages {
 					input := bytes.Clone(message)
 					compressed, err := c.Compress(input, nil)
@@ -185,7 +185,7 @@ func TestCompressedFragments(t *testing.T) {
 	}
 	var enc codec.Encoder
 	var wire []byte
-	for i := 0; i < len(compressed); i++ {
+	for i := range compressed {
 		opcode := codec.Continuation
 		if i == 0 {
 			opcode = codec.Text
@@ -320,7 +320,7 @@ func TestContextTakeover(t *testing.T) {
 			}
 			defer w.Close()
 			var history []byte
-			for round := 0; round < 2; round++ {
+			for round := range 2 {
 				cw.Reset()
 				dw.Reset()
 				pw.Reset()
@@ -415,7 +415,7 @@ func TestTakeoverHistoryAndReset(t *testing.T) {
 		}
 	}
 	// Without a window every message stands alone, whatever came before.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		compressed, err := c.Compress(message, nil)
 		if err != nil || !bytes.Equal(compressed, first) {
 			t.Fatal("nil window retained history")
@@ -483,7 +483,7 @@ func TestWindowed(t *testing.T) {
 		}
 		var cw deflate.Window
 		var history []byte
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			compressed, err := c.Compress(message, &cw)
 			if err != nil {
 				t.Fatal(err)
@@ -520,7 +520,7 @@ func TestCompressChunk(t *testing.T) {
 		if w != nil {
 			dw = new(deflate.Window)
 		}
-		for round := 0; round < 2; round++ {
+		for round := range 2 {
 			var wire []byte
 			for i := 0; i < len(message); i += 7000 {
 				end := min(i+7000, len(message))
@@ -569,7 +569,7 @@ func TestWindowBits(t *testing.T) {
 	var d deflate.Decompressor
 	send, recv := deflate.Window{Bits: 9}, deflate.Window{Bits: 9}
 	message := bytes.Repeat([]byte("nine-bit windows on both sides "), 300)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		compressed, err := c.Compress(message, &send)
 		if err != nil {
 			t.Fatal(err)
@@ -605,7 +605,7 @@ func TestSharedHelpers(t *testing.T) {
 	for i := range conns {
 		_, _ = rand.New(rand.NewSource(int64(10 + i))).Read(conns[i].message)
 	}
-	for round := 0; round < 3; round++ {
+	for round := range 3 {
 		for i := range conns {
 			cn := &conns[i]
 			compressed, err := c.Compress(cn.message, &cn.send)

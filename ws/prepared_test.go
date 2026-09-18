@@ -67,7 +67,7 @@ func TestPrepared(t *testing.T) {
 	// takeover server interleaves prepared and ordinary compressed messages.
 	server, client := compressionPair(t, true, true, 1)
 	wait := run(t, func() error {
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			if _, got, err := client.ReadMessage(); err != nil || !bytes.Equal(got, payload) {
 				return fmt.Errorf("client message %d: %v", i, err)
 			}
@@ -77,7 +77,7 @@ func TestPrepared(t *testing.T) {
 		}
 		return nil
 	})
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := server.WritePrepared(p); err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func TestPreparedTakeoverHistory(t *testing.T) {
 		return bytes.Repeat([]byte(fmt.Sprintf("msg %02d payload text ", i)), size/20+1)[:size]
 	}
 	var prepared []*ws.Prepared
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		var p []byte
 		switch {
 		case i == 11:

@@ -130,7 +130,7 @@ func BenchmarkUTF8(b *testing.B) {
 						for i := range clients {
 							clients[i] = harness.Dial(b, srv.URL, harness.Plain)
 						}
-						for round := 0; round < 5; round++ {
+						for range 5 {
 							for _, c := range clients {
 								c.Write(codec.Text, msg)
 								c.ReadMessage()
@@ -146,9 +146,7 @@ func BenchmarkUTF8(b *testing.B) {
 							if i < b.N%conns {
 								per++
 							}
-							wg.Add(1)
-							go func() {
-								defer wg.Done()
+							wg.Go(func() {
 								for range per {
 									if err := c.Write(codec.Text, msg); err != nil {
 										errs <- err
@@ -159,7 +157,7 @@ func BenchmarkUTF8(b *testing.B) {
 										return
 									}
 								}
-							}()
+							})
 						}
 						wg.Wait()
 						b.StopTimer()

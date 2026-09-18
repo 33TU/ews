@@ -44,7 +44,7 @@ func TestGwsDefaultInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := bytes.Repeat([]byte("twelve-bit windows on both sides "), 500)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := c.Write(codec.Text, payload); err != nil {
 			t.Fatal(err)
 		}

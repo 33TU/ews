@@ -76,7 +76,7 @@ func TestServe(t *testing.T) {
 	}
 	c, _ := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 	payload := bytes.Repeat([]byte("served without net/http "), 200)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := c.Write(codec.Text, payload); err != nil {
 			t.Fatal(err)
 		}

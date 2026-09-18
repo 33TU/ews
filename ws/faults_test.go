@@ -162,7 +162,7 @@ func TestQueueFailure(t *testing.T) {
 
 func TestQueueCoalesces(t *testing.T) {
 	for _, vectored := range []bool{false, true} {
-		rw := &blockingRW{faultRW: faultRW{writes: 100}, release: make(chan struct{})}
+		rw := &blockingRW{writes: 100, release: make(chan struct{})}
 		var transport io.ReadWriter = rw
 		if vectored {
 			transport = vecBlockingRW{rw}
