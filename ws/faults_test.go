@@ -120,9 +120,7 @@ func TestWriteErrors(t *testing.T) {
 				t.Fatalf("large write, second half: %v", err)
 			}
 			// Successful writes land whole in every mode.
-			rw := &faultRW{writes: 10}
 			c = newConn(t, tc.rw(10), ws.Config{})
-			_ = rw
 			if err := c.Write(codec.Binary, []byte("ok")); err != nil {
 				t.Fatal(err)
 			}

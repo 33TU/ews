@@ -163,7 +163,7 @@ func TestServeBufferedInput(t *testing.T) {
 	var enc codec.Encoder
 	enc.Encode(true, codec.Binary, []byte("early"), &[4]byte{1, 2, 3, 4})
 	var wire bytes.Buffer
-	wire.WriteString("GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n")
+	wire.WriteString(upgradeRequest(key))
 	wire.Write(enc.HeaderBytes())
 	wire.Write(enc.PayloadBytes())
 	nc.Write(wire.Bytes())

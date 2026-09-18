@@ -101,7 +101,7 @@ func TestPreparedTakeoverHistory(t *testing.T) {
 	server, client := compressionPair(t, true, true, 1)
 	var want [][]byte
 	text := func(i, size int) []byte {
-		return bytes.Repeat([]byte(fmt.Sprintf("msg %02d payload text ", i)), size/20+1)[:size]
+		return bytes.Repeat(fmt.Appendf(nil, "msg %02d payload text ", i), size/20+1)[:size]
 	}
 	var prepared []*ws.Prepared
 	for i := range 24 {

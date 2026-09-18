@@ -173,6 +173,10 @@ func main() {
 			rowLabels[fc] = append(rowLabels[fc], k.dims)
 		}
 	}
+	if err := sc.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "reading stdin:", err)
+		os.Exit(1)
+	}
 	if len(rows) == 0 {
 		fmt.Fprintln(os.Stderr, "no benchmark lines found on stdin")
 		os.Exit(1)
