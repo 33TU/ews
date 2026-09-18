@@ -15,8 +15,10 @@ type ControlHandler interface {
 // Embed it to override a single method.
 type DefaultControlHandler struct{}
 
+// OnPing answers with a pong carrying the same payload.
 func (DefaultControlHandler) OnPing(c *Conn, payload []byte) error { return c.Pong(payload) }
 
+// OnPong ignores the frame.
 func (DefaultControlHandler) OnPong(*Conn, []byte) error { return nil }
 
 // OnClose echoes the peer's close code. A failed echo is not an error: the

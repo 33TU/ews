@@ -14,6 +14,7 @@ type MessageHandler interface {
 // MessageFunc adapts a function to MessageHandler.
 type MessageFunc func(c *Conn, op codec.Opcode, payload []byte) error
 
+// OnMessage calls f.
 func (f MessageFunc) OnMessage(c *Conn, op codec.Opcode, payload []byte) error {
 	return f(c, op, payload)
 }
