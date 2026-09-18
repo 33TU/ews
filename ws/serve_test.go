@@ -26,8 +26,7 @@ func TestServe(t *testing.T) {
 			return err
 		}
 		_, _, err := client.ReadMessage() // The server's close echo, or its write blocks.
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) {
+		if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 			return err
 		}
 		return nil
@@ -37,8 +36,7 @@ func TestServe(t *testing.T) {
 		seen++
 		return c.Write(op, payload)
 	}))
-	var ce *ws.CloseError
-	if !errors.As(err, &ce) || ce.Code != 1000 || ce.Reason != "done" || seen != len(messages()) {
+	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1000 || ce.Reason != "done" || seen != len(messages()) {
 		t.Fatalf("Serve returned %v after %d messages", err, seen)
 	}
 	wait()

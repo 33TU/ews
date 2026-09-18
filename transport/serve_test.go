@@ -87,8 +87,7 @@ func TestServe(t *testing.T) {
 
 	// Accept can refuse with a status.
 	_, _, err = transport.Dial(context.Background(), url+"/elsewhere", transport.DialOptions{})
-	var he *transport.HandshakeError
-	if !errors.As(err, &he) || he.Status != 404 {
+	if he, ok := errors.AsType[*transport.HandshakeError](err); !ok || he.Status != 404 {
 		t.Fatalf("refused path: %v", err)
 	}
 }

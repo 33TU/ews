@@ -256,15 +256,14 @@ func TestCloseHandshake(t *testing.T) {
 			return fmt.Errorf("write after close: %v", err)
 		}
 		_, _, err := client.ReadMessage()
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) || ce.Code != 1000 || ce.Reason != "" {
+		if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1000 || ce.Reason != "" {
 			return fmt.Errorf("client read: %v", err)
 		}
 		return nil
 	})
 	_, _, err := server.ReadMessage()
-	var ce *ws.CloseError
-	if !errors.As(err, &ce) || ce.Code != 1000 || ce.Reason != "bye" {
+	ce, ok := errors.AsType[*ws.CloseError](err)
+	if !ok || ce.Code != 1000 || ce.Reason != "bye" {
 		t.Fatalf("server read: %v", err)
 	}
 	if !server.CloseSent() {
@@ -292,8 +291,7 @@ func TestCloseWithoutStatus(t *testing.T) {
 		return nil
 	})
 	_, _, err := server.ReadMessage()
-	var ce *ws.CloseError
-	if !errors.As(err, &ce) || ce.Code != ws.NoStatus {
+	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != ws.NoStatus {
 		t.Fatal(err)
 	}
 	wait()
@@ -322,8 +320,8 @@ func TestProtocolError(t *testing.T) {
 				return nil
 			})
 			_, _, err := server.ReadMessage()
-			var we *ws.Error
-			if !errors.As(err, &we) || we.Code != tt.code {
+			we, ok := errors.AsType[*ws.Error](err)
+			if !ok || we.Code != tt.code {
 				t.Fatalf("got %v, want code %d", err, tt.code)
 			}
 			if _, err := server.NextMessage(); err != error(we) {
@@ -359,8 +357,7 @@ func TestTextValidation(t *testing.T) {
 		return nil
 	})
 	_, _, err := server.ReadMessage()
-	var we *ws.Error
-	if !errors.As(err, &we) || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidUTF8) {
+	if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidUTF8) {
 		t.Fatal(err)
 	}
 	wait()
@@ -400,15 +397,13 @@ func TestMessageTooLarge(t *testing.T) {
 	go client.Write(codec.Binary, big)
 	wait = run(t, func() error {
 		_, _, err := client.ReadMessage()
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) || ce.Code != 1009 {
+		if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1009 {
 			return fmt.Errorf("client expected close 1009, got %v", err)
 		}
 		return nil
 	})
 	_, _, err = server.ReadMessage()
-	var we *ws.Error
-	if !errors.As(err, &we) || we.Code != 1009 || !errors.Is(err, ws.ErrMessageTooLarge) {
+	if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1009 || !errors.Is(err, ws.ErrMessageTooLarge) {
 		t.Fatal(err)
 	}
 	wait()
@@ -593,8 +588,7 @@ func TestControlHandler(t *testing.T) {
 		return err
 	})
 	_, _, err := server.ReadMessage()
-	var ce *ws.CloseError
-	if !errors.As(err, &ce) || ce.Code != 1001 || server.CloseSent() {
+	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1001 || server.CloseSent() {
 		t.Fatal(err)
 	}
 	wait()
@@ -1019,8 +1013,7 @@ func TestCompressedErrors(t *testing.T) {
 		} else {
 			_, _, err = server.ReadMessage()
 		}
-		var we *ws.Error
-		if !errors.As(err, &we) || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidData) {
+		if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1007 || !errors.Is(err, ws.ErrInvalidData) {
 			t.Fatalf("chunked=%t: %v", chunked, err)
 		}
 		wait()
@@ -1032,15 +1025,13 @@ func TestCompressedErrors(t *testing.T) {
 	go client.Write(codec.Binary, big) // Read by the server before failing.
 	wait := run(t, func() error {
 		_, _, err := client.ReadMessage()
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) || ce.Code != 1009 {
+		if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1009 {
 			return fmt.Errorf("client expected close 1009, got %v", err)
 		}
 		return nil
 	})
 	_, _, err := server.ReadMessage()
-	var we *ws.Error
-	if !errors.As(err, &we) || we.Code != 1009 {
+	if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1009 {
 		t.Fatal(err)
 	}
 	wait()

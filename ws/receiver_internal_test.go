@@ -78,8 +78,7 @@ func TestInvalidFrames(t *testing.T) {
 				var r receiver
 				r.Init(Client, false)
 				_, err := drive(t, &r, tt.wire, chunk)
-				var pe *Error
-				if !errors.As(err, &pe) || pe.Code != tt.code {
+				if pe, ok := errors.AsType[*Error](err); !ok || pe.Code != tt.code {
 					t.Fatalf("expected code %d, got %v", tt.code, err)
 				}
 				r.Feed(frame(t, 0x81, nil, false))

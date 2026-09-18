@@ -88,16 +88,14 @@ func (nc *netConn) Read(p []byte) (int, error) {
 // readErr maps a normal peer close to io.EOF and keeps terminal errors;
 // transport errors such as deadlines pass through and leave state intact.
 func (nc *netConn) readErr(err error) error {
-	var ce *CloseError
-	if errors.As(err, &ce) {
+	if ce, ok := errors.AsType[*CloseError](err); ok {
 		if ce.Code == 1000 || ce.Code == 1001 || ce.Code == NoStatus {
 			err = io.EOF
 		}
 		nc.err = err
 		return err
 	}
-	var pe *Error
-	if errors.As(err, &pe) {
+	if _, ok := errors.AsType[*Error](err); ok {
 		nc.err = err
 	}
 	return err

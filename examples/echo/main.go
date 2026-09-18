@@ -37,8 +37,7 @@ func main() {
 				conn.SetDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
 				if err != nil {
-					var ce *ws.CloseError
-					if !errors.As(err, &ce) {
+					if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 						log.Printf("%s: %v", conn.RemoteAddr(), err)
 					}
 					return

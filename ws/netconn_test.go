@@ -63,8 +63,8 @@ func TestNetConn(t *testing.T) {
 	if err := ns.SetReadDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
 		t.Fatal(err)
 	}
-	var ne net.Error
-	if _, err := ns.Read(buf); !errors.As(err, &ne) || !ne.Timeout() || !errors.Is(err, os.ErrDeadlineExceeded) {
+	_, err = ns.Read(buf)
+	if ne, ok := errors.AsType[net.Error](err); !ok || !ne.Timeout() || !errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf("deadline: %v", err)
 	}
 	if err := ns.SetReadDeadline(time.Time{}); err != nil {
@@ -109,8 +109,7 @@ func TestNetConnUnexpectedType(t *testing.T) {
 			return err
 		}
 		_, _, err := client.ReadMessage()
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) || ce.Code != 1003 {
+		if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1003 {
 			return errors.New("peer did not see close 1003")
 		}
 		return nil
@@ -133,14 +132,13 @@ func TestNetConnAbnormalClose(t *testing.T) {
 			return err
 		}
 		_, _, err := client.ReadMessage() // The echoed close.
-		var ce *ws.CloseError
-		if !errors.As(err, &ce) || ce.Code != 1011 {
+		if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1011 {
 			return err
 		}
 		return nil
 	})
-	var ce *ws.CloseError
-	if _, err := ns.Read(make([]byte, 8)); !errors.As(err, &ce) || ce.Code != 1011 || ce.Reason != "boom" {
+	_, err := ns.Read(make([]byte, 8))
+	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1011 || ce.Reason != "boom" {
 		t.Fatalf("got %v", err)
 	}
 	wait()

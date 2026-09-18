@@ -407,11 +407,12 @@ func TestNetConnEdges(t *testing.T) {
 		readFrame(t, peer) // The close frame.
 		return nil
 	})
-	var we *ws.Error
-	if _, err := nc.Read(make([]byte, 8)); !errors.As(err, &we) || we.Code != 1002 {
+	_, err := nc.Read(make([]byte, 8))
+	if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1002 {
 		t.Fatalf("protocol failure: %v", err)
 	}
-	if _, err := nc.Read(make([]byte, 8)); !errors.As(err, &we) {
+	_, err = nc.Read(make([]byte, 8))
+	if _, ok := errors.AsType[*ws.Error](err); !ok {
 		t.Fatalf("not sticky: %v", err)
 	}
 	wait()
