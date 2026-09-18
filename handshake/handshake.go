@@ -122,7 +122,7 @@ func validKey(key string) bool {
 
 // hasToken reports whether a comma-separated header value contains token.
 func hasToken(header, token string) bool {
-	for _, t := range strings.Split(header, ",") {
+	for t := range strings.SplitSeq(header, ",") {
 		if strings.EqualFold(strings.TrimSpace(t), token) {
 			return true
 		}

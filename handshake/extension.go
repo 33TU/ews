@@ -19,7 +19,7 @@ type extension struct {
 // optional token or quoted-string values.
 func parseExtensions(header string) ([]extension, error) {
 	var out []extension
-	for _, offer := range strings.Split(header, ",") {
+	for offer := range strings.SplitSeq(header, ",") {
 		offer = strings.TrimSpace(offer)
 		if offer == "" {
 			continue

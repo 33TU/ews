@@ -324,7 +324,7 @@ func throughput(r result) string {
 // rowCells renders "size=16384/conns=32" as "16 KiB | 32".
 func rowCells(label string) string {
 	var out []string
-	for _, d := range strings.Split(label, "/") {
+	for d := range strings.SplitSeq(label, "/") {
 		k, v, _ := strings.Cut(d, "=")
 		if n, err := strconv.Atoi(v); err == nil && k == "size" {
 			if n < 1024 {
@@ -391,7 +391,7 @@ func cpu() string {
 	if err != nil {
 		return runtime.GOARCH
 	}
-	for _, l := range strings.Split(string(data), "\n") {
+	for l := range strings.SplitSeq(string(data), "\n") {
 		if strings.HasPrefix(l, "model name") {
 			_, v, _ := strings.Cut(l, ":")
 			return strings.TrimSpace(v)
@@ -408,7 +408,7 @@ func modVersion(mod string) string {
 		if err != nil {
 			continue
 		}
-		for _, l := range strings.Split(string(data), "\n") {
+		for l := range strings.SplitSeq(string(data), "\n") {
 			if strings.Contains(l, mod) {
 				f := strings.Fields(l)
 				return f[len(f)-1]
