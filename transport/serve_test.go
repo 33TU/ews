@@ -76,7 +76,7 @@ func TestServe(t *testing.T) {
 	}
 	c, _ := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 	payload := bytes.Repeat([]byte("served without net/http "), 200)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := c.Write(codec.Text, payload); err != nil {
 			t.Fatal(err)
 		}
@@ -87,8 +87,7 @@ func TestServe(t *testing.T) {
 
 	// Accept can refuse with a status.
 	_, _, err = transport.Dial(context.Background(), url+"/elsewhere", transport.DialOptions{})
-	var he *transport.HandshakeError
-	if !errors.As(err, &he) || he.Status != 404 {
+	if he, ok := errors.AsType[*transport.HandshakeError](err); !ok || he.Status != 404 {
 		t.Fatalf("refused path: %v", err)
 	}
 }
@@ -164,7 +163,7 @@ func TestServeBufferedInput(t *testing.T) {
 	var enc codec.Encoder
 	enc.Encode(true, codec.Binary, []byte("early"), &[4]byte{1, 2, 3, 4})
 	var wire bytes.Buffer
-	wire.WriteString("GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n")
+	wire.WriteString(upgradeRequest(key))
 	wire.Write(enc.HeaderBytes())
 	wire.Write(enc.PayloadBytes())
 	nc.Write(wire.Bytes())

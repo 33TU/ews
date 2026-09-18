@@ -14,7 +14,7 @@ func maskScalar(dst, src []byte, key [4]byte) {
 func TestMask(t *testing.T) {
 	for _, key := range [][4]byte{{}, {0xff, 0xff, 0xff, 0xff}, {0x37, 0xfa, 0x21, 0x3d}} {
 		for n := 0; n <= 1025; n++ {
-			for offset := 0; offset < 16; offset++ {
+			for offset := range 16 {
 				input := make([]byte, n+32)
 				for i := range input {
 					input[i] = byte(i*37 + n)

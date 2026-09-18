@@ -336,7 +336,7 @@ func FuzzDecompress(f *testing.F) {
 			t.Fatal(err)
 		}
 		var cw, dw deflate.Window
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			compressed := bytes.Clone(compressWith(t, c, data, &cw))
 			got, err := d.Decompress(compressed, len(data), &dw)
 			if err != nil || !bytes.Equal(got, data) {

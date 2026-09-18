@@ -46,8 +46,7 @@ func TestDialMoreErrors(t *testing.T) {
 	}))
 	defer srv.Close()
 	_, _, err = transport.Dial(ctx, wsURL(srv), transport.DialOptions{})
-	var he *transport.HandshakeError
-	if !errors.As(err, &he) || he.Status != http.StatusForbidden || !strings.Contains(he.Error(), "403") {
+	if he, ok := errors.AsType[*transport.HandshakeError](err); !ok || he.Status != http.StatusForbidden || !strings.Contains(he.Error(), "403") {
 		t.Fatalf("non-101 response: %v", err)
 	}
 	// A server that speaks nonsense.

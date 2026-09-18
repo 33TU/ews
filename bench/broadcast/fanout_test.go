@@ -43,7 +43,7 @@ func BenchmarkFanout(b *testing.B) {
 						if _, _, err := c.ReadMessage(); err != nil {
 							return
 						}
-						for i := 0; i < fanout; i++ {
+						for range fanout {
 							var err error
 							if queued {
 								err = q.Send(codec.Binary, reply)
@@ -70,22 +70,20 @@ func BenchmarkFanout(b *testing.B) {
 					if i < b.N%conns {
 						per++
 					}
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+					wg.Go(func() {
 						for range per {
 							if err := c.Write(codec.Binary, request); err != nil {
 								b.Error(err)
 								return
 							}
-							for j := 0; j < fanout; j++ {
+							for j := range fanout {
 								if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
 									b.Errorf("reply %d: %v", j, err)
 									return
 								}
 							}
 						}
-					}()
+					})
 				}
 				wg.Wait()
 				b.StopTimer()

@@ -78,8 +78,7 @@ func (s *Server) Serve(ln net.Listener) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			var ne net.Error
-			if errors.As(err, &ne) && ne.Timeout() {
+			if ne, ok := errors.AsType[net.Error](err); ok && ne.Timeout() {
 				// Transient accept failure: back off briefly and keep serving.
 				delay = min(max(2*delay, 5*time.Millisecond), time.Second)
 				time.Sleep(delay)
@@ -300,6 +299,6 @@ func statusText(status int) string {
 }
 
 func isNetErr(err error) bool {
-	var ne net.Error
-	return errors.As(err, &ne) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed)
+	_, isNet := errors.AsType[net.Error](err)
+	return isNet || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed)
 }

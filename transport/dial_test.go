@@ -82,8 +82,7 @@ func TestDialErrors(t *testing.T) {
 	}))
 	defer plain.Close()
 	_, _, err := transport.Dial(context.Background(), wsURL(plain), transport.DialOptions{})
-	var he *transport.HandshakeError
-	if !errors.As(err, &he) || he.Status != 403 || he.Header.Get("X-Reason") != "nope" || !errors.Is(err, handshake.ErrBadStatus) {
+	if he, ok := errors.AsType[*transport.HandshakeError](err); !ok || he.Status != 403 || he.Header.Get("X-Reason") != "nope" || !errors.Is(err, handshake.ErrBadStatus) {
 		t.Fatalf("plain HTTP: %v", err)
 	}
 

@@ -293,7 +293,7 @@ func BenchmarkEcho(b *testing.B) {
 						}
 						// Warm up: pools, goroutines, and socket buffers settle
 						// over several round trips per connection.
-						for round := 0; round < 5; round++ {
+						for range 5 {
 							for _, c := range clients {
 								c.Write(codec.Binary, msg)
 								c.ReadMessage()
@@ -310,9 +310,7 @@ func BenchmarkEcho(b *testing.B) {
 							if i < b.N%conns {
 								per++
 							}
-							wg.Add(1)
-							go func() {
-								defer wg.Done()
+							wg.Go(func() {
 								for range per {
 									if err := c.Write(codec.Binary, msg); err != nil {
 										errs <- err
@@ -323,7 +321,7 @@ func BenchmarkEcho(b *testing.B) {
 										return
 									}
 								}
-							}()
+							})
 						}
 						wg.Wait()
 						b.StopTimer()

@@ -102,7 +102,7 @@ func BenchmarkBroadcast(b *testing.B) {
 						defer srv.Close()
 
 						received := make(chan struct{}, conns)
-						for i := 0; i < conns; i++ {
+						for range conns {
 							c := harness.Dial(b, srv.URL, mode)
 							go func() {
 								for {
@@ -166,11 +166,11 @@ func BenchmarkBroadcast(b *testing.B) {
 								}
 								bc.Close()
 							}
-							for i := 0; i < conns; i++ {
+							for range conns {
 								<-received
 							}
 						}
-						for i := 0; i < 20; i++ {
+						for range 20 {
 							round() // Warm up: pools, goroutines, and socket buffers settle.
 						}
 						b.ReportAllocs()

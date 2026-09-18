@@ -25,7 +25,7 @@ func BenchmarkMask(b *testing.B) {
 func TestMaskPublic(t *testing.T) {
 	key := [4]byte{0x37, 0xfa, 0x21, 0x3d}
 	for _, n := range []int{0, 1, 3, 4, 7, 16, 63, 64, 125, 511, 512, 513, 1025} {
-		for offset := 0; offset < 256; offset++ {
+		for offset := range 256 {
 			original := bytes.Repeat([]byte{0xab}, n)
 			payload := bytes.Clone(original)
 			next := codec.Mask(payload, key, uint8(offset))

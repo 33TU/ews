@@ -142,7 +142,7 @@ func TestUpgradeBufferedInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wire bytes.Buffer
-	wire.WriteString("GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n")
+	wire.WriteString(upgradeRequest(key))
 	wire.Write(enc.HeaderBytes())
 	wire.Write(enc.PayloadBytes())
 	if _, err := nc.Write(wire.Bytes()); err != nil {
@@ -165,4 +165,10 @@ func TestUpgradeBufferedInput(t *testing.T) {
 	if err != nil || op != codec.Binary || string(p) != "early" {
 		t.Fatalf("%d %q %v", op, p, err)
 	}
+}
+
+// upgradeRequest is a minimal client handshake for key, written raw so the
+// test controls what follows it on the wire.
+func upgradeRequest(key string) string {
+	return "GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n"
 }

@@ -120,9 +120,7 @@ func TestWriteErrors(t *testing.T) {
 				t.Fatalf("large write, second half: %v", err)
 			}
 			// Successful writes land whole in every mode.
-			rw := &faultRW{writes: 10}
 			c = newConn(t, tc.rw(10), ws.Config{})
-			_ = rw
 			if err := c.Write(codec.Binary, []byte("ok")); err != nil {
 				t.Fatal(err)
 			}
@@ -162,7 +160,7 @@ func TestQueueFailure(t *testing.T) {
 
 func TestQueueCoalesces(t *testing.T) {
 	for _, vectored := range []bool{false, true} {
-		rw := &blockingRW{faultRW: faultRW{writes: 100}, release: make(chan struct{})}
+		rw := &blockingRW{writes: 100, release: make(chan struct{})}
 		var transport io.ReadWriter = rw
 		if vectored {
 			transport = vecBlockingRW{rw}
@@ -407,11 +405,12 @@ func TestNetConnEdges(t *testing.T) {
 		readFrame(t, peer) // The close frame.
 		return nil
 	})
-	var we *ws.Error
-	if _, err := nc.Read(make([]byte, 8)); !errors.As(err, &we) || we.Code != 1002 {
+	_, err := nc.Read(make([]byte, 8))
+	if we, ok := errors.AsType[*ws.Error](err); !ok || we.Code != 1002 {
 		t.Fatalf("protocol failure: %v", err)
 	}
-	if _, err := nc.Read(make([]byte, 8)); !errors.As(err, &we) {
+	_, err = nc.Read(make([]byte, 8))
+	if _, ok := errors.AsType[*ws.Error](err); !ok {
 		t.Fatalf("not sticky: %v", err)
 	}
 	wait()

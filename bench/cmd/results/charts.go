@@ -5,6 +5,7 @@ import (
 	"html"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -100,7 +101,7 @@ func renderChart(spec chartSpec, subtitle string, records []record) string {
 				ok = false
 			}
 		}
-		if !ok || r.dims[spec.panel] == "" || !contains(spec.columns, r.dims[spec.column]) {
+		if !ok || r.dims[spec.panel] == "" || !slices.Contains(spec.columns, r.dims[spec.column]) {
 			continue
 		}
 		sel = append(sel, r)
@@ -237,13 +238,4 @@ func valueLess(a, b string) bool {
 		return an < bn
 	}
 	return false // Keep first-seen order for names.
-}
-
-func contains(list []string, v string) bool {
-	for _, x := range list {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }
