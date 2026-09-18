@@ -9,10 +9,17 @@ import (
 )
 
 var (
+	// ErrMessageTooLarge is returned by Decompress when the decompressed size
+	// exceeds maxSize.
 	ErrMessageTooLarge = errors.New("ews/deflate: decompressed message exceeds limit")
-	ErrInvalidLimit    = errors.New("ews/deflate: negative output limit")
-	ErrNoMessage       = errors.New("ews/deflate: no message in progress")
-	ErrInvalidWindow   = errors.New("ews/deflate: window bits must be 8 to 15")
+	// ErrInvalidLimit is returned by Decompress for a negative maxSize.
+	ErrInvalidLimit = errors.New("ews/deflate: negative output limit")
+	// ErrNoMessage is returned by Read when no message was started with Begin,
+	// or the previous one has ended.
+	ErrNoMessage = errors.New("ews/deflate: no message in progress")
+	// ErrInvalidWindow is returned by NewCompressorWindow for window bits
+	// outside 8 to 15.
+	ErrInvalidWindow = errors.New("ews/deflate: window bits must be 8 to 15")
 )
 
 // ChunkSource supplies the compressed bytes of one message in order. Chunks

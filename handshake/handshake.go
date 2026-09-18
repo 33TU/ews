@@ -8,14 +8,28 @@ import (
 	"strings"
 )
 
+// Handshake failures. Negotiate returns the first four for a bad request;
+// Confirm returns the rest, and ErrNotWebSocket, for a bad response.
 var (
-	ErrNotWebSocket   = errors.New("ews/handshake: not a WebSocket upgrade")
-	ErrBadVersion     = errors.New("ews/handshake: unsupported WebSocket version")
-	ErrBadKey         = errors.New("ews/handshake: invalid Sec-WebSocket-Key")
-	ErrBadExtension   = errors.New("ews/handshake: invalid Sec-WebSocket-Extensions")
-	ErrBadAccept      = errors.New("ews/handshake: Sec-WebSocket-Accept mismatch")
-	ErrBadStatus      = errors.New("ews/handshake: unexpected response status")
-	ErrBadProtocol    = errors.New("ews/handshake: unexpected subprotocol")
+	// ErrNotWebSocket means the Upgrade and Connection headers do not ask
+	// for, or agree to, a WebSocket.
+	ErrNotWebSocket = errors.New("ews/handshake: not a WebSocket upgrade")
+	// ErrBadVersion means the client asked for a version other than 13.
+	ErrBadVersion = errors.New("ews/handshake: unsupported WebSocket version")
+	// ErrBadKey means Sec-WebSocket-Key is not 16 base64-encoded bytes.
+	ErrBadKey = errors.New("ews/handshake: invalid Sec-WebSocket-Key")
+	// ErrBadExtension means Sec-WebSocket-Extensions could not be parsed, or
+	// the server agreed to an extension the client did not offer.
+	ErrBadExtension = errors.New("ews/handshake: invalid Sec-WebSocket-Extensions")
+	// ErrBadAccept means Sec-WebSocket-Accept does not match the key sent.
+	ErrBadAccept = errors.New("ews/handshake: Sec-WebSocket-Accept mismatch")
+	// ErrBadStatus means the response status is not 101.
+	ErrBadStatus = errors.New("ews/handshake: unexpected response status")
+	// ErrBadProtocol means the server chose a subprotocol the client did not
+	// offer.
+	ErrBadProtocol = errors.New("ews/handshake: unexpected subprotocol")
+	// ErrInvalidOptions means Options.Compression has a level outside -2 to 9
+	// or a negative MinSize.
 	ErrInvalidOptions = errors.New("ews/handshake: invalid options")
 )
 

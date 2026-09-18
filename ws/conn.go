@@ -13,11 +13,14 @@ import (
 // Role identifies the local endpoint.
 type Role uint8
 
+// The two roles. A Server reads masked frames and writes unmasked ones; a
+// Client does the reverse.
 const (
 	Server Role = iota
 	Client
 )
 
+// Defaults for the zero values of the corresponding Config fields.
 const (
 	DefaultReadBufferSize = 4 << 10
 	DefaultMaxMessageSize = 8 << 20

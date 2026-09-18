@@ -7,8 +7,13 @@ import (
 )
 
 var (
-	ErrInvalidOpcode          = errors.New("ews/codec: invalid opcode")
-	ErrInvalidControlFrame    = errors.New("ews/codec: invalid control frame")
+	// ErrInvalidOpcode is returned for an opcode RFC 6455 does not define.
+	ErrInvalidOpcode = errors.New("ews/codec: invalid opcode")
+	// ErrInvalidControlFrame is returned for a fragmented control frame, a
+	// control payload over 125 bytes, or a one-byte close payload.
+	ErrInvalidControlFrame = errors.New("ews/codec: invalid control frame")
+	// ErrInvalidCompressedFrame is returned by EncodeCompressed for a control
+	// opcode.
 	ErrInvalidCompressedFrame = errors.New("ews/codec: only data frames may be compressed")
 )
 
