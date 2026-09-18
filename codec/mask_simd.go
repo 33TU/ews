@@ -8,7 +8,7 @@ import (
 )
 
 // simdMin is the payload size from which the vector loop pays for itself.
-const simdMin = 4096
+const simdMin = 1024
 
 func mask(dst, src []byte, key [4]byte, offset uint8) {
 	key = rotateMaskKey(key, offset)
@@ -23,8 +23,8 @@ func mask(dst, src []byte, key [4]byte, offset uint8) {
 
 	i := 0
 	// Below simdMin the vector loop's setup costs more than it saves: measured
-	// against the SWAR loop it loses at 512 B and 2 KiB, ties at 1 KiB, and
-	// wins by 4 to 8 percent from 4 KiB up, 25 percent at 64 KiB.
+	// against the SWAR loop in this build it loses at 512 bytes, ties at 768,
+	// and wins from 1 KiB, by 25 percent at 64 KiB and above.
 	if n >= simdMin {
 		k := [2]uint64{k64, k64}
 		vkey := archsimd.LoadUint8x16Array((*[16]byte)(unsafe.Pointer(&k)))
