@@ -105,6 +105,7 @@ Runnable programs under `examples/`, each started with `go run ./examples/<name>
 | `echo-queue` | replies through a `Queue`, so a slow peer is dropped at its limit instead of stalling the reader |
 | `broadcast` | a hub with a queue per connection, one ping ticker, and a read deadline |
 | `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
+| `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
 
 Read a message in chunks:
 
