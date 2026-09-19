@@ -152,16 +152,7 @@ func (r *receiver) Next() (frameKind, error) {
 // Payload consumes available bytes of the open data frame, unmasked. The
 // chunk is borrowed until the next call. done reports frame completion; it is
 // true when no frame is open.
-func (r *receiver) Payload() ([]byte, bool, error) {
-	if r.failed != nil {
-		return nil, false, r.failed
-	}
-	if r.remaining == 0 {
-		return nil, true, nil
-	}
-	chunk, done := r.dec.Payload()
-	return r.consumed(chunk, done)
-}
+func (r *receiver) Payload() ([]byte, bool, error) { return r.PayloadN(r.dec.Buffered()) }
 
 // PayloadN is like Payload but consumes at most n bytes.
 func (r *receiver) PayloadN(n int) ([]byte, bool, error) {
