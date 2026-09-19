@@ -196,6 +196,7 @@ Runnable programs under `examples/`, each started with `go run ./examples/<name>
 | `echo-events` | the same server as an `events.Handler`, one method per event, the shape a gws handler takes |
 | `broadcast` | a hub with a queue per connection, one ping ticker, and a read deadline |
 | `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
+| `client-events` | the chat client as an `events.Handler` through `events.Dial`, with dial-time state in `UserData` |
 | `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
 
 The read, write, queue, prepare and tunnel methods have runnable examples on
