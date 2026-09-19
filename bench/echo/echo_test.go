@@ -17,6 +17,7 @@ import (
 
 	"github.com/33TU/ews/bench/internal/harness"
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/events"
 	"github.com/33TU/ews/transport"
 	"github.com/33TU/ews/ws"
 	"github.com/coder/websocket"
@@ -71,7 +72,32 @@ func ewsServerWith(mode harness.Mode, shared, stream bool) *httptest.Server {
 	}))
 }
 
-// gwsEcho is the event handler for the interop test's ReadLoop server.
+// ewsEventsServer is the echo server as an events.Handler behind events.HTTP,
+// the shape a gws handler takes, against gws-events.
+func ewsEventsServer(mode harness.Mode) *httptest.Server {
+	return httptest.NewServer(events.HTTP(ewsEcho{}, mode.Options(), ws.Config{MaxMessageSize: 64 << 20}))
+}
+
+type ewsEcho struct{ events.Base }
+
+func (ewsEcho) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
+	return c.Write(op, payload)
+}
+
+// gwsEventsServer echoes from gws's OnMessage event, driven by ReadLoop on
+// a goroutine of its own, the shape gws documents.
+func gwsEventsServer(mode harness.Mode) *httptest.Server {
+	up := harness.GwsUpgrader(mode, gwsEcho{})
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		socket, err := up.Upgrade(w, r)
+		if err != nil {
+			return
+		}
+		go socket.ReadLoop()
+	}))
+}
+
+// gwsEcho is the event handler for the gws-events and interop servers.
 type gwsEcho struct{ gws.BuiltinEventHandler }
 
 func (gwsEcho) OnMessage(socket *gws.Conn, message *gws.Message) {
@@ -259,8 +285,10 @@ func BenchmarkEcho(b *testing.B) {
 		{"ews", ewsServer, all},
 		{"ews-shared", ewsSharedServer, []harness.Mode{harness.Takeover}}, // Identical to ews in the other modes.
 		{"ews-stream", ewsStreamServer, all},
+		{"ews-events", ewsEventsServer, all},
 		{"gws", gwsServer, all},
 		{"gws-stream", gwsStreamServer, all},
+		{"gws-events", gwsEventsServer, all},
 		{"coder", coderServer, all},
 		{"coder-stream", coderStreamServer, all},
 		{"gorilla", gorillaServer, []harness.Mode{harness.Plain, harness.NoTakeover}}, // No takeover support.

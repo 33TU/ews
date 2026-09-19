@@ -46,8 +46,10 @@ var families = map[string]family{
 - ` + "`ews`" + `: ` + "`ws.Conn`" + ` with ` + "`ReadMessage`" + ` and ` + "`Write`" + `, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
 - ` + "`ews-shared`" + `: the same with ` + "`CompressionShared`" + `, borrowing a pooled compressor per message as gws and coder do. Takeover table only; it is identical to ` + "`ews`" + ` otherwise.
 - ` + "`ews-stream`" + `: ` + "`NextMessage`" + ` then ` + "`WriteFrom`" + ` reading the connection itself, so no message is held whole and compressed input is inflated as its frames arrive. Messages above ` + "`FragmentSize`" + ` (64 KiB) go out as several frames, each compressed chunk flushed on its own, and each chunk is copied out of the read buffer, which is what separates it from ` + "`ews`" + ` at 256 KiB. This is ews's streaming shape, against ` + "`gws-stream`" + ` and ` + "`coder-stream`" + `.
+- ` + "`ews-events`" + `: the same echo as an ` + "`events.Handler`" + ` behind ` + "`events.HTTP`" + `, one method per event, against ` + "`gws-events`" + `.
 - ` + "`gws`" + `: gws's ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop, the like-for-like shape against ews. Its event-driven ` + "`ReadLoop`" + ` shares the frame path and measured the same within noise.
 - ` + "`gws-stream`" + `: gws's ` + "`NextReader`" + ` piped into ` + "`WriteFile`" + `, so no message is held whole.
+- ` + "`gws-events`" + `: gws's ` + "`ReadLoop`" + ` driving an ` + "`OnMessage`" + ` handler that writes the message back, the shape gws documents.
 - ` + "`coder`" + `: coder/websocket with ` + "`Read`" + ` and ` + "`Write`" + ` in a loop.
 - ` + "`coder-stream`" + `: coder/websocket piping ` + "`Reader`" + ` into ` + "`Writer`" + ` through a reusable buffer, so no message is held whole.
 - ` + "`gorilla`" + `: gorilla/websocket with ` + "`ReadMessage`" + ` and ` + "`WriteMessage`" + ` in a loop. Uncompressed and no-takeover tables only, since gorilla negotiates only ` + "`no_context_takeover`" + `.
@@ -416,7 +418,7 @@ func dimLess(a, b string) bool {
 // libRank orders server columns: ews first, then each library with its
 // variants beside it; unknown names go last in input order.
 func libRank(name string) int {
-	for i, known := range []string{"ews", "ews-shared", "ews-stream", "ews-sync", "gws", "gws-stream", "coder", "coder-stream", "gorilla", "gorilla-stream"} {
+	for i, known := range []string{"ews", "ews-shared", "ews-stream", "ews-events", "ews-sync", "gws", "gws-stream", "gws-events", "coder", "coder-stream", "gorilla", "gorilla-stream"} {
 		if name == known {
 			return i
 		}
