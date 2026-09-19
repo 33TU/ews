@@ -18,13 +18,28 @@ so results from different machines measure the same shape, and each results
 file records the thread count and library versions. The committed tables
 were run pinned to the eight cores of one die (`taskset -c 0-7`), so the
 threads share one L3. Nothing else should run during a benchmark; a
-concurrent build or test run skews the numbers.
+concurrent build or test run skews the numbers. The recipes write the Go
+version, kernel and commit as `#` lines at the top of the raw output, and the
+results tool reads those and the `cpu:` line back, so `just results` on any
+machine regenerates the tables and charts with the labels of the run that
+produced them.
 
 ## Echo
 
+By payload size on 128 connections, one round trip at a time per connection,
+each size scaled to its fastest server:
+
+![Echo by payload size, uncompressed](echo/echo-sizes.svg)
+
+![Echo by payload size, compressed](echo/echo-sizes-compressed.svg)
+
+![Echo by payload size, compressed without context takeover](echo/echo-sizes-nocontext.svg)
+
 Uncompressed echo is bounded by the kernel round trip and every well-built
-library ties on it, within a few percent of a raw TCP echo. The comparison
-is in compression:
+library ties on it up to 16 KiB, within a few percent of a raw TCP echo; at
+256 KiB gws, coder and gorilla allocate a frame per message above their
+pooled buffer sizes and ews does not. Compressed, ews leads at every size.
+The full tables by connection count:
 
 ![Echo, compressed](echo/echo-compressed.svg)
 

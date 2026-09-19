@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1376" viewBox="0 0 1500 1376" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1396" viewBox="0 0 1500 1396" role="img" aria-labelledby="title desc">
   <title id="title">Echo, uncompressed</title>
-  <desc id="desc">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D 16- · 1s benchtime Higher is better.</desc>
+  <desc id="desc">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D · GOMAXPROCS=8 · 1s benchtime Higher is better.</desc>
   <style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#d8dee9}.title{font-family:ui-sans-serif,system-ui,sans-serif;font-size:28px;font-weight:700}.subtitle{font-family:ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:#aab4c3}.group{font-family:ui-sans-serif,system-ui,sans-serif;font-size:18px;font-weight:650}.contract{font-family:ui-sans-serif,system-ui,sans-serif;font-size:14px;font-weight:650;fill:#9eabbc}.series{font-size:13px;fill:#c4ccd8}.value{font-size:13px;font-weight:650}.panel{fill:#151c27}</style>
-  <rect width="1500" height="1376" rx="14" fill="#10151d"/>
+  <rect width="1500" height="1396" rx="14" fill="#10151d"/>
   <text class="title" x="40" y="48">Echo, uncompressed</text>
-  <text class="subtitle" x="40" y="76">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D 16- · 1s benchtime · higher is better</text>
+  <text class="subtitle" x="40" y="76">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D · GOMAXPROCS=8 · 1s benchtime · higher is better</text>
   <rect x="40" y="94" width="14" height="14" rx="3" fill="#50c878"/><text class="series" x="62" y="106">ews</text>
   <rect x="129" y="94" width="14" height="14" rx="3" fill="#a3e4b0"/><text class="series" x="151" y="106">ews-stream</text>
   <rect x="281" y="94" width="14" height="14" rx="3" fill="#ef8354"/><text class="series" x="303" y="106">gws</text>
@@ -13,8 +13,8 @@
   <rect x="629" y="94" width="14" height="14" rx="3" fill="#e76f9a"/><text class="series" x="651" y="106">coder-stream</text>
   <rect x="799" y="94" width="14" height="14" rx="3" fill="#c9a86a"/><text class="series" x="821" y="106">gorilla</text>
   <rect x="924" y="94" width="14" height="14" rx="3" fill="#e8d5a3"/><text class="series" x="946" y="106">gorilla-stream</text>
-  <text class="subtitle" x="1460" y="106" text-anchor="end">Each column uses its own linear scale; labels show throughput and allocations per message.</text>
-  <g transform="translate(0,145)">
+  <text class="subtitle" x="40" y="134">Each column uses its own linear scale; labels show throughput and allocations per message.</text>
+  <g transform="translate(0,165)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">64 B messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
@@ -93,7 +93,7 @@
     <rect x="1147" y="243" width="97.3" height="17" rx="4" fill="#e8d5a3"/>
     <text class="value" x="1252.3" y="256">118 MB/s · 2 allocs</text>
   </g>
-  <g transform="translate(0,444)">
+  <g transform="translate(0,464)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">1 KiB messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
@@ -172,7 +172,7 @@
     <rect x="1147" y="243" width="96.9" height="17" rx="4" fill="#e8d5a3"/>
     <text class="value" x="1251.9" y="256">1.8 GB/s · 2 allocs</text>
   </g>
-  <g transform="translate(0,743)">
+  <g transform="translate(0,763)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">16 KiB messages</text>
     <text class="contract" x="45" y="53">1 connection</text>
@@ -251,7 +251,7 @@
     <rect x="1147" y="243" width="52.9" height="17" rx="4" fill="#e8d5a3"/>
     <text class="value" x="1207.9" y="256">7.3 GB/s · 2 allocs</text>
   </g>
-  <g transform="translate(0,1042)">
+  <g transform="translate(0,1062)">
     <rect class="panel" x="25" y="0" width="1450" height="283" rx="10"/>
     <text class="group" x="45" y="27">256 KiB messages</text>
     <text class="contract" x="45" y="53">1 connection</text>

@@ -22,18 +22,25 @@ type record struct {
 
 // chartSpec describes one SVG: a panel per value of one dimension, a column
 // per listed value of another, and a bar per server in each. Other
-// dimensions are fixed.
+// dimensions are fixed. The grouped kind draws one panel of vertical bars
+// instead, a group per column value, for a chart with the columns as its
+// axis; libs, when set, limits the servers drawn.
 type chartSpec struct {
 	file    string
 	title   string
+	kind    string // "" for panels of horizontal bars, "grouped" for vertical groups.
 	panel   string
 	column  string
 	columns []string
 	fixed   map[string]string
+	libs    []string
 }
 
 var charts = map[string][]chartSpec{
 	"Echo": {
+		{file: "echo-sizes-compressed", kind: "grouped", title: "Echo by payload size, compressed with context takeover, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "true", "conns": "128"}, libs: []string{"ews", "gws", "coder"}},
+		{file: "echo-sizes-nocontext", kind: "grouped", title: "Echo by payload size, compressed without context takeover, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "nocontext", "conns": "128"}, libs: []string{"ews", "gws", "coder", "gorilla"}},
+		{file: "echo-sizes", kind: "grouped", title: "Echo by payload size, uncompressed, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "false", "conns": "128"}, libs: []string{"ews", "gws", "coder", "gorilla"}},
 		{file: "echo-plain", title: "Echo, uncompressed", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "false"}},
 		{file: "echo-compressed", title: "Echo, compressed with context takeover", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "true"}},
 		{file: "echo-nocontext", title: "Echo, compressed without context takeover", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "nocontext"}},
@@ -101,7 +108,10 @@ func renderChart(spec chartSpec, subtitle string, records []record) string {
 				ok = false
 			}
 		}
-		if !ok || r.dims[spec.panel] == "" || !slices.Contains(spec.columns, r.dims[spec.column]) {
+		if !ok || spec.panel != "" && r.dims[spec.panel] == "" || !slices.Contains(spec.columns, r.dims[spec.column]) {
+			continue
+		}
+		if spec.libs != nil && !slices.Contains(spec.libs, r.lib) {
 			continue
 		}
 		sel = append(sel, r)
@@ -121,11 +131,14 @@ func renderChart(spec chartSpec, subtitle string, records []record) string {
 	sort.SliceStable(libs, func(i, j int) bool { return libRank(libs[i]) < libRank(libs[j]) })
 	lookup := func(panel, col, lib string) (result, bool) {
 		for _, r := range sel {
-			if r.dims[spec.panel] == panel && r.dims[spec.column] == col && r.lib == lib {
+			if (spec.panel == "" || r.dims[spec.panel] == panel) && r.dims[spec.column] == col && r.lib == lib {
 				return r.result, true
 			}
 		}
 		return result{}, false
+	}
+	if spec.kind == "grouped" {
+		return renderGrouped(spec, subtitle, libs, lookup)
 	}
 
 	const width = 1500
@@ -135,7 +148,7 @@ func renderChart(spec chartSpec, subtitle string, records []record) string {
 	valueW := 190
 	barMax := float64(colWidth - labelW - valueW - 30)
 	panelH := 68 + len(libs)*25 + 15
-	top := 145
+	top := 165
 	height := top + len(panels)*(panelH+16) + 35
 
 	var b strings.Builder
@@ -146,12 +159,8 @@ func renderChart(spec chartSpec, subtitle string, records []record) string {
 	fmt.Fprintf(&b, "  <rect width=\"%d\" height=\"%d\" rx=\"14\" fill=\"#10151d\"/>\n", width, height)
 	fmt.Fprintf(&b, "  <text class=\"title\" x=\"40\" y=\"48\">%s</text>\n", html.EscapeString(spec.title))
 	fmt.Fprintf(&b, "  <text class=\"subtitle\" x=\"40\" y=\"76\">%s · higher is better</text>\n", html.EscapeString(subtitle))
-	x := 40
-	for _, lib := range libs {
-		fmt.Fprintf(&b, "  <rect x=\"%d\" y=\"94\" width=\"14\" height=\"14\" rx=\"3\" fill=\"%s\"/><text class=\"series\" x=\"%d\" y=\"106\">%s</text>\n", x, colors[lib], x+22, html.EscapeString(lib))
-		x += 22 + 9*len(lib) + 40
-	}
-	fmt.Fprintf(&b, "  <text class=\"subtitle\" x=\"1460\" y=\"106\" text-anchor=\"end\">Each column uses its own linear scale; labels show throughput and allocations per message.</text>\n")
+	legend(&b, libs)
+	fmt.Fprintf(&b, "  <text class=\"subtitle\" x=\"40\" y=\"134\">Each column uses its own linear scale; labels show throughput and allocations per message.</text>\n")
 
 	for pi, panel := range panels {
 		fmt.Fprintf(&b, "  <g transform=\"translate(0,%d)\">\n", top+pi*(panelH+16))
@@ -238,4 +247,72 @@ func valueLess(a, b string) bool {
 		return an < bn
 	}
 	return false // Keep first-seen order for names.
+}
+
+// legend draws one swatch and name per server on the row under the subtitle.
+func legend(b *strings.Builder, libs []string) {
+	x := 40
+	for _, lib := range libs {
+		fmt.Fprintf(b, "  <rect x=\"%d\" y=\"94\" width=\"14\" height=\"14\" rx=\"3\" fill=\"%s\"/><text class=\"series\" x=\"%d\" y=\"106\">%s</text>\n", x, colors[lib], x+22, html.EscapeString(lib))
+		x += 22 + 9*len(lib) + 40
+	}
+}
+
+// renderGrouped draws one panel of vertical bars: a group per column value
+// along the bottom, a bar per server in each, every group scaled to its own
+// fastest server, with throughput and allocations labeled above each bar.
+func renderGrouped(spec chartSpec, subtitle string, libs []string, lookup func(panel, col, lib string) (result, bool)) string {
+	const width = 1500
+	const top = 165   // Panel top.
+	const plotH = 300 // Bar area height.
+	const labelH = 60 // Room above the bars for two label lines.
+	const axisH = 40  // Room below the baseline for the group name.
+	panelH := labelH + plotH + axisH + 20
+	height := top + panelH + 35
+	ncol := len(spec.columns)
+	groupW := 1410 / ncol
+	barW := min(72, (groupW-40)/len(libs)-12)
+	gap := (groupW - 40 - barW*len(libs)) / (len(libs) + 1)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-labelledby="title desc">`+"\n", width, height, width, height)
+	fmt.Fprintf(&b, "  <title id=\"title\">%s</title>\n", html.EscapeString(spec.title))
+	fmt.Fprintf(&b, "  <desc id=\"desc\">%s Higher is better.</desc>\n", html.EscapeString(subtitle))
+	fmt.Fprintf(&b, "  <style>%s</style>\n", svgStyle)
+	fmt.Fprintf(&b, "  <rect width=\"%d\" height=\"%d\" rx=\"14\" fill=\"#10151d\"/>\n", width, height)
+	fmt.Fprintf(&b, "  <text class=\"title\" x=\"40\" y=\"48\">%s</text>\n", html.EscapeString(spec.title))
+	fmt.Fprintf(&b, "  <text class=\"subtitle\" x=\"40\" y=\"76\">%s · higher is better</text>\n", html.EscapeString(subtitle))
+	legend(&b, libs)
+	fmt.Fprintf(&b, "  <text class=\"subtitle\" x=\"40\" y=\"134\">Each payload size is scaled to its fastest server; labels show throughput and allocations per message.</text>\n")
+
+	fmt.Fprintf(&b, "  <g transform=\"translate(0,%d)\">\n", top)
+	fmt.Fprintf(&b, "    <rect class=\"panel\" x=\"25\" y=\"0\" width=\"1450\" height=\"%d\" rx=\"10\"/>\n", panelH)
+	base := 10 + labelH + plotH
+	fmt.Fprintf(&b, "    <line x1=\"45\" y1=\"%d\" x2=\"1455\" y2=\"%d\" stroke=\"#2a3442\" stroke-width=\"1\"/>\n", base, base)
+	for ci, col := range spec.columns {
+		x0 := 45 + ci*groupW
+		var maxv float64
+		for _, lib := range libs {
+			if r, ok := lookup("", col, lib); ok && score(r) > maxv {
+				maxv = score(r)
+			}
+		}
+		fmt.Fprintf(&b, "    <text class=\"group\" x=\"%d\" y=\"%d\" text-anchor=\"middle\">%s</text>\n", x0+groupW/2, base+30, html.EscapeString(dimLabel(spec.column, col)))
+		for li, lib := range libs {
+			r, ok := lookup("", col, lib)
+			if !ok || maxv == 0 {
+				continue
+			}
+			h := float64(plotH) * score(r) / maxv
+			bx := x0 + 20 + gap + li*(barW+gap)
+			by := float64(base) - h
+			fmt.Fprintf(&b, "    <rect x=\"%d\" y=\"%.1f\" width=\"%d\" height=\"%.1f\" rx=\"4\" fill=\"%s\"/>\n", bx, by, barW, h, colors[lib])
+			cx := bx + barW/2
+			fmt.Fprintf(&b, "    <text class=\"value\" x=\"%d\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n", cx, by-24, html.EscapeString(throughput(r)))
+			fmt.Fprintf(&b, "    <text class=\"series\" x=\"%d\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n", cx, by-8, allocLabel(r.allocs))
+		}
+	}
+	b.WriteString("  </g>\n")
+	b.WriteString("</svg>\n")
+	return b.String()
 }

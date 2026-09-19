@@ -9,6 +9,17 @@ go get github.com/33TU/ews@latest
 
 Requires Go 1.27. Passes the full Autobahn test suite.
 
+![Echo by payload size, compressed with context takeover, 128 connections](bench/echo/echo-sizes-compressed.svg)
+
+![Echo by payload size, compressed without context takeover, 128 connections](bench/echo/echo-sizes-nocontext.svg)
+
+Echo throughput with permessage-deflate on, one round trip at a time per
+connection, on a 9950X3D. With context takeover the lead is the compressor
+that stays attached to the connection; without it the libraries tie until
+the allocations of a 256 KiB message separate them. Uncompressed, every
+well-built Go library ties on this test up to 16 KiB and ews pulls ahead at
+256 KiB; [bench/](bench/README.md) has that chart and the rest.
+
 ## Packages
 
 | package | what it does |

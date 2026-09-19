@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="620" viewBox="0 0 1500 620" role="img" aria-labelledby="title desc">
+  <title id="title">Echo by payload size, uncompressed, 128 connections</title>
+  <desc id="desc">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D · GOMAXPROCS=8 · 1s benchtime Higher is better.</desc>
+  <style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#d8dee9}.title{font-family:ui-sans-serif,system-ui,sans-serif;font-size:28px;font-weight:700}.subtitle{font-family:ui-sans-serif,system-ui,sans-serif;font-size:15px;fill:#aab4c3}.group{font-family:ui-sans-serif,system-ui,sans-serif;font-size:18px;font-weight:650}.contract{font-family:ui-sans-serif,system-ui,sans-serif;font-size:14px;font-weight:650;fill:#9eabbc}.series{font-size:13px;fill:#c4ccd8}.value{font-size:13px;font-weight:650}.panel{fill:#151c27}</style>
+  <rect width="1500" height="620" rx="14" fill="#10151d"/>
+  <text class="title" x="40" y="48">Echo by payload size, uncompressed, 128 connections</text>
+  <text class="subtitle" x="40" y="76">go1.27.1-X:nodwarf5 · default build · AMD Ryzen 9 9950X3D · GOMAXPROCS=8 · 1s benchtime · higher is better</text>
+  <rect x="40" y="94" width="14" height="14" rx="3" fill="#50c878"/><text class="series" x="62" y="106">ews</text>
+  <rect x="129" y="94" width="14" height="14" rx="3" fill="#ef8354"/><text class="series" x="151" y="106">gws</text>
+  <rect x="218" y="94" width="14" height="14" rx="3" fill="#b388eb"/><text class="series" x="240" y="106">coder</text>
+  <rect x="325" y="94" width="14" height="14" rx="3" fill="#c9a86a"/><text class="series" x="347" y="106">gorilla</text>
+  <text class="subtitle" x="40" y="134">Each payload size is scaled to its fastest server; labels show throughput and allocations per message.</text>
+  <g transform="translate(0,165)">
+    <rect class="panel" x="25" y="0" width="1450" height="420" rx="10"/>
+    <line x1="45" y1="370" x2="1455" y2="370" stroke="#2a3442" stroke-width="1"/>
+    <text class="group" x="221" y="400" text-anchor="middle">64 B messages</text>
+    <rect x="74" y="71.7" width="66" height="298.3" rx="4" fill="#50c878"/>
+    <text class="value" x="107" y="47.7" text-anchor="middle">118 MB/s</text>
+    <text class="series" x="107" y="63.7" text-anchor="middle">0 allocs</text>
+    <rect x="149" y="70.0" width="66" height="300.0" rx="4" fill="#ef8354"/>
+    <text class="value" x="182" y="46.0" text-anchor="middle">119 MB/s</text>
+    <text class="series" x="182" y="62.0" text-anchor="middle">1 alloc</text>
+    <rect x="224" y="156.5" width="66" height="213.5" rx="4" fill="#b388eb"/>
+    <text class="value" x="257" y="132.5" text-anchor="middle">84 MB/s</text>
+    <text class="series" x="257" y="148.5" text-anchor="middle">13 allocs</text>
+    <rect x="299" y="95.2" width="66" height="274.8" rx="4" fill="#c9a86a"/>
+    <text class="value" x="332" y="71.2" text-anchor="middle">109 MB/s</text>
+    <text class="series" x="332" y="87.2" text-anchor="middle">2 allocs</text>
+    <text class="group" x="573" y="400" text-anchor="middle">1 KiB messages</text>
+    <rect x="426" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
+    <text class="value" x="459" y="46.0" text-anchor="middle">1.8 GB/s</text>
+    <text class="series" x="459" y="62.0" text-anchor="middle">0 allocs</text>
+    <rect x="501" y="73.4" width="66" height="296.6" rx="4" fill="#ef8354"/>
+    <text class="value" x="534" y="49.4" text-anchor="middle">1.8 GB/s</text>
+    <text class="series" x="534" y="65.4" text-anchor="middle">1 alloc</text>
+    <rect x="576" y="203.5" width="66" height="166.5" rx="4" fill="#b388eb"/>
+    <text class="value" x="609" y="179.5" text-anchor="middle">1.0 GB/s</text>
+    <text class="series" x="609" y="195.5" text-anchor="middle">24 allocs</text>
+    <rect x="651" y="140.6" width="66" height="229.4" rx="4" fill="#c9a86a"/>
+    <text class="value" x="684" y="116.6" text-anchor="middle">1.4 GB/s</text>
+    <text class="series" x="684" y="132.6" text-anchor="middle">5 allocs</text>
+    <text class="group" x="925" y="400" text-anchor="middle">16 KiB messages</text>
+    <rect x="778" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
+    <text class="value" x="811" y="46.0" text-anchor="middle">19.6 GB/s</text>
+    <text class="series" x="811" y="62.0" text-anchor="middle">0 allocs</text>
+    <rect x="853" y="72.3" width="66" height="297.7" rx="4" fill="#ef8354"/>
+    <text class="value" x="886" y="48.3" text-anchor="middle">19.4 GB/s</text>
+    <text class="series" x="886" y="64.3" text-anchor="middle">1 alloc</text>
+    <rect x="928" y="297.5" width="66" height="72.5" rx="4" fill="#b388eb"/>
+    <text class="value" x="961" y="273.5" text-anchor="middle">4.7 GB/s</text>
+    <text class="series" x="961" y="289.5" text-anchor="middle">61 allocs</text>
+    <rect x="1003" y="275.9" width="66" height="94.1" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1036" y="251.9" text-anchor="middle">6.1 GB/s</text>
+    <text class="series" x="1036" y="267.9" text-anchor="middle">16 allocs</text>
+    <text class="group" x="1277" y="400" text-anchor="middle">256 KiB messages</text>
+    <rect x="1130" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
+    <text class="value" x="1163" y="46.0" text-anchor="middle">41.0 GB/s</text>
+    <text class="series" x="1163" y="62.0" text-anchor="middle">0 allocs</text>
+    <rect x="1205" y="298.6" width="66" height="71.4" rx="4" fill="#ef8354"/>
+    <text class="value" x="1238" y="274.6" text-anchor="middle">9.7 GB/s</text>
+    <text class="series" x="1238" y="290.6" text-anchor="middle">5 allocs</text>
+    <rect x="1280" y="299.1" width="66" height="70.9" rx="4" fill="#b388eb"/>
+    <text class="value" x="1313" y="275.1" text-anchor="middle">9.7 GB/s</text>
+    <text class="series" x="1313" y="291.1" text-anchor="middle">96 allocs</text>
+    <rect x="1355" y="298.9" width="66" height="71.1" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1388" y="274.9" text-anchor="middle">9.7 GB/s</text>
+    <text class="series" x="1388" y="290.9" text-anchor="middle">23 allocs</text>
+  </g>
+</svg>
