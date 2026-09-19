@@ -28,16 +28,27 @@ const (
 	idleTimeout  = 2 * pingInterval
 )
 
-// client is one connection: the queue broadcasts go to, the connection for
-// pings, and the transport for deadlines and closing.
+// client is one connection: the connection for pings, the queue broadcasts
+// go to, and the transport for deadlines and closing.
 type client struct {
 	c    *ws.Conn
+	q    *ws.Queue
 	conn net.Conn
 }
 
-// clients maps each client's queue to it, so a client that falls behind can
-// be closed.
-var clients sync.Map // *ws.Queue -> *client
+var clients sync.Map // Set of *client.
+
+// each calls f on every client and closes those it fails for, which ends
+// their handlers. No lock is held while f runs, so a ping blocked on one
+// slow peer delays nobody else.
+func each(f func(*client) error) {
+	clients.Range(func(key, _ any) bool {
+		if cl := key.(*client); f(cl) != nil {
+			cl.conn.Close()
+		}
+		return true
+	})
+}
 
 // keepalive refreshes the read deadline when a pong arrives, so a quiet but
 // live client stays connected.
@@ -58,17 +69,19 @@ func main() {
 		Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
 		Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
 			c, err := ws.NewConn(conn, ws.Config{
-				Role:              ws.Server,
-				Compression:       res.Compression,
+				Role:        ws.Server,
+				Compression: res.Compression,
+				// Broadcasts are compressed once in Prepare, so per-connection
+				// compressors would sit idle at 800 KB each; share them.
 				CompressionShared: true,
 				ControlHandler:    keepalive{conn: conn},
 			})
 			if err != nil {
 				return
 			}
-			q := c.NewQueue(1 << 20) // A client more than 1 MiB behind is dropped.
-			clients.Store(q, &client{c: c, conn: conn})
-			defer clients.Delete(q)
+			cl := &client{c: c, q: c.NewQueue(1 << 20), conn: conn} // More than 1 MiB behind: dropped.
+			clients.Store(cl, nil)
+			defer clients.Delete(cl)
 
 			for {
 				conn.SetReadDeadline(time.Now().Add(idleTimeout))
@@ -90,31 +103,20 @@ func main() {
 }
 
 // broadcast compresses and encodes the message once and queues it to every
-// client. It returns as soon as the frames are queued; a client whose queue
-// is full or failed is closed, which ends its handler.
+// client, returning as soon as the frames are queued. A client whose queue
+// is full or failed is closed.
 func broadcast(op codec.Opcode, payload []byte) {
 	p, err := ws.Prepare(op, payload)
 	if err != nil {
 		return
 	}
-	clients.Range(func(key, value any) bool {
-		if err := key.(*ws.Queue).SendPrepared(p); err != nil {
-			value.(*client).conn.Close()
-		}
-		return true
-	})
+	each(func(cl *client) error { return cl.q.SendPrepared(p) })
 }
 
-// pingAll pings every client on one ticker. Ping is safe beside the queue's
-// writer and a failed ping closes the client.
+// pingAll pings every client from one ticker. Ping writes beside the
+// queue's writer, and a failed ping closes the client.
 func pingAll() {
 	for range time.Tick(pingInterval) {
-		clients.Range(func(_, value any) bool {
-			cl := value.(*client)
-			if err := cl.c.Ping(nil); err != nil {
-				cl.conn.Close()
-			}
-			return true
-		})
+		each(func(cl *client) error { return cl.c.Ping(nil) })
 	}
 }

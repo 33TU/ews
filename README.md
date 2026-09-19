@@ -95,6 +95,18 @@ Deadlines, keepalive and closing belong to the `net.Conn` you were given;
 
 ## Examples
 
+Runnable programs under `examples/`, each started with `go run ./examples/<name>`:
+
+| Program | Shows |
+|---|---|
+| `echo` | `transport.Server` with the synchronous read and write loop; the shape the Autobahn suite tests |
+| `echo-http` | the same behind an `http.Handler` through `transport.Upgrade`, using `ws.Serve`, with optional TLS |
+| `echo-stream` | relaying each message frame by frame with `NextMessage` and `WriteFrom`, memory bounded by `FragmentSize` |
+| `echo-queue` | replies through a `Queue`, so a slow peer is dropped at its limit instead of stalling the reader |
+| `broadcast` | a hub with a queue per connection, one ping ticker, and a read deadline |
+| `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
+| `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
+
 Read a message in chunks:
 
 ```go
