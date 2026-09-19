@@ -70,17 +70,49 @@ err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []by
 ```
 
 Or as a handler with one method per event, the shape a gws handler takes.
-`events.Base` supplies the defaults for open, ping, pong and close, and a
-panic in a handler ends that connection rather than the process:
+`events.Base` supplies the defaults for whatever you leave out, a panic in a
+handler ends that connection rather than the process, and the peer's close
+arrives in `OnClose` as a `*ws.CloseError`. The whole `echo-events` example:
 
 ```go
+// echo serves every connection; Base answers pings.
 type echo struct{ events.Base }
 
+func (echo) OnOpen(c *events.Conn) {
+	log.Printf("%s connected", c.Request.RemoteAddr)
+	c.SetReadDeadline(time.Now().Add(time.Minute))
+}
+
 func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
+	c.SetReadDeadline(time.Now().Add(time.Minute))
 	return c.Write(op, payload)
 }
 
-server := &transport.Server{Handler: events.Serve(echo{}, ws.Config{})}
+func (echo) OnPong(c *events.Conn, _ []byte) error {
+	return c.SetReadDeadline(time.Now().Add(time.Minute))
+}
+
+func (echo) OnClose(c *events.Conn, err error) {
+	if _, ok := errors.AsType[*ws.CloseError](err); !ok {
+		log.Printf("%s: %v", c.Request.RemoteAddr, err)
+	}
+}
+
+func main() {
+	server := &transport.Server{
+		Handshake: handshake.Options{
+			Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true},
+		},
+		Handler: events.Serve(echo{}, ws.Config{MaxMessageSize: 32 << 20, ValidateUTF8: true}),
+	}
+
+	ln, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Fatal(server.Serve(ln))
+}
 ```
 
 ## Client
