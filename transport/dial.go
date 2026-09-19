@@ -60,6 +60,7 @@ func Dial(ctx context.Context, rawURL string, opts DialOptions) (net.Conn, hands
 	default:
 		return nil, handshake.Result{}, errors.New("ews: unsupported URL scheme " + strconv.Quote(u.Scheme))
 	}
+
 	hreq, err := handshake.NewRequest(opts.Handshake)
 	if err != nil {
 		return nil, handshake.Result{}, err
@@ -81,6 +82,7 @@ func Dial(ctx context.Context, rawURL string, opts DialOptions) (net.Conn, hands
 	if err != nil {
 		return nil, handshake.Result{}, err
 	}
+
 	// Abort the handshake if ctx ends while it is in progress. The socket
 	// deadline is set only from here, after ctx is done, so a failure caused
 	// by ctx always reports ctx.Err rather than a bare timeout.
@@ -129,6 +131,7 @@ func Dial(ctx context.Context, rawURL string, opts DialOptions) (net.Conn, hands
 	if hreq.Protocols != "" {
 		req.Header.Set("Sec-WebSocket-Protocol", hreq.Protocols)
 	}
+
 	if err := req.Write(conn); err != nil {
 		return fail(err)
 	}

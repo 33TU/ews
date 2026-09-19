@@ -25,6 +25,7 @@ func (c *Conn) Write(op codec.Opcode, payload []byte) error {
 		c.wmu.Unlock()
 		return err
 	}
+
 	q, seq, err := c.sendFrame(header, body)
 	c.wmu.Unlock()
 	return await(q, seq, err)
@@ -53,6 +54,7 @@ func (c *Conn) encodeData(op codec.Opcode, payload []byte) (header, body []byte,
 	if err == nil {
 		header, body, err = c.tx.EncodeCompressed(op, compressed)
 	}
+
 	if shared {
 		// The body borrows the compressor's output; copy it so the compressor
 		// can go back to the pool now rather than after the write.
@@ -100,11 +102,13 @@ func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	next := c.getChunk()
 	defer fromPool.Put(next)
 	if err := c.BeginMessage(op); err != nil {
 		return 0, err
 	}
+
 	var total int64
 	for {
 		// Look one chunk ahead so the current one can be final.
@@ -112,6 +116,7 @@ func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 			return total, err
 		}
+
 		final := err == io.EOF
 		if werr := c.writeFragment((*cur)[:n], final); werr != nil {
 			return total, werr
@@ -147,6 +152,7 @@ func (c *Conn) BeginMessage(op codec.Opcode) error {
 	if c.tx.CloseSent() {
 		return ErrClosing
 	}
+
 	c.frag.op, c.frag.first, c.frag.compressed = op, true, c.comp.config != nil
 	if c.frag.compressed && c.comp.attached == nil {
 		// Hold one compressor for the whole message so its chunks continue one stream.
@@ -179,6 +185,7 @@ func (c *Conn) fragment(payload []byte, final bool) (*Queue, uint64, error) {
 	if c.frag.op == 0 {
 		return nil, 0, ErrNoMessage
 	}
+
 	op := codec.Continuation
 	if c.frag.first {
 		op = c.frag.op
@@ -190,6 +197,7 @@ func (c *Conn) fragment(payload []byte, final bool) (*Queue, uint64, error) {
 			return nil, 0, c.endFragmented(err)
 		}
 	}
+
 	header, body, err := c.tx.EncodeFragment(op, final, payload, c.frag.compressed)
 	if err != nil {
 		return nil, 0, c.endFragmented(err)
@@ -198,6 +206,7 @@ func (c *Conn) fragment(payload []byte, final bool) (*Queue, uint64, error) {
 	if err != nil {
 		return nil, 0, c.endFragmented(err)
 	}
+
 	c.frag.first = false
 	if final {
 		return q, seq, c.endFragmented(nil)

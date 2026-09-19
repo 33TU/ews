@@ -53,6 +53,7 @@ func (w *Window) remember(p []byte) {
 		w.buf = append(w.buf[:0], p[len(p)-size:]...)
 		return
 	}
+
 	if cap(w.buf) < 2*size {
 		w.buf = append(make([]byte, 0, 2*size), w.dict()...)
 	}

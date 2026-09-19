@@ -7,6 +7,7 @@ func NewRequest(opts Options) (Request, error) {
 	if err := validOptions(opts); err != nil {
 		return Request{}, err
 	}
+
 	req := Request{
 		Method:     "GET",
 		Upgrade:    "websocket",
@@ -56,6 +57,7 @@ func Confirm(req Request, resp Response, opts Options) (Result, error) {
 	if !ok {
 		return Result{}, ErrBadExtension
 	}
+
 	takeover := opts.Compression.ContextTakeover
 	res.Compression = &Compression{
 		Level:                  opts.Compression.Level,

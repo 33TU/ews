@@ -120,6 +120,7 @@ func (c *Conn) notePrepared(p *Prepared) {
 			c.applyPending()
 		}
 	}
+
 	c.comp.pending[c.comp.npending] = p
 	c.comp.npending++
 	c.comp.pendingBytes += n
@@ -208,6 +209,7 @@ func (c *Conn) inflate(b []byte) (int, error) {
 		}
 		c.decomp.streaming = true
 	}
+
 	n, err := d.Read(b)
 	switch {
 	case err == nil:

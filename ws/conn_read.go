@@ -21,6 +21,7 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 	}
 	c.releaseDecompressor()
 	c.releaseMsg()
+
 	if err := c.nextFrame(); err != nil {
 		return 0, err
 	}
@@ -48,6 +49,7 @@ func (c *Conn) Read(b []byte) (int, error) {
 	if c.rx.MessageCompressed() {
 		return c.inflate(b)
 	}
+
 	for {
 		chunk, done, err := c.rx.PayloadN(len(b))
 		if err != nil {
@@ -96,6 +98,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 	if !c.inMessage {
 		return 0, nil
 	}
+
 	var total int64
 	if c.rx.MessageCompressed() {
 		buf := c.staging()
@@ -107,6 +110,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 			if err != nil {
 				return total, err
 			}
+
 			m, err := w.Write(buf[:n])
 			total += int64(m)
 			if err != nil {
@@ -117,6 +121,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 			}
 		}
 	}
+
 	for {
 		chunk, done, err := c.rx.Payload()
 		if err != nil {
@@ -141,6 +146,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 			}
 			done = c.rx.Remaining() == 0
 		}
+
 		if len(chunk) != 0 {
 			n, err := w.Write(chunk)
 			total += int64(n)
@@ -151,6 +157,7 @@ func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 				return total, io.ErrShortWrite
 			}
 		}
+
 		if !done {
 			continue
 		}
@@ -184,6 +191,7 @@ func (c *Conn) readInto(msg []byte, n int) ([]byte, error) {
 	if err != nil {
 		return msg, err
 	}
+
 	c.rx.Feed(spare[:got])
 	chunk, _, err := c.rx.PayloadN(got) // Unmasks in place; chunk aliases spare.
 	if err != nil {
@@ -207,6 +215,7 @@ func (c *Conn) growMsg(msg []byte, n int) []byte {
 		}
 		msg = c.msg.b[:0]
 	}
+
 	msg = slices.Grow(msg, n)
 	c.msg.b = msg
 	return msg
@@ -236,6 +245,7 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	c.rx.Feed(b[:n])
 	chunk, _, err := c.rx.PayloadN(n)
 	if err != nil {
@@ -271,6 +281,7 @@ func (c *Conn) assemble() ([]byte, error) {
 		if c.rx.Header().PayloadLen() > uint64(c.limit-len(msg)) {
 			return nil, c.fail(&Error{Code: 1009, Err: ErrMessageTooLarge})
 		}
+
 		for {
 			chunk, done, err := c.rx.Payload()
 			if err != nil {
@@ -286,6 +297,7 @@ func (c *Conn) assemble() ([]byte, error) {
 				}
 				continue
 			}
+
 			// Frame open, nothing buffered. A remainder at least as large as
 			// the read buffer goes straight into the message buffer.
 			if remaining := c.rx.Remaining(); remaining >= uint64(len(c.buf)) {
@@ -299,6 +311,7 @@ func (c *Conn) assemble() ([]byte, error) {
 				return nil, err
 			}
 		}
+
 		if !c.rx.MessageOpen() {
 			return msg, nil
 		}
@@ -340,6 +353,7 @@ func (c *Conn) discard() error {
 			}
 		}
 	}
+
 	c.decomp.streaming = false
 	for c.inMessage {
 		chunk, done, err := c.rx.Payload()
@@ -423,6 +437,7 @@ func (c *Conn) handleControl() error {
 	if h == nil {
 		h = DefaultControlHandler{}
 	}
+
 	payload := c.rx.ControlPayload()
 	var err error
 	switch c.rx.ControlOpcode() {
@@ -436,6 +451,7 @@ func (c *Conn) handleControl() error {
 			err = &CloseError{Code: code, Reason: string(reason)}
 		}
 	}
+
 	if err != nil {
 		c.readErr, c.inMessage, c.decomp.streaming = err, false, false
 	}
