@@ -1,5 +1,5 @@
-// Command client talks to an echo server. Each line typed on stdin is sent
-// as a text message and every reply is printed, until stdin ends and the
+// Command client talks to an echo server. Stdin goes out as text messages,
+// one per line typed, and every reply is printed, until stdin ends and the
 // connection is closed with code 1000. With -file, the file is streamed as
 // one binary message straight from disk and the reply streamed back into a
 // hash, which exercises the fragmenting paths in both directions without
@@ -10,11 +10,9 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -53,108 +51,55 @@ func main() {
 	log.Printf("connected to %s, compression %v", *url, res.Compression != nil)
 
 	if *file != "" {
-		err = sendFile(c, *file)
+		if err := sendFile(c, *file); err != nil {
+			log.Fatal(err)
+		}
+		c.Close(1000, "")
 	} else {
-		err = chat(c)
+		// As a net.Conn, each Write is one text message and each reply is
+		// read back as bytes: io.Copy in both directions is the whole chat.
+		go func() {
+			io.Copy(ws.NetConn(c, codec.Text), os.Stdin)
+			c.Close(1000, "") // Stdin ended: our half of the close handshake.
+		}()
 	}
-	if err != nil {
+	// The peer's close with code 1000 reads as io.EOF, so copying to the end
+	// waits for the handshake to complete and prints every reply on the way.
+	if _, err := io.Copy(os.Stdout, ws.NetConn(c, codec.Text)); err != nil {
 		log.Fatal(err)
 	}
+	log.Print("closed")
 }
 
-// closed reports the end of the connection: the peer's close frame arrives
-// as a *ws.CloseError from the read that meets it, and anything else is a
-// failure.
-func closed(err error) error {
-	if ce, ok := errors.AsType[*ws.CloseError](err); ok {
-		log.Printf("closed, code %d", ce.Code)
-		return nil
-	}
-	return err
-}
-
-// chat sends stdin lines and prints replies until stdin ends, then closes.
-// One goroutine reads and one writes, as on any connection; the reader is
-// the one that sees the peer's close frame.
-func chat(c *ws.Conn) error {
-	readErr := make(chan error, 1)
-	go func() {
-		for {
-			op, p, err := c.ReadMessage()
-			if err != nil {
-				readErr <- err
-				return
-			}
-			if op == codec.Text {
-				fmt.Printf("< %s\n", p)
-			} else {
-				fmt.Printf("< %d bytes binary\n", len(p))
-			}
-		}
-	}()
-	sc := bufio.NewScanner(os.Stdin)
-	for sc.Scan() {
-		if err := c.Write(codec.Text, sc.Bytes()); err != nil {
-			return err
-		}
-	}
-	if err := sc.Err(); err != nil {
-		return err
-	}
-	// A clean close is a close frame each way: send ours, then the reader
-	// returns when the peer's arrives.
-	if err := c.Close(1000, ""); err != nil {
-		return err
-	}
-	select {
-	case err := <-readErr:
-		return closed(err)
-	case <-time.After(5 * time.Second):
-		return errors.New("no close from peer")
-	}
-}
-
-// sendFile streams the file out and the echo back in at the same time,
-// comparing hashes. Sending and receiving must overlap: an echo server
-// cannot take the whole message before replying, so a client that sent
-// everything first would deadlock once the socket buffers filled.
+// sendFile streams the file out and the echo back in at the same time and
+// compares hashes. The two must overlap: an echo server cannot take the
+// whole message before replying, so a client that sent everything first
+// would deadlock once the socket buffers filled.
 func sendFile(c *ws.Conn, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	start := time.Now()
-	out := sha256.New()
-	sent := make(chan int64, 1)
-	sendErr := make(chan error, 1)
+	out, in := sha256.New(), sha256.New()
+	sent := make(chan error, 1)
 	go func() {
-		n, err := c.WriteFrom(codec.Binary, io.TeeReader(f, out)) // Fragmented as it is read.
-		sent <- n
-		sendErr <- err
+		_, err := c.WriteFrom(codec.Binary, io.TeeReader(f, out)) // Fragmented as it is read.
+		sent <- err
 	}()
 	if _, err := c.NextMessage(); err != nil {
 		return err
 	}
-	in := sha256.New()
-	got, err := c.WriteTo(in) // Frame by frame into the hash, no message buffer.
+	n, err := c.WriteTo(in) // Frame by frame into the hash, no message buffer.
 	if err != nil {
 		return err
 	}
-	if err := <-sendErr; err != nil {
+	if err := <-sent; err != nil {
 		return err
 	}
-	elapsed := time.Since(start)
-	if n := <-sent; got != n || !bytes.Equal(out.Sum(nil), in.Sum(nil)) {
-		return fmt.Errorf("echo mismatch: sent %d bytes, got %d", n, got)
+	if !bytes.Equal(out.Sum(nil), in.Sum(nil)) {
+		return fmt.Errorf("echo differs after %d bytes", n)
 	}
-	log.Printf("%d bytes round trip in %v, %.0f MB/s", got, elapsed.Round(time.Millisecond), 2*float64(got)/elapsed.Seconds()/1e6)
-	if err := c.Close(1000, ""); err != nil {
-		return err
-	}
-	for {
-		if _, _, err := c.ReadMessage(); err != nil {
-			return closed(err)
-		}
-	}
+	log.Printf("%d bytes echoed intact", n)
+	return nil
 }
