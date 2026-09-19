@@ -4,6 +4,8 @@ Run at ews commit `955c34d` with `go test -run '^$' -bench Echo -benchtime 1s`; 
 
 ![echo-sizes-compressed-simd](echo-sizes-compressed-simd.svg)
 
+![echo-sizes-nocontext-simd](echo-sizes-nocontext-simd.svg)
+
 ![echo-sizes-simd](echo-sizes-simd.svg)
 
 ![echo-plain-simd](echo-plain-simd.svg)

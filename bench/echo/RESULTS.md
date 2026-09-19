@@ -4,6 +4,8 @@ Run at ews commit `955c34d` with `go test -run '^$' -bench Echo -benchtime 1s`; 
 
 ![echo-sizes-compressed](echo-sizes-compressed.svg)
 
+![echo-sizes-nocontext](echo-sizes-nocontext.svg)
+
 ![echo-sizes](echo-sizes.svg)
 
 ![echo-plain](echo-plain.svg)

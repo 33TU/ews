@@ -33,6 +33,8 @@ each size scaled to its fastest server:
 
 ![Echo by payload size, compressed](echo/echo-sizes-compressed.svg)
 
+![Echo by payload size, compressed without context takeover](echo/echo-sizes-nocontext.svg)
+
 Uncompressed echo is bounded by the kernel round trip and every well-built
 library ties on it up to 16 KiB, within a few percent of a raw TCP echo; at
 256 KiB gws, coder and gorilla allocate a frame per message above their

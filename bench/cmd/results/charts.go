@@ -39,6 +39,7 @@ type chartSpec struct {
 var charts = map[string][]chartSpec{
 	"Echo": {
 		{file: "echo-sizes-compressed", kind: "grouped", title: "Echo by payload size, compressed with context takeover, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "true", "conns": "128"}, libs: []string{"ews", "gws", "coder"}},
+		{file: "echo-sizes-nocontext", kind: "grouped", title: "Echo by payload size, compressed without context takeover, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "nocontext", "conns": "128"}, libs: []string{"ews", "gws", "coder", "gorilla"}},
 		{file: "echo-sizes", kind: "grouped", title: "Echo by payload size, uncompressed, 128 connections", column: "size", columns: []string{"64", "1024", "16384", "262144"}, fixed: map[string]string{"compress": "false", "conns": "128"}, libs: []string{"ews", "gws", "coder", "gorilla"}},
 		{file: "echo-plain", title: "Echo, uncompressed", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "false"}},
 		{file: "echo-compressed", title: "Echo, compressed with context takeover", panel: "size", column: "conns", columns: []string{"1", "128", "2048"}, fixed: map[string]string{"compress": "true"}},
