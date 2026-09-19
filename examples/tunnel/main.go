@@ -27,36 +27,33 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: tunnel server|client [flags]")
-		os.Exit(2)
+	addr := flag.String("addr", ":9004", "server: WebSocket listen address")
+	upstream := flag.String("upstream", "127.0.0.1:22", "server: TCP address each tunnel connects to")
+	listen := flag.String("listen", "127.0.0.1:2222", "client: local TCP listen address")
+	url := flag.String("url", "ws://localhost:9004", "client: tunnel server URL")
+	mode := ""
+	if len(os.Args) > 1 {
+		mode = os.Args[1]
+		flag.CommandLine.Parse(os.Args[2:])
 	}
-	switch os.Args[1] {
+
+	switch mode {
 	case "server":
-		server(os.Args[2:])
+		server(*addr, *upstream)
 	case "client":
-		client(os.Args[2:])
+		client(*listen, *url)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown mode %q; want server or client\n", os.Args[1])
+		fmt.Fprintln(os.Stderr, "usage: tunnel server|client [flags]")
 		os.Exit(2)
 	}
 }
 
-// server accepts WebSockets and connects each to the upstream TCP address.
-func server(args []string) {
-	fs := flag.NewFlagSet("server", flag.ExitOnError)
-	addr := fs.String("addr", ":9004", "listen address")
-	upstream := fs.String("upstream", "127.0.0.1:22", "TCP address each tunnel connects to")
-	fs.Parse(args)
-
+// server connects each WebSocket to the upstream TCP address.
+func server(addr, upstream string) {
 	srv := &transport.Server{
 		Handler: func(conn net.Conn, _ handshake.Result, _ *transport.Request) {
-			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server})
-			if err != nil {
-				log.Print(err)
-				return
-			}
-			up, err := net.DialTimeout("tcp", *upstream, 10*time.Second)
+			c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server}) // Only an invalid Config fails.
+			up, err := net.DialTimeout("tcp", upstream, 10*time.Second)
 			if err != nil {
 				log.Printf("%s: %v", conn.RemoteAddr(), err)
 				c.Close(1011, "upstream unavailable")
@@ -65,27 +62,21 @@ func server(args []string) {
 			pipe(ws.NetConn(c, codec.Binary), up)
 		},
 	}
-	ln, err := net.Listen("tcp", *addr)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("tunnel server on %s, upstream %s", *addr, *upstream)
+	log.Printf("tunnel server on %s, upstream %s", addr, upstream)
 	log.Fatal(srv.Serve(ln))
 }
 
-// client accepts TCP connections and opens a WebSocket to the server for
-// each one.
-func client(args []string) {
-	fs := flag.NewFlagSet("client", flag.ExitOnError)
-	listen := fs.String("listen", "127.0.0.1:2222", "local TCP address to accept on")
-	url := fs.String("url", "ws://localhost:9004", "tunnel server URL")
-	fs.Parse(args)
-
-	ln, err := net.Listen("tcp", *listen)
+// client opens a WebSocket to the server for each TCP connection accepted.
+func client(listen, url string) {
+	ln, err := net.Listen("tcp", listen)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("tunnel client on %s, server %s", *listen, *url)
+	log.Printf("tunnel client on %s, server %s", listen, url)
 	for {
 		tcp, err := ln.Accept()
 		if err != nil {
@@ -93,20 +84,14 @@ func client(args []string) {
 		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			conn, _, err := transport.Dial(ctx, *url, transport.DialOptions{})
+			conn, _, err := transport.Dial(ctx, url, transport.DialOptions{})
 			cancel()
 			if err != nil {
 				log.Printf("%s: %v", tcp.RemoteAddr(), err)
 				tcp.Close()
 				return
 			}
-			c, err := ws.NewConn(conn, ws.Config{Role: ws.Client})
-			if err != nil {
-				log.Print(err)
-				conn.Close()
-				tcp.Close()
-				return
-			}
+			c, _ := ws.NewConn(conn, ws.Config{Role: ws.Client})
 			pipe(tcp, ws.NetConn(c, codec.Binary))
 		}()
 	}
