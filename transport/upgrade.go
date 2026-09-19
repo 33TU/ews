@@ -18,9 +18,10 @@ var ErrNotHijackable = errors.New("ews: response writer does not support hijacki
 // Upgrade performs the server side of the opening handshake and returns the
 // hijacked connection with any deadlines cleared. Wrap it with ws.NewConn
 // using ws.Server and the returned compression. On a rejected request an
-// HTTP error has been written and the error explains why. Headers set on w
-// before the call, such as cookies, are sent with the 101 response.
-// Origin checks are the caller's business before calling Upgrade.
+// HTTP error has been written and the error explains why.
+//
+// Headers set on w before the call, such as cookies, are sent with the 101
+// response. Origin checks are the caller's business before calling Upgrade.
 func Upgrade(w http.ResponseWriter, r *http.Request, opts handshake.Options) (net.Conn, handshake.Result, error) {
 	req := handshake.Request{
 		Method:     r.Method,

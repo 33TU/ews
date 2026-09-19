@@ -61,12 +61,13 @@ type Config struct {
 	Compression *handshake.Compression
 	// CompressionShared borrows a compressor from the shared pool for every
 	// compressed write instead of keeping one attached to the connection.
+	// Without send context takeover compressors are always shared.
+	//
 	// With send context takeover an attached compressor continues one
 	// stream and is the fastest per message, but holds about 800 KB per
 	// connection; a shared one is primed from the 32 KB window on each
 	// message and costs more CPU per message but almost no memory, which
-	// wins once thousands of connections compete for cache. Without send
-	// context takeover compressors are always shared.
+	// wins once thousands of connections compete for cache.
 	CompressionShared bool
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler

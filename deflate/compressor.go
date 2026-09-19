@@ -59,9 +59,11 @@ func (c *Compressor) Compress(payload []byte, w *Window) ([]byte, error) {
 
 // CompressChunk compresses one fragment of a message sent as it is produced.
 // The first chunk primes or continues the stream as Compress does, and later
-// chunks continue it, so the fragments decode as one message. Only the final
-// chunk drops the sync-flush tail; middle chunks keep it, since the receiver
-// only restores it once at the end. Output is borrowed until the next call.
+// chunks continue it, so the fragments decode as one message. Output is
+// borrowed until the next call.
+//
+// Only the final chunk drops the sync-flush tail; middle chunks keep it,
+// since the receiver only restores it once at the end.
 func (c *Compressor) CompressChunk(payload []byte, w *Window, final bool) ([]byte, error) {
 	c.output.Reset()
 	// Mid-message the encoder must continue whatever the window says. Between

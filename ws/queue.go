@@ -13,12 +13,13 @@ import (
 // write. Prepared messages are queued by reference.
 //
 // Once a connection has a queue, its other data writes join the queue too:
-// Write, WritePrepared, and fragmented sends enqueue their
-// frames in submission order and return when those frames have been written,
-// so message order and compressed-stream order are preserved and the two
+// Write, WritePrepared, and fragmented sends enqueue their frames in
+// submission order and return when those frames have been written, so
+// message order and compressed-stream order are preserved and the two
 // styles mix freely. Close joins it as well, so the close frame follows
-// every message queued before it. Pings and pongs bypass the queue. A Queue
-// is safe for concurrent use.
+// every message queued before it. Pings and pongs bypass the queue.
+//
+// A Queue is safe for concurrent use.
 type Queue struct {
 	c     *Conn
 	limit int
@@ -62,15 +63,18 @@ type arena struct{ b []byte }
 
 var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<10)} }}
 
-// NewQueue attaches a queue to c, or returns the one it already has. limit
-// is a high-water mark on bytes queued by Send and SendPrepared: an empty
-// queue accepts any message, and a message that would push a nonempty queue
-// past the limit is refused with ErrQueueFull rather than blocking, so a
-// slow peer cannot stall the sender. The application decides what a full
-// queue means, usually closing the connection. Zero means 1 MiB on a new
-// queue and leaves an existing queue's limit alone, so a hub can look a
-// connection's queue up again with NewQueue(0); a nonzero limit on an
-// existing queue adjusts it, taking effect on the next Send.
+// NewQueue attaches a queue to c, or returns the one it already has.
+//
+// limit is a high-water mark on bytes queued by Send and SendPrepared: an
+// empty queue accepts any message, and a message that would push a nonempty
+// queue past the limit is refused with ErrQueueFull rather than blocking, so
+// a slow peer cannot stall the sender. The application decides what a full
+// queue means, usually closing the connection.
+//
+// Zero means 1 MiB on a new queue and leaves an existing queue's limit
+// alone, so a hub can look a connection's queue up again with NewQueue(0); a
+// nonzero limit on an existing queue adjusts it, taking effect on the next
+// Send.
 func (c *Conn) NewQueue(limit int) *Queue {
 	c.wmu.Lock()
 	defer c.wmu.Unlock()

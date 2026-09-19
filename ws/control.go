@@ -1,10 +1,12 @@
 package ws
 
-// ControlHandler handles control frames during reads.
-// Shared handlers must support concurrent calls from different connections.
-// Payloads are borrowed for the duration of each call.
-// Handlers replace defaults: OnPing must send a Pong, and OnClose a close response
-// if needed. They may write but must not read from c. An error terminates the connection.
+// ControlHandler handles control frames during reads. Payloads are borrowed
+// for the duration of each call, and a shared handler must support
+// concurrent calls from different connections.
+//
+// Handlers replace the defaults: OnPing must send a Pong, and OnClose a close
+// response if needed. They may write to c but must not read from it. An
+// error terminates the connection.
 type ControlHandler interface {
 	OnPing(c *Conn, payload []byte) error
 	OnPong(c *Conn, payload []byte) error

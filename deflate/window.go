@@ -3,9 +3,10 @@ package deflate
 // Window is one direction's compression history for context takeover: the
 // most recent 32 KB of payload sent or received on a connection. Give each
 // direction of each connection its own Window and pass it to every call for
-// that direction; nil means no context takeover. The zero value is ready to
-// use. A failed message clears the window, since the peers' histories have
-// diverged.
+// that direction; nil means no context takeover.
+//
+// The zero value is ready to use. A failed message clears the window, since
+// the peers' histories have diverged.
 type Window struct {
 	// Bits is the window size as a power of two, 8 to 15; zero means 15. Set
 	// it to the negotiated size before use: for a send window the size this

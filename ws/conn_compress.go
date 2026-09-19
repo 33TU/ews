@@ -45,12 +45,13 @@ type decompressorContext struct {
 }
 
 // Context takeover state is a 32 KB window per direction on the connection.
-// Decompressors are always shared across connections. Compressors are shared
-// too, except that a connection with send takeover keeps one attached so its
-// messages continue one stream instead of re-priming from the window on every
-// message. Attached is faster per message; shared is far smaller per
-// connection and wins once connections outnumber what the cache can hold.
-// Config.CompressionShared picks.
+// Decompressors are always shared across connections.
+//
+// Compressors are shared too, except that a connection with send takeover
+// keeps one attached so its messages continue one stream instead of
+// re-priming from the window on every message. Attached is faster per
+// message; shared is far smaller per connection and wins once connections
+// outnumber what the cache can hold. Config.CompressionShared picks.
 var (
 	compressorPools  [12]sync.Pool // Full window, indexed by flate level + 2.
 	windowPools      [7]sync.Pool  // Reduced windows, indexed by window bits - 8.

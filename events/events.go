@@ -25,11 +25,12 @@ type Conn struct {
 }
 
 // Handler receives a connection's events on its read goroutine. Payloads
-// are borrowed until the call returns; an error ends the connection and is
-// passed to OnClose, as is the *ws.CloseError of a peer's close and, as a
-// *PanicError, a panic in any other event. One Handler serves every
-// connection; per-connection state goes in Conn.UserData. Embed Base for
-// the defaults.
+// are borrowed until the call returns. An error from an event ends the
+// connection and reaches OnClose, which also receives the *ws.CloseError
+// of a peer's close and the *PanicError of a panic in another event.
+//
+// One Handler serves every connection; per-connection state goes in
+// Conn.UserData. Embed Base for the defaults.
 type Handler interface {
 	OnOpen(c *Conn)
 	OnMessage(c *Conn, op codec.Opcode, payload []byte) error
