@@ -26,6 +26,7 @@ well-built Go library ties on this test up to 16 KiB and ews pulls ahead at
 |---|---|
 | `ws` | connections: read and write messages over an upgraded transport |
 | `transport` | get a connection: `Upgrade` inside `net/http`, `Server` without it, `Dial` for clients |
+| `events` | serve connections through a handler with one method per event, over `transport` and `ws.Serve` |
 | `handshake` | the opening handshake rules, including `permessage-deflate` negotiation |
 | `codec` | frame encoding and decoding |
 | `deflate` | per-message compression with context takeover |
@@ -34,7 +35,9 @@ well-built Go library ties on this test up to 16 KiB and ews pulls ahead at
 
 ```go
 server := &transport.Server{
-	Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
+	Handshake: handshake.Options{
+		Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true},
+	},
 	Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
 		c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression})
 		if err != nil {
@@ -64,6 +67,20 @@ handler: `net/http` keeps about 10 KB of request state alive until it returns,
 err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []byte) error {
 	return c.Write(op, payload) // Returns a *ws.CloseError when the peer closes.
 }))
+```
+
+Or as a handler with one method per event, the shape a gws handler takes.
+`events.Base` supplies the defaults for open, ping, pong and close, and a
+panic in a handler ends that connection rather than the process:
+
+```go
+type echo struct{ events.Base }
+
+func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
+	return c.Write(op, payload)
+}
+
+server := &transport.Server{Handler: events.Serve(echo{}, ws.Config{})}
 ```
 
 ## Client
