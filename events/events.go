@@ -64,13 +64,9 @@ func Serve(h Handler, cfg ws.Config) func(net.Conn, handshake.Result, *transport
 	}
 }
 
-// Dial connects to rawURL as a client and runs h on the connection until it
-// ends, then closes the transport. It returns the error OnClose received,
-// so a caller deciding whether to reconnect sees the same thing the handler
-// did, or the dial error if no connection was made. Run it on a goroutine
-// to keep working while the connection lives. Conn.Request carries the
-// URL's host and path and the server's address, and cfg.UserData is in
-// place before OnOpen, for state the caller has at dial time.
+// Dial connects to rawURL, runs h until the connection ends and closes the
+// transport. It returns the error OnClose received, or the dial error.
+// cfg.UserData is set before OnOpen.
 func Dial(ctx context.Context, rawURL string, opts transport.DialOptions, h Handler, cfg ws.Config) error {
 	conn, res, err := transport.Dial(ctx, rawURL, opts)
 	if err != nil {
