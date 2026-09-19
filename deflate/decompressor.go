@@ -50,8 +50,10 @@ type Decompressor struct {
 	done      bool // Last byte delivered; the next Read returns io.EOF.
 }
 
-// Decompress borrows its output until the next call. maxSize must be nonnegative.
-// It returns ErrMessageTooLarge if the decompressed size exceeds maxSize.
+// Decompress borrows its output until the next call. maxSize must be
+// nonnegative, and a message that decompresses past it fails with
+// ErrMessageTooLarge.
+//
 // With a window, the message continues that direction's history and the
 // window is updated; with nil, it is decompressed on its own. Any error
 // clears the window.

@@ -31,11 +31,13 @@ func (c *Conn) NextMessage() (codec.Opcode, error) {
 
 // Read copies payload of the current message into b, spanning continuation
 // frames and dispatching interleaved control frames. It returns 0, io.EOF at
-// the end of the message and before NextMessage has been called. Transport EOF
-// mid-message is io.ErrUnexpectedEOF. Text read in chunks is never UTF-8
-// validated; only complete messages are. Compressed messages are inflated as
-// they stream, holding one frame at a time; a transport error during one
-// ends the connection, since the inflater cannot resume.
+// the end of the message and before NextMessage has been called. Transport
+// EOF mid-message is io.ErrUnexpectedEOF.
+//
+// Text read in chunks is never UTF-8 validated; only complete messages are.
+// Compressed messages are inflated as they stream, holding one frame at a
+// time; a transport error during one ends the connection, since the inflater
+// cannot resume.
 func (c *Conn) Read(b []byte) (int, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -83,14 +85,16 @@ func (c *Conn) Read(b []byte) (int, error) {
 }
 
 // WriteTo writes the rest of the current message to w, so io.Copy(w, c) moves
-// a message without a buffer of its own. Plain frames go to w as they arrive:
-// what the read buffer holds is borrowed, and a longer remainder is read from
-// the transport into the pooled message buffer in pieces of up to
-// Config.FragmentSize. A compressed message is inflated as it streams into
-// the message buffer, FragmentSize at a time, and each piece written. It
-// returns nil at the end of the message and writes nothing when
-// no message is open. An error from w is returned as is and leaves the rest
-// of the message unread; NextMessage discards it.
+// a message without a buffer of its own. It returns nil at the end of the
+// message and writes nothing when no message is open. An error from w is
+// returned as is and leaves the rest of the message unread; NextMessage
+// discards it.
+//
+// Plain frames go to w as they arrive: what the read buffer holds is
+// borrowed, and a longer remainder is read from the transport into the
+// pooled message buffer in pieces of up to Config.FragmentSize. A compressed
+// message is inflated as it streams into the message buffer, FragmentSize at
+// a time, and each piece written.
 func (c *Conn) WriteTo(w io.Writer) (int64, error) {
 	if c.readErr != nil {
 		return 0, c.readErr
@@ -254,11 +258,12 @@ func (c *Conn) readDirect(b []byte) (int, error) {
 	return len(chunk), nil
 }
 
-// ReadMessage returns the next complete text or binary message. The payload is
-// borrowed until the next read call. Messages larger than
-// Config.MaxMessageSize, before or after decompression, fail with close code
-// 1009; undecodable compressed data, and with Config.ValidateUTF8 text that
-// is not valid UTF-8, fail with 1007.
+// ReadMessage returns the next complete text or binary message. The payload
+// is borrowed until the next read call.
+//
+// Messages larger than Config.MaxMessageSize, before or after
+// decompression, fail with close code 1009; undecodable compressed data, and
+// with Config.ValidateUTF8 text that is not valid UTF-8, fail with 1007.
 func (c *Conn) ReadMessage() (codec.Opcode, []byte, error) {
 	op, err := c.NextMessage()
 	if err != nil {

@@ -133,8 +133,10 @@ func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
 // WritePrepared sends a prepared message. On a server it writes the shared
 // bytes with no encoding or copying; a client must mask, so it falls back to
 // Write. A compressed variant advances the send window like any compressed
-// message. On a connection with a Queue the message joins the queue in order
-// and WritePrepared returns once it has been written.
+// message.
+//
+// On a connection with a Queue the message joins the queue in order and
+// WritePrepared returns once it has been written.
 func (c *Conn) WritePrepared(p *Prepared) error {
 	if c.role == Client {
 		return c.Write(p.op, p.payload)

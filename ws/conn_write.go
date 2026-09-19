@@ -138,8 +138,10 @@ func (c *Conn) WriteFrom(op codec.Opcode, r io.Reader) (int64, error) {
 // BeginMessage starts a fragmented text or binary message. Each WriteChunk
 // then sends one fragment and EndMessage finishes it. Until then Write and
 // BeginMessage return ErrMessageOpen; Ping, Pong, and Close may interleave,
-// as the protocol allows. The message is compressed whenever compression is
-// negotiated, regardless of MinSize.
+// as the protocol allows.
+//
+// The message is compressed whenever compression is negotiated, regardless
+// of MinSize.
 func (c *Conn) BeginMessage(op codec.Opcode) error {
 	if op != codec.Text && op != codec.Binary {
 		return ErrProtocol
@@ -233,11 +235,13 @@ func (c *Conn) Ping(payload []byte) error { return c.send(codec.Ping, payload) }
 // Pong sends a pong with at most 125 payload bytes. Pongs are allowed after Close.
 func (c *Conn) Pong(payload []byte) error { return c.send(codec.Pong, payload) }
 
-// Close sends a close frame once. Code zero sends an empty payload and requires
-// an empty reason. Later data writes return ErrClosing. The transport stays
-// open; reads deliver the peer's close as a *CloseError. On a connection with
-// a Queue the frame joins the queue behind the data already sent, so nothing
-// queued is lost or follows the close, and Close returns once it is written.
+// Close sends a close frame once. Code zero sends an empty payload and
+// requires an empty reason. Later data writes return ErrClosing. The
+// transport stays open; reads deliver the peer's close as a *CloseError.
+//
+// On a connection with a Queue the frame joins the queue behind the data
+// already sent, so nothing queued is lost or follows the close, and Close
+// returns once it is written.
 func (c *Conn) Close(code uint16, reason string) error {
 	c.wmu.Lock()
 	header, body, err := c.tx.EncodeClose(code, reason)

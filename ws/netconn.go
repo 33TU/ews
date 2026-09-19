@@ -12,9 +12,10 @@ import (
 
 // NetConn presents a connection as a net.Conn for tunneling other protocols
 // over WebSocket. Each Write sends one message of the given type, Text or
-// Binary; Read delivers message payloads in order, continuing into the next
-// message as one ends and never spanning a message in a single call. A
-// message of the other type closes the connection with code 1003 and fails
+// Binary. Read delivers message payloads in order, continuing into the next
+// message as one ends and never spanning a message in a single call.
+//
+// A message of the other type closes the connection with code 1003 and fails
 // every later Read with ErrUnexpectedType. A peer close with code 1000 or
 // 1001 reads as io.EOF; any other close code is returned as the CloseError.
 //
