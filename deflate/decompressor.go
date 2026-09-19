@@ -51,8 +51,8 @@ type Decompressor struct {
 }
 
 // Decompress borrows its output until the next call. maxSize must be
-// nonnegative; it returns ErrMessageTooLarge if the decompressed size exceeds
-// it.
+// nonnegative, and a message that decompresses past it fails with
+// ErrMessageTooLarge.
 //
 // With a window, the message continues that direction's history and the
 // window is updated; with nil, it is decompressed on its own. Any error
