@@ -78,6 +78,7 @@ func (c *Compressor) CompressChunk(payload []byte, w *Window, final bool) ([]byt
 		}
 		c.writer.ResetDict(&c.output, dict)
 	}
+
 	if _, err := c.writer.Write(payload); err != nil {
 		c.attached, c.mid = nil, false
 		return nil, err
@@ -86,11 +87,13 @@ func (c *Compressor) CompressChunk(payload []byte, w *Window, final bool) ([]byt
 		c.attached, c.mid = nil, false
 		return nil, err
 	}
+
 	c.attached, c.mid = w, !final
 	if w != nil {
 		w.remember(payload)
 		c.gen = w.gen
 	}
+
 	output := c.output.Bytes()
 	if final {
 		output = output[:len(output)-4] // Strip the permessage-deflate sync-flush tail.

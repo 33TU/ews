@@ -62,6 +62,7 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 	if err := d.begin(nil, payload, w); err != nil {
 		return nil, err
 	}
+
 	d.output = d.output[:0]
 	for {
 		size := 32 << 10
@@ -69,6 +70,7 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 			size = remaining + 1
 		}
 		d.output = slices.Grow(d.output, size)
+
 		n, err := d.Read(d.output[len(d.output) : len(d.output)+size])
 		d.output = d.output[:len(d.output)+n]
 		if len(d.output) > maxSize {
@@ -102,6 +104,7 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 		d.finish(true)
 		return 0, io.EOF
 	}
+
 	for {
 		n, err := d.reader.Read(p)
 		// Streamed output leaves with the caller, so its history is kept as
@@ -123,6 +126,7 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 				d.done = true
 				return n, nil
 			}
+
 			// RFC 7692 permits final DEFLATE blocks within a message; continue
 			// with the message so far as the dictionary.
 			if err := d.reader.Reset(&d.input, d.dict(n)); err != nil {
@@ -159,6 +163,7 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 	d.streaming = src != nil
 	d.kept = 0
 	d.active, d.done = true, false
+
 	if d.reader == nil {
 		d.reader = flate.NewReaderDict(&d.input, w.dict()).(resetReader)
 		return nil
@@ -181,6 +186,7 @@ func (d *Decompressor) dict(n int) []byte {
 		}
 		return d.scratch.dict()
 	}
+
 	out := d.output[:len(d.output)+n]
 	if d.window != nil {
 		d.window.remember(out[d.kept:])
@@ -207,6 +213,7 @@ func (d *Decompressor) finish(ok bool) {
 			d.window.remember(d.output[d.kept:])
 		}
 	}
+
 	d.window = nil
 	d.input = messageReader{}
 	d.active, d.done, d.streaming = false, false, false
@@ -251,6 +258,7 @@ func (r *messageReader) Read(p []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	if ok {
 		n := copy(p, r.payload)
 		r.payload = r.payload[n:]
@@ -269,6 +277,7 @@ func (r *messageReader) ReadByte() (byte, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	if ok {
 		b := r.payload[0]
 		r.payload = r.payload[1:]

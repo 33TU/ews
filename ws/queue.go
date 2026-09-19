@@ -82,6 +82,7 @@ func (c *Conn) NewQueue(limit int) *Queue {
 		}
 		return q
 	}
+
 	if limit <= 0 {
 		limit = 1 << 20
 	}
@@ -113,6 +114,7 @@ func (q *Queue) Send(op codec.Opcode, payload []byte) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = q.enqueue(header, body, nil)
 	return err
 }
@@ -195,6 +197,7 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 		q.cur.b = append(append(q.cur.b, header...), body...)
 		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
 	}
+
 	q.size += n
 	q.enqueued++
 	if !q.running {
@@ -235,6 +238,7 @@ func (q *Queue) run() {
 			q.mu.Unlock()
 			return
 		}
+
 		// Take the producer's storage for writing, so enqueue continues into
 		// fresh storage while the write is in progress.
 		q.cur, q.flushing = nil, q.cur
@@ -256,6 +260,7 @@ func (q *Queue) run() {
 				arenaPool.Put(a)
 			}
 		}
+
 		if err != nil {
 			q.err = err
 			q.segments, q.size = q.segments[:0], 0
@@ -287,6 +292,7 @@ func (q *Queue) flush() error {
 		_, err := c.rw.Write(frame)
 		return err
 	}
+
 	if c.vectored {
 		q.bufs = q.bufs[:0]
 		for _, s := range q.flushSegments {
@@ -301,6 +307,7 @@ func (q *Queue) flush() error {
 		clear(q.bufs) // Drop references to prepared frames.
 		return err
 	}
+
 	buf := writePool.Get().(*[]byte)
 	out := (*buf)[:0]
 	for _, s := range q.flushSegments {

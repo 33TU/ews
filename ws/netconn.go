@@ -57,6 +57,7 @@ func (nc *netConn) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+
 	for {
 		if !nc.inMsg {
 			op, err := nc.c.NextMessage()
@@ -70,6 +71,7 @@ func (nc *netConn) Read(p []byte) (int, error) {
 			}
 			nc.inMsg = true
 		}
+
 		n, err := nc.c.Read(p)
 		if err == io.EOF {
 			nc.inMsg = false

@@ -29,6 +29,7 @@ func parseExtensions(header string) ([]extension, error) {
 		if e.name == "" {
 			return nil, ErrBadExtension
 		}
+
 		for _, p := range parts[1:] {
 			name, value, _ := strings.Cut(strings.TrimSpace(p), "=")
 			name = strings.TrimSpace(name)
@@ -61,6 +62,7 @@ func parseDeflate(e extension) (p deflateParams, ok bool) {
 			return p, false
 		}
 		seen[name] = true
+
 		switch name {
 		case "server_no_context_takeover":
 			if kv.value != "" {

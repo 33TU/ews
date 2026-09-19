@@ -97,6 +97,7 @@ func (r *receiver) Next() (frameKind, error) {
 	if r.closeReceived {
 		return needInput, nil
 	}
+
 	for {
 		if r.controlOpen {
 			chunk, done := r.dec.Payload()

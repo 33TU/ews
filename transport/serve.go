@@ -119,6 +119,7 @@ func (s *Server) serve(conn net.Conn) {
 		timeout = 10 * time.Second
 	}
 	conn.SetDeadline(time.Now().Add(timeout))
+
 	br := bufio.NewReaderSize(conn, 4<<10)
 	req, err := readRequest(br, s.maxHeaderBytes())
 	if err != nil {
@@ -130,6 +131,7 @@ func (s *Server) serve(conn net.Conn) {
 		conn.Close()
 		return
 	}
+
 	req.RemoteAddr = conn.RemoteAddr()
 	if s.Accept != nil {
 		if status := s.Accept(req); status != 0 {
@@ -138,6 +140,7 @@ func (s *Server) serve(conn net.Conn) {
 			return
 		}
 	}
+
 	resp, res, err := handshake.Negotiate(handshake.Request{
 		Method:     req.Method,
 		Upgrade:    req.Header["Upgrade"],
@@ -157,6 +160,7 @@ func (s *Server) serve(conn net.Conn) {
 		conn.Close()
 		return
 	}
+
 	if _, err := conn.Write(responseBytes(resp)); err != nil {
 		conn.Close()
 		return
@@ -190,6 +194,7 @@ func readRequest(br *bufio.Reader, limit int) (*Request, error) {
 	if !ok || !ok2 || method == "" || path == "" || version != "HTTP/1.1" {
 		return nil, errors.New("ews: bad request line")
 	}
+
 	req := &Request{Method: method, Path: path, Header: make(map[string]string, 12)}
 	for {
 		line, err := readLine(br, &limit)
@@ -199,6 +204,7 @@ func readRequest(br *bufio.Reader, limit int) (*Request, error) {
 		if line == "" {
 			break
 		}
+
 		name, value, ok := strings.Cut(line, ":")
 		if !ok || name == "" || strings.ContainsAny(name, " \t") {
 			return nil, errors.New("ews: bad header line")
@@ -233,6 +239,7 @@ func readLine(br *bufio.Reader, limit *int) (string, error) {
 		}
 		return "", err
 	}
+
 	*limit -= len(line)
 	if *limit < 0 {
 		return "", errHeadTooLarge

@@ -117,6 +117,7 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 	if comp != nil && (comp.Level < -2 || comp.Level > 9 || comp.MinSize < 0 || !validBits(comp.SendWindowBits) || !validBits(comp.ReceiveWindowBits)) {
 		return nil, ErrInvalidConfig
 	}
+
 	c := &Conn{
 		ControlHandler: cfg.ControlHandler,
 		rw:             rw,
@@ -131,6 +132,7 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 	})
 	c.rx.Init(cfg.Role, comp != nil)
 	c.tx.Init(cfg.Role)
+
 	if comp != nil {
 		c.comp.config = comp
 		c.comp.minSize = cmp.Or(comp.MinSize, DefaultMinSize)

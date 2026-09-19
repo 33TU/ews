@@ -38,6 +38,7 @@ func Prepare(op codec.Opcode, payload []byte) (*Prepared, error) {
 	if err := enc.Encode(true, op, payload, nil); err != nil {
 		return nil, err
 	}
+
 	header := enc.HeaderBytes()
 	p := &Prepared{op: op, frame: make([]byte, 0, len(header)+len(payload))}
 	p.frame = append(append(p.frame, header...), payload...)
@@ -62,11 +63,13 @@ func PrepareAppend(op codec.Opcode, size int, fill func(dst []byte) ([]byte, err
 	if len(buf) < codec.MaxHeaderSize {
 		return nil, ErrProtocol
 	}
+
 	payload := buf[codec.MaxHeaderSize:]
 	var enc codec.Encoder
 	if err := enc.Encode(true, op, payload, nil); err != nil {
 		return nil, err
 	}
+
 	header := enc.HeaderBytes()
 	start := codec.MaxHeaderSize - len(header)
 	copy(buf[start:codec.MaxHeaderSize], header)
@@ -100,6 +103,7 @@ func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
 			return p.variants[i].frame
 		}
 	}
+
 	// Compressed against an empty dictionary, so any peer decodes it, with or
 	// without history; a takeover connection then re-primes its compressor.
 	pool := compressorPool(comp)
@@ -117,6 +121,7 @@ func (p *Prepared) compressedFor(comp *handshake.Compression) []byte {
 	}
 	cp.Reset()
 	pool.Put(cp)
+
 	if err != nil {
 		// Compression cannot fail on valid input; fall back rather than error.
 		v.frame = p.frame
@@ -140,6 +145,7 @@ func (c *Conn) WritePrepared(p *Prepared) error {
 		c.wmu.Unlock()
 		return err
 	}
+
 	if q := c.queue; q != nil {
 		seq, err := q.enqueue(nil, nil, frame)
 		c.wmu.Unlock()

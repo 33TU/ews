@@ -31,6 +31,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request, opts handshake.Options) (ne
 		Extensions: strings.Join(r.Header.Values("Sec-WebSocket-Extensions"), ", "),
 		Protocols:  strings.Join(r.Header.Values("Sec-WebSocket-Protocol"), ", "),
 	}
+
 	resp, res, err := handshake.Negotiate(req, opts)
 	if err != nil {
 		status := handshake.StatusCode(err)
@@ -80,6 +81,7 @@ func Upgrade(w http.ResponseWriter, r *http.Request, opts handshake.Options) (ne
 		}
 	}
 	b = append(b, "\r\n"...)
+
 	if _, err := conn.Write(b); err != nil {
 		conn.Close()
 		return nil, handshake.Result{}, err

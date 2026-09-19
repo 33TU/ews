@@ -83,6 +83,7 @@ func (s *sender) encodeFrame(op codec.Opcode, final bool, payload []byte, compre
 		rand.Read(s.key[:])
 		key = &s.key
 	}
+
 	if compressed {
 		err = s.enc.EncodeCompressed(final, op, payload, key)
 	} else {
@@ -91,6 +92,7 @@ func (s *sender) encodeFrame(op codec.Opcode, final bool, payload []byte, compre
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if op == codec.Close {
 		s.closeSent = true
 	}
@@ -109,6 +111,7 @@ func (s *sender) EncodeClose(code uint16, reason string) (header, body []byte, e
 	if len(reason) > 123 {
 		return nil, nil, ErrProtocol
 	}
+
 	binary.BigEndian.PutUint16(s.closeBuf[:2], code)
 	copy(s.closeBuf[2:], reason)
 	return s.Encode(codec.Close, s.closeBuf[:2+len(reason)])

@@ -36,6 +36,7 @@ func Negotiate(req Request, opts Options) (Response, Result, error) {
 			if !ok {
 				continue
 			}
+
 			takeover := opts.Compression.ContextTakeover
 			res.Compression = &Compression{
 				Level:                  opts.Compression.Level,
