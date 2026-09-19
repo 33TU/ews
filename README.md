@@ -107,13 +107,17 @@ Runnable programs under `examples/`, each started with `go run ./examples/<name>
 | `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
 | `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
 
-Read a message in chunks:
+The read, write, queue, prepare and tunnel methods have runnable examples on
+[pkg.go.dev](https://pkg.go.dev/github.com/33TU/ews/ws#pkg-examples). Four
+that show what is particular to ews:
+
+Read a message in chunks as its frames arrive, inflating compressed ones on the way:
 
 ```go
 op, err := c.NextMessage()
 buf := make([]byte, 32<<10)
 for {
-	n, err := c.Read(buf) // Compressed messages inflate as frames arrive.
+	n, err := c.Read(buf)
 	if err == io.EOF {
 		break
 	}
@@ -121,21 +125,7 @@ for {
 }
 ```
 
-Relay a message without a buffer of your own:
-
-```go
-if _, err := c.NextMessage(); err == nil {
-	_, err = io.Copy(file, c) // Uses WriteTo, frame by frame.
-}
-```
-
-Send from a reader, fragmented as it is read:
-
-```go
-_, err := c.WriteFrom(codec.Binary, file)
-```
-
-Send a burst asynchronously; a client more than 1 MiB behind is dropped:
+Send a burst without waiting on the peer; a client more than 1 MiB behind is dropped:
 
 ```go
 q := c.NewQueue(1 << 20)
@@ -147,37 +137,14 @@ for _, event := range events {
 }
 ```
 
-Broadcast one message to every connection, encoded once:
+Broadcast one message to every connection, encoded and compressed once:
 
 ```go
 p, _ := ws.Prepare(codec.Text, payload)
 for _, q := range queues {
-	q.SendPrepared(p) // Shared bytes; compressed once per configuration.
+	q.SendPrepared(p) // Shared bytes, nothing allocated per recipient.
 }
 ```
-
-`Prepare` copies the payload, so the result is immutable: send it from any
-goroutine, as often as you like, and let it go when you are done. The copy
-is one allocation per message, the frame every recipient shares, and
-sending costs nothing per recipient. Dynamic content skips the copy by
-marshaling straight into the frame:
-
-```go
-p, err := ws.PrepareAppend(codec.Binary, proto.Size(msg), func(dst []byte) ([]byte, error) {
-	return proto.MarshalOptions{}.MarshalAppend(dst, msg)
-})
-```
-
-Give every connection its own `Queue` when you broadcast. A slow or dead
-client then blocks only its own writer, and the queue's limit turns a
-backlog into `ErrQueueFull` on that connection instead of a stall, so the hub
-decides what to do with a client that cannot keep up without waiting for it.
-Below the machine's bandwidth ceiling this costs less CPU per delivery than
-writing in a loop. At the ceiling, large frames to thousands of clients at
-once, it costs more, because thousands of writers wait on memory together;
-that is the price of never letting one client slow another. A loop of
-`WritePrepared` over the connections is cheaper there only by giving that
-isolation up: it stalls on the first slow socket.
 
 Tunnel another protocol over the connection:
 
@@ -185,39 +152,6 @@ Tunnel another protocol over the connection:
 nc := ws.NetConn(c, codec.Binary) // A net.Conn: one message per Write.
 go io.Copy(nc, upstream)
 io.Copy(upstream, nc)
-```
-
-Keepalive with one read deadline and no timer per connection:
-
-```go
-type keepalive struct {
-	ws.DefaultControlHandler
-	conn net.Conn
-}
-
-func (k keepalive) OnPong(*ws.Conn, []byte) error {
-	return k.conn.SetReadDeadline(time.Now().Add(time.Minute))
-}
-
-c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, ControlHandler: keepalive{conn}})
-// Refresh the deadline before each read; ping all connections from one ticker.
-```
-
-Reject invalid UTF-8 in text messages with close code 1007:
-
-```go
-c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server, ValidateUTF8: true})
-```
-
-Route and check origins before the handshake completes:
-
-```go
-server.Accept = func(req *transport.Request) int {
-	if req.Path != "/socket" || req.Header["Origin"] != "https://example.com" {
-		return 403 // Any HTTP status refuses; zero accepts.
-	}
-	return 0
-}
 ```
 
 ## Compression
@@ -231,37 +165,14 @@ compete for cache.
 
 ## Performance
 
-Benchmarks against gws, coder/websocket and gorilla/websocket live in
-`bench/`, with results, charts and raw output committed:
-[echo](bench/echo/RESULTS.md), [broadcast](bench/broadcast/RESULTS.md),
-[text validation](bench/utf8/RESULTS.md). Uncompressed echo sits within a few
-percent of a raw TCP echo for every library; the differences are in
-compression, large messages, fan-out and allocations, where ews allocates
-nothing.
-
-![Echo, compressed](bench/echo/echo-compressed.svg)
-
-![Echo, compressed without context takeover](bench/echo/echo-nocontext.svg)
-
-![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
-
-![Text validation, 128 connections](bench/utf8/utf8-128conn.svg)
-
-![Text validation, 128 connections, built with GOEXPERIMENT=simd](bench/utf8/utf8-128conn-simd.svg)
-
-Build with `GOEXPERIMENT=simd` for SIMD masking and UTF-8 validation;
-results for that build are beside the default ones.
-
-ews is also wired into a fork of lxzan's
+Uncompressed echo sits within a few percent of a raw TCP echo for every
+well-built Go library; the differences are in compression, large messages,
+fan-out, memory and allocations, where ews allocates nothing on the hot
+paths. Two results stand out. In lxzan's
 [go-websocket-benchmark](https://github.com/33TU/go-websocket-benchmark),
-the harness behind gws's published chart, with current library versions and
-[results](https://github.com/33TU/go-websocket-benchmark/tree/main/results)
-from its echo and rate tests at 10k connections. Echo ties there; in the
-rate test ews takes the whole offered load with no drops at 1.8 times
-gws's echoes per CPU point, because the Queue coalesces each connection's
-backlog into one writev. The rate test at 10k connections on a 9950X3D,
-where every server below takes the whole offered load and the difference
-is the CPU it takes to do so:
+the harness behind gws's published chart, every server below answers the
+full offered load of the rate test at 10k connections, and the difference is
+the CPU it takes:
 
 | server | echoes per second per CPU percent | CPU |
 |---|---|---|
@@ -272,31 +183,26 @@ is the CPU it takes to do so:
 | gws_std | 5,809 | 343% |
 | gws | 5,687 | 350% |
 
-At 256 KiB payloads the loopback link is the ceiling, about 4.2 GB/s each
-way, and the libraries separate on what it costs them to reach it. With
-10,000 connections and one message in flight on each:
+And at 256 KiB payloads over 10,000 connections, where every library reaches
+the loopback ceiling, memory follows what each holds per message:
 
 | server | echoes/s | median round trip | CPU | memory |
 |---|---|---|---|---|
 | ews | 16,384 | 10.1 ms | 175% | 147 MB |
 | ews_sync | 16,786 | 6.5 ms | 146% | 156 MB |
 | nbio_std | 16,706 | 9.9 ms | 177% | 331 MB |
-| nbio_blocking | 16,638 | 10.7 ms | 172% | 220 MB |
 | gws | 13,294 | 16.6 ms | 408% | 310 MB |
-| gws_std | 12,516 | 17.1 ms | 398% | 264 MB |
 | gorilla | 14,874 | 8.3 ms | 111% | 4.99 GB |
-| fasthttp | 15,444 | 8.4 ms | 159% | 4.62 GB |
 | quickws | 14,202 | 14.5 ms | 231% | 5.35 GB |
 | nettyws | 12,995 | 14.5 ms | 208% | 9.99 GB |
 
-ews holds a message only until the next read and returns the buffer to a
-pool bounded at 1 MiB per buffer, so its memory follows what is in flight
-rather than the connection count. gws allocates a frame per message above
-its largest pooled buffer class, which a 256 KiB payload just exceeds; at
-128 KiB the two tie completely. Over TLS the record buffers level the
-memory column and encryption takes a quarter off everyone's echo rate; ews
-and gws then tie within three percent at 1 KiB, and ews still moves 256 KiB
-messages on the least CPU. The fork has the TLS results.
+![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
+
+![Text validation, 128 connections](bench/utf8/utf8-128conn.svg)
+
+[bench/](bench/README.md) has the method, the compressed echo charts, the
+SIMD build's results, the TLS results and what is behind each number, with raw
+output committed so every table can be regenerated.
 
 ## Development
 
