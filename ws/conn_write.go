@@ -226,15 +226,19 @@ func (c *Conn) Pong(payload []byte) error { return c.send(codec.Pong, payload) }
 
 // Close sends a close frame once. Code zero sends an empty payload and requires
 // an empty reason. Later data writes return ErrClosing. The transport stays
-// open; reads deliver the peer's close as a *CloseError.
+// open; reads deliver the peer's close as a *CloseError. On a connection with
+// a Queue the frame joins the queue behind the data already sent, so nothing
+// queued is lost or follows the close, and Close returns once it is written.
 func (c *Conn) Close(code uint16, reason string) error {
 	c.wmu.Lock()
-	defer c.wmu.Unlock()
 	header, body, err := c.tx.EncodeClose(code, reason)
 	if err != nil {
+		c.wmu.Unlock()
 		return err
 	}
-	return c.write(header, body)
+	q, seq, err := c.sendFrame(header, body)
+	c.wmu.Unlock()
+	return await(q, seq, err)
 }
 
 // CloseSent reports whether a close frame has been sent or attempted.

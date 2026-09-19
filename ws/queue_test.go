@@ -184,3 +184,45 @@ func TestNewQueueAdjustsLimit(t *testing.T) {
 		t.Fatalf("limit not adjusted up: %v", err)
 	}
 }
+
+// TestQueueCloseOrder: Close on a connection with a Queue goes out behind
+// the data already queued, so the peer reads every message and then the
+// close, and nothing follows the close frame on the wire.
+func TestQueueCloseOrder(t *testing.T) {
+	for range 100 {
+		server, client := pair(t, ws.Config{}, ws.Config{})
+		wait := run(t, func() error {
+			for i := range 3 {
+				_, got, err := client.ReadMessage()
+				if err != nil {
+					return fmt.Errorf("message %d: %v", i, err)
+				}
+				if want := fmt.Sprintf("message %d", i); string(got) != want {
+					return fmt.Errorf("message %d: got %q", i, got)
+				}
+			}
+			_, _, err := client.ReadMessage()
+			if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1000 || ce.Reason != "done" {
+				return fmt.Errorf("after the data: %v", err)
+			}
+			return nil
+		})
+		q := server.NewQueue(0)
+		for i := range 3 {
+			if err := q.Send(codec.Text, fmt.Appendf(nil, "message %d", i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := server.Close(1000, "done"); err != nil {
+			t.Fatal(err)
+		}
+		if q.Pending() != 0 {
+			t.Fatalf("Close returned with %d bytes still queued", q.Pending())
+		}
+		// The client's close echo needs a reader on the pipe.
+		if _, _, err := server.ReadMessage(); err == nil {
+			t.Fatalf("expected the close echo, got %v", err)
+		}
+		wait()
+	}
+}

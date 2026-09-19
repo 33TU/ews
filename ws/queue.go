@@ -16,8 +16,9 @@ import (
 // Write, WritePrepared, and fragmented sends enqueue their
 // frames in submission order and return when those frames have been written,
 // so message order and compressed-stream order are preserved and the two
-// styles mix freely. Control frames bypass the queue. A Queue is safe for
-// concurrent use.
+// styles mix freely. Close joins it as well, so the close frame follows
+// every message queued before it. Pings and pongs bypass the queue. A Queue
+// is safe for concurrent use.
 type Queue struct {
 	c     *Conn
 	limit int
