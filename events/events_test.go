@@ -186,7 +186,7 @@ type greeter struct {
 
 func (g *greeter) OnOpen(c *events.Conn) {
 	g.host = c.Request.Host
-	c.Write(codec.Text, []byte("hello"))
+	c.Write(codec.Text, []byte(c.UserData.(string))) // Set by Dial's Config.
 }
 
 func (g *greeter) OnMessage(c *events.Conn, _ codec.Opcode, payload []byte) error {
@@ -206,7 +206,7 @@ func TestDial(t *testing.T) {
 
 	g := &greeter{got: make(chan string, 1)}
 	url := "ws://" + ln.Addr().String() + "/room"
-	err = events.Dial(context.Background(), url, transport.DialOptions{}, g, ws.Config{})
+	err = events.Dial(context.Background(), url, transport.DialOptions{}, g, ws.Config{UserData: "hello"})
 	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1000 {
 		t.Fatalf("Dial returned %v", err)
 	}

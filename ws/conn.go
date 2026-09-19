@@ -70,6 +70,9 @@ type Config struct {
 	CompressionShared bool
 	// ControlHandler replaces the defaults. Nil uses DefaultControlHandler.
 	ControlHandler ControlHandler
+	// UserData is the initial value of Conn.UserData, for state a caller has
+	// before the connection exists.
+	UserData any
 }
 
 // Conn is a WebSocket connection over an upgraded transport.
@@ -123,6 +126,7 @@ func NewConn(conn net.Conn, cfg Config) (*Conn, error) {
 
 	c := &Conn{
 		ControlHandler: cfg.ControlHandler,
+		UserData:       cfg.UserData,
 		conn:           conn,
 		role:           cfg.Role,
 		limit:          cmp.Or(cfg.MaxMessageSize, DefaultMaxMessageSize),

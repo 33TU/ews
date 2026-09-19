@@ -138,6 +138,23 @@ defer conn.Close()
 c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 ```
 
+Or with the events shape, where `Dial` runs the handler until the connection
+ends and returns the error `OnClose` saw, so a reconnect loop is a loop over
+it. State you have at dial time reaches `OnOpen` through `Config.UserData`:
+
+```go
+type client struct{ events.Base }
+
+func (client) OnOpen(c *events.Conn) { c.Write(codec.Text, []byte("hello")) }
+
+func (client) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
+	log.Printf("%s", payload)
+	return nil
+}
+
+err := events.Dial(ctx, "wss://example.com/socket", transport.DialOptions{}, client{}, ws.Config{UserData: state})
+```
+
 ## Reading and writing
 
 Three ways to read, one goroutine at a time:
