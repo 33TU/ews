@@ -29,9 +29,7 @@ type echo struct{}
 func (echo) OnOpen(c *events.Conn) {
 	log.Printf("%s connected", c.Request.RemoteAddr)
 	c.SetReadDeadline(time.Now().Add(time.Minute))
-
-	// c.Value is an "any" for whatever you want to keep per connection:
-	// c.Value = ...
+	c.UserData = time.Now() // Anything you want to keep per connection.
 }
 
 func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
@@ -51,9 +49,12 @@ func (echo) OnPong(c *events.Conn, _ []byte) error {
 // OnClose is the last event: a *ws.CloseError when the peer closed
 // cleanly, a *events.PanicError when a handler panicked, or the read error.
 func (echo) OnClose(c *events.Conn, err error) {
-	if _, ok := errors.AsType[*ws.CloseError](err); !ok {
-		log.Printf("%s: %v", c.Request.RemoteAddr, err)
+	since := time.Since(c.UserData.(time.Time)).Round(time.Second)
+	if _, ok := errors.AsType[*ws.CloseError](err); ok {
+		log.Printf("%s closed after %s", c.Request.RemoteAddr, since)
+		return
 	}
+	log.Printf("%s lost after %s: %v", c.Request.RemoteAddr, since, err)
 }
 
 func main() {

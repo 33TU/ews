@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
@@ -21,10 +22,10 @@ type recorder struct {
 
 func (r *recorder) OnOpen(c *events.Conn) {
 	r.opened++
-	c.Value = c.Request.Path
+	c.UserData = c.Request.Path
 }
 func (r *recorder) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
-	return c.Write(op, append([]byte(c.Value.(string)+" "), payload...))
+	return c.Write(op, append([]byte(c.UserData.(string)+" "), payload...))
 }
 func (r *recorder) OnPing(c *events.Conn, payload []byte) error {
 	return c.Pong(append([]byte("tagged "), payload...))
@@ -173,4 +174,59 @@ func TestPanicEndsConnection(t *testing.T) {
 	if _, _, err := client.ReadMessage(); err == nil {
 		t.Fatal("connection still open after the panic")
 	}
+}
+
+// greeter is a client handler: it sends one message on open, closes when
+// the echo comes back, and records what it saw.
+type greeter struct {
+	events.Base
+	got  chan string
+	host string
+}
+
+func (g *greeter) OnOpen(c *events.Conn) {
+	g.host = c.Request.Host
+	c.Write(codec.Text, []byte("hello"))
+}
+
+func (g *greeter) OnMessage(c *events.Conn, _ codec.Opcode, payload []byte) error {
+	g.got <- string(payload)
+	return c.Close(1000, "seen")
+}
+
+func TestDial(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	srv := &transport.Server{Handler: events.Serve(echoHandler{}, ws.Config{})}
+	go srv.Serve(ln)
+	defer srv.Close()
+
+	g := &greeter{got: make(chan string, 1)}
+	url := "ws://" + ln.Addr().String() + "/room"
+	err = events.Dial(context.Background(), url, transport.DialOptions{}, g, ws.Config{})
+	if ce, ok := errors.AsType[*ws.CloseError](err); !ok || ce.Code != 1000 {
+		t.Fatalf("Dial returned %v", err)
+	}
+	if got := <-g.got; got != "hello" {
+		t.Fatalf("echo %q", got)
+	}
+	if g.host != ln.Addr().String() {
+		t.Fatalf("Request.Host %q", g.host)
+	}
+	if _, err := net.Dial("tcp", "127.0.0.1:1"); err == nil {
+		t.Skip("port 1 answers")
+	}
+	if err := events.Dial(context.Background(), "ws://127.0.0.1:1", transport.DialOptions{}, g, ws.Config{}); err == nil {
+		t.Fatal("dial to a closed port succeeded")
+	}
+}
+
+// echoHandler echoes and answers pings through Base.
+type echoHandler struct{ events.Base }
+
+func (echoHandler) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
+	return c.Write(op, payload)
 }
