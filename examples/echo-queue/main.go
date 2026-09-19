@@ -43,9 +43,9 @@ func main() {
 				conn.SetReadDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
 				if err != nil {
-					if _, ok := errors.AsType[*ws.CloseError](err); ok {
-						q.Wait() // Let the close echo out before the transport closes.
-					} else {
+					// A peer close arrives after its echo has gone out behind
+					// the queued replies; Close waits for its own frame.
+					if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 						log.Printf("%s: %v", conn.RemoteAddr(), err)
 					}
 					return
