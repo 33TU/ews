@@ -37,6 +37,7 @@ func main() {
 	if *compress {
 		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	conn, res, err := transport.Dial(ctx, *url, transport.DialOptions{Handshake: opts})
 	cancel()
@@ -44,6 +45,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
+
 	c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compression})
 	if err != nil {
 		log.Fatal(err)
@@ -63,6 +65,7 @@ func main() {
 			c.Close(1000, "") // Stdin ended: our half of the close handshake.
 		}()
 	}
+
 	// The peer's close with code 1000 reads as io.EOF, so copying to the end
 	// waits for the handshake to complete and prints every reply on the way.
 	if _, err := io.Copy(os.Stdout, ws.NetConn(c, codec.Text)); err != nil {
@@ -81,12 +84,14 @@ func sendFile(c *ws.Conn, path string) error {
 		return err
 	}
 	defer f.Close()
+
 	out, in := sha256.New(), sha256.New()
 	sent := make(chan error, 1)
 	go func() {
 		_, err := c.WriteFrom(codec.Binary, io.TeeReader(f, out)) // Fragmented as it is read.
 		sent <- err
 	}()
+
 	if _, err := c.NextMessage(); err != nil {
 		return err
 	}
@@ -94,9 +99,11 @@ func sendFile(c *ws.Conn, path string) error {
 	if err != nil {
 		return err
 	}
+
 	if err := <-sent; err != nil {
 		return err
 	}
+
 	if !bytes.Equal(out.Sum(nil), in.Sum(nil)) {
 		return fmt.Errorf("echo differs after %d bytes", n)
 	}

@@ -35,10 +35,12 @@ func main() {
 				log.Print(err)
 				return
 			}
+
 			// From here on every write, including the close echo, goes through
 			// the queue's goroutine, so only the read deadline is set: a write
 			// deadline would fire on the writer while the peer is merely slow.
 			q := c.NewQueue(*limit)
+
 			for {
 				conn.SetReadDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
@@ -50,6 +52,7 @@ func main() {
 					}
 					return
 				}
+
 				if err := q.Send(op, p); err != nil { // Copies p; the borrowed payload is not retained.
 					if errors.Is(err, ws.ErrQueueFull) {
 						log.Printf("%s: %d bytes behind, dropping", conn.RemoteAddr(), q.Pending())
@@ -59,10 +62,12 @@ func main() {
 			}
 		},
 	}
+
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("queued echo server on %s", *addr)
 	log.Fatal(server.Serve(ln))
 }

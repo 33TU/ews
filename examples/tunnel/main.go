@@ -31,6 +31,7 @@ func main() {
 	upstream := flag.String("upstream", "127.0.0.1:22", "server: TCP address each tunnel connects to")
 	listen := flag.String("listen", "127.0.0.1:2222", "client: local TCP listen address")
 	url := flag.String("url", "ws://localhost:9004", "client: tunnel server URL")
+
 	mode := ""
 	if len(os.Args) > 1 {
 		mode = os.Args[1]
@@ -53,19 +54,23 @@ func server(addr, upstream string) {
 	srv := &transport.Server{
 		Handler: func(conn net.Conn, _ handshake.Result, _ *transport.Request) {
 			c, _ := ws.NewConn(conn, ws.Config{Role: ws.Server}) // Only an invalid Config fails.
+
 			up, err := net.DialTimeout("tcp", upstream, 10*time.Second)
 			if err != nil {
 				log.Printf("%s: %v", conn.RemoteAddr(), err)
 				c.Close(1011, "upstream unavailable")
 				return
 			}
+
 			pipe(ws.NetConn(c, codec.Binary), up)
 		},
 	}
+
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("tunnel server on %s, upstream %s", addr, upstream)
 	log.Fatal(srv.Serve(ln))
 }
@@ -77,6 +82,7 @@ func client(listen, url string) {
 		log.Fatal(err)
 	}
 	log.Printf("tunnel client on %s, server %s", listen, url)
+
 	for {
 		tcp, err := ln.Accept()
 		if err != nil {
@@ -91,6 +97,7 @@ func client(listen, url string) {
 				tcp.Close()
 				return
 			}
+
 			c, _ := ws.NewConn(conn, ws.Config{Role: ws.Client})
 			pipe(tcp, ws.NetConn(c, codec.Binary))
 		}()
@@ -104,6 +111,7 @@ func pipe(a, b net.Conn) {
 	done := make(chan struct{}, 2)
 	go func() { io.Copy(a, b); done <- struct{}{} }()
 	go func() { io.Copy(b, a); done <- struct{}{} }()
+
 	<-done
 	a.Close()
 	b.Close()

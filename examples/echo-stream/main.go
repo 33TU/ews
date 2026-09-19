@@ -32,6 +32,7 @@ func main() {
 				log.Print(err)
 				return
 			}
+
 			for {
 				conn.SetDeadline(time.Now().Add(time.Minute))
 				op, err := c.NextMessage()
@@ -41,6 +42,7 @@ func main() {
 					}
 					return
 				}
+
 				// c is the reader: Read hands out the message's frames as they
 				// arrive, inflated if compressed, and WriteFrom sends them on as
 				// fragments of a new message until Read reports io.EOF.
@@ -51,10 +53,12 @@ func main() {
 			}
 		},
 	}
+
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("streaming echo server on %s", *addr)
 	log.Fatal(server.Serve(ln))
 }

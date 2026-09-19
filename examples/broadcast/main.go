@@ -79,6 +79,7 @@ func main() {
 			if err != nil {
 				return
 			}
+
 			cl := &client{c: c, q: c.NewQueue(1 << 20), conn: conn} // More than 1 MiB behind: dropped.
 			clients.Store(cl, nil)
 			defer clients.Delete(cl)
@@ -93,11 +94,13 @@ func main() {
 			}
 		},
 	}
+
 	go pingAll()
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("broadcast hub on %s", *addr)
 	log.Fatal(server.Serve(ln))
 }

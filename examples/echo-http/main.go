@@ -30,6 +30,7 @@ func main() {
 	flag.Parse()
 
 	opts := handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
 		conn, res, err := transport.Upgrade(w, r, opts)
@@ -37,9 +38,11 @@ func main() {
 			log.Printf("%s: %v", r.RemoteAddr, err) // The HTTP error response is already written.
 			return
 		}
+
 		go echo(conn, res)
 		// Returning releases the request's buffers; conn is hijacked and ours.
 	})
+
 	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	if *cert != "" {
 		log.Printf("echo server on wss://%s/echo", *addr)
@@ -58,6 +61,7 @@ func echo(conn net.Conn, res handshake.Result) {
 		log.Print(err)
 		return
 	}
+
 	conn.SetDeadline(time.Now().Add(time.Minute))
 	err = ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []byte) error {
 		conn.SetDeadline(time.Now().Add(time.Minute))

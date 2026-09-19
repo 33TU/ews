@@ -25,6 +25,7 @@ func main() {
 	if *compress {
 		opts.Compression = &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}
 	}
+
 	server := &transport.Server{
 		Handshake: opts,
 		Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
@@ -33,6 +34,7 @@ func main() {
 				log.Print(err)
 				return
 			}
+
 			for {
 				conn.SetDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
@@ -42,16 +44,19 @@ func main() {
 					}
 					return
 				}
+
 				if err := c.Write(op, p); err != nil {
 					return
 				}
 			}
 		},
 	}
+
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	log.Printf("echo server on %s", *addr)
 	log.Fatal(server.Serve(ln))
 }
