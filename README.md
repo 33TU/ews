@@ -70,17 +70,21 @@ err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []by
 ```
 
 Or as a handler with one method per event, the shape a gws handler takes.
-`events.Base` supplies the defaults for whatever you leave out, a panic in a
-handler ends that connection rather than the process, and the peer's close
-arrives in `OnClose` as a `*ws.CloseError`. The whole `echo-events` example:
+Every event is written out below to show the interface; `events.Base`
+supplies defaults for whatever a handler leaves out, and a panic in a handler
+ends that connection rather than the process. The whole `echo-events` example:
 
 ```go
-// echo serves every connection; Base answers pings.
-type echo struct{ events.Base }
+// echo serves every connection. The read deadline set on open is refreshed
+// by each message and pong, so a silent peer is dropped after a minute.
+type echo struct{}
 
 func (echo) OnOpen(c *events.Conn) {
 	log.Printf("%s connected", c.Request.RemoteAddr)
 	c.SetReadDeadline(time.Now().Add(time.Minute))
+
+	// c.Value is an "any" for whatever you want to keep per connection:
+	// c.Value = ...
 }
 
 func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
@@ -88,10 +92,17 @@ func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
 	return c.Write(op, payload)
 }
 
+// OnPing owns the reply: a handler that takes pings must send the pong.
+func (echo) OnPing(c *events.Conn, payload []byte) error {
+	return c.Pong(payload)
+}
+
 func (echo) OnPong(c *events.Conn, _ []byte) error {
 	return c.SetReadDeadline(time.Now().Add(time.Minute))
 }
 
+// OnClose is the last event: a *ws.CloseError when the peer closed
+// cleanly, a *events.PanicError when a handler panicked, or the read error.
 func (echo) OnClose(c *events.Conn, err error) {
 	if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 		log.Printf("%s: %v", c.Request.RemoteAddr, err)
@@ -106,7 +117,7 @@ func main() {
 		Handler: events.Serve(echo{}, ws.Config{MaxMessageSize: 32 << 20, ValidateUTF8: true}),
 	}
 
-	ln, err := net.Listen("tcp", ":8080")
+	ln, err := net.Listen("tcp", ":9005")
 	if err != nil {
 		log.Fatal(err)
 	}
