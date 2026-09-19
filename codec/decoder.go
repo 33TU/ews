@@ -56,11 +56,19 @@ func (d *Decoder) Preserve() {
 // Unread payloads and invalid lengths are errors; other validation is up to the caller.
 func (d *Decoder) NextHeader() (Header, bool, error) {
 	var h Header
+	ok, err := d.NextHeaderInto(&h)
+	return h, ok, err
+}
+
+// NextHeaderInto is NextHeader writing into h, which is left as it was when
+// no header is complete, so a caller can keep one Header and decode every
+// frame into it.
+func (d *Decoder) NextHeaderInto(h *Header) (bool, error) {
 	if d.remaining != 0 {
-		return h, false, ErrPayloadPending
+		return false, ErrPayloadPending
 	}
 	if len(d.pending) < 2 {
-		return h, false, nil
+		return false, nil
 	}
 
 	n := 2
@@ -75,7 +83,7 @@ func (d *Decoder) NextHeader() (Header, bool, error) {
 		n += 4
 	}
 	if len(d.pending) < n {
-		return h, false, nil
+		return false, nil
 	}
 
 	copy(h.raw[:], d.pending[:n])
@@ -83,12 +91,13 @@ func (d *Decoder) NextHeader() (Header, bool, error) {
 
 	remaining := h.PayloadLen()
 	if (lengthCode == 126 && remaining < 126) || (lengthCode == 127 && (remaining < 65536 || remaining>>63 != 0)) {
-		return Header{}, false, ErrInvalidPayloadLength
+		*h = Header{}
+		return false, ErrInvalidPayloadLength
 	}
 	d.pending = d.pending[n:]
 	d.remaining = remaining
 
-	return h, true, nil
+	return true, nil
 }
 
 // Payload consumes available bytes from this frame without unmasking.

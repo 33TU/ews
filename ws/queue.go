@@ -289,7 +289,7 @@ func (q *Queue) flush() error {
 		if frame == nil {
 			frame = q.flushing.b[s.start:s.end]
 		}
-		_, err := c.rw.Write(frame)
+		_, err := c.conn.Write(frame)
 		return err
 	}
 
@@ -303,7 +303,7 @@ func (q *Queue) flush() error {
 			}
 		}
 		q.nb = q.bufs
-		_, err := q.nb.WriteTo(c.rw)
+		_, err := q.nb.WriteTo(c.conn)
 		clear(q.bufs) // Drop references to prepared frames.
 		return err
 	}
@@ -318,7 +318,7 @@ func (q *Queue) flush() error {
 		}
 	}
 	*buf = out
-	_, err := c.rw.Write(out)
+	_, err := c.conn.Write(out)
 	if cap(out) <= poolKeep {
 		writePool.Put(buf)
 	}

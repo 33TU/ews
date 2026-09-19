@@ -101,7 +101,8 @@ Writing from any goroutine:
 - `NetConn(c, op)` turns the connection into a `net.Conn` for tunneling.
 
 Pings are answered and close frames echoed by the default `ControlHandler`.
-Deadlines, keepalive and closing belong to the `net.Conn` you were given;
+Deadlines and addresses are forwarded from the `net.Conn` you were given;
+closing it is yours, through `Transport()` if you no longer hold it.
 `examples/broadcast` shows a hub with a read deadline and one ping ticker.
 
 ## Examples
@@ -114,6 +115,7 @@ Runnable programs under `examples/`, each started with `go run ./examples/<name>
 | `echo-http` | the same behind an `http.Handler` through `transport.Upgrade`, using `ws.Serve`, with optional TLS |
 | `echo-stream` | relaying each message frame by frame with `NextMessage` and `WriteFrom`, memory bounded by `FragmentSize` |
 | `echo-queue` | replies through a `Queue`, so a slow peer is dropped at its limit instead of stalling the reader |
+| `echo-events` | the same server as an `events.Handler`, one method per event, the shape a gws handler takes |
 | `broadcast` | a hub with a queue per connection, one ping ticker, and a read deadline |
 | `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
 | `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |

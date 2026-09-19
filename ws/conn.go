@@ -2,9 +2,10 @@ package ws
 
 import (
 	"cmp"
-	"io"
+	"net"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/33TU/ews/deflate"
 	"github.com/33TU/ews/handshake"
@@ -81,9 +82,9 @@ type Conn struct {
 	UserData any
 
 	// Transport and configuration, fixed at construction.
-	rw           io.ReadWriter
+	conn         net.Conn
 	role         Role
-	vectored     bool // rw is a kernel socket, so net.Buffers writes header and payload in one writev.
+	vectored     bool // conn is a kernel socket, so net.Buffers writes header and payload in one writev.
 	limit        int  // MaxMessageSize.
 	fragmentSize int  // WriteFrom chunk size.
 	validateUTF8 bool // Check text messages in ReadMessage.
@@ -108,9 +109,11 @@ type Conn struct {
 	out   writeBuffers
 }
 
-// NewConn wraps an upgraded transport.
-func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
-	if rw == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
+// NewConn wraps an upgraded transport. Deadlines and addresses are the
+// transport's, reachable through the Conn; closing it stays with the caller,
+// since Close on a Conn sends the close frame.
+func NewConn(conn net.Conn, cfg Config) (*Conn, error) {
+	if conn == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
 		return nil, ErrInvalidConfig
 	}
 	comp := cfg.Compression
@@ -120,14 +123,14 @@ func NewConn(rw io.ReadWriter, cfg Config) (*Conn, error) {
 
 	c := &Conn{
 		ControlHandler: cfg.ControlHandler,
-		rw:             rw,
+		conn:           conn,
 		role:           cfg.Role,
 		limit:          cmp.Or(cfg.MaxMessageSize, DefaultMaxMessageSize),
 		fragmentSize:   cmp.Or(cfg.FragmentSize, DefaultFragmentSize),
 		validateUTF8:   cfg.ValidateUTF8,
 		buf:            make([]byte, cmp.Or(cfg.ReadBufferSize, DefaultReadBufferSize)),
 	}
-	_, c.vectored = rw.(interface {
+	_, c.vectored = conn.(interface {
 		SyscallConn() (syscall.RawConn, error)
 	})
 	c.rx.Init(cfg.Role, comp != nil)
@@ -153,3 +156,26 @@ func window(takeover bool, bits int) *deflate.Window {
 }
 
 func validBits(b int) bool { return b == 0 || b >= 8 && b <= 15 }
+
+// Transport returns the connection NewConn was given, for closing it or
+// anything else the Conn does not forward.
+func (c *Conn) Transport() net.Conn { return c.conn }
+
+// LocalAddr returns the transport's local address.
+func (c *Conn) LocalAddr() net.Addr { return c.conn.LocalAddr() }
+
+// RemoteAddr returns the transport's remote address.
+func (c *Conn) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
+
+// SetDeadline sets the transport's read and write deadlines.
+func (c *Conn) SetDeadline(t time.Time) error { return c.conn.SetDeadline(t) }
+
+// SetReadDeadline sets the transport's read deadline. An expired read
+// deadline interrupts the blocked read with a timeout error and leaves the
+// connection usable, so it serves as an idle timeout that a handler refreshes.
+func (c *Conn) SetReadDeadline(t time.Time) error { return c.conn.SetReadDeadline(t) }
+
+// SetWriteDeadline sets the transport's write deadline. A deadline that
+// expires mid-frame ends the connection, as it would any framed protocol;
+// with a Queue, the writer goroutine is what it interrupts.
+func (c *Conn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }

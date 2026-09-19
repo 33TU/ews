@@ -81,7 +81,7 @@ func TestUpgrade(t *testing.T) {
 	if !ok {
 		t.Fatal("no protocol switch body")
 	}
-	c, err := ws.NewConn(rwc, ws.Config{Role: ws.Client})
+	c, err := ws.NewConn(bodyConn{rwc}, ws.Config{Role: ws.Client})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,10 +154,7 @@ func TestUpgradeBufferedInput(t *testing.T) {
 	if err != nil || resp.StatusCode != 101 || resp.Header.Get("Sec-WebSocket-Accept") != handshake.Accept(key) {
 		t.Fatalf("%v %v", resp, err)
 	}
-	c, err := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{br, nc}, ws.Config{Role: ws.Client})
+	c, err := ws.NewConn(bufConn{nc, br}, ws.Config{Role: ws.Client})
 	if err != nil {
 		t.Fatal(err)
 	}

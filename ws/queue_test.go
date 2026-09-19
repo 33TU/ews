@@ -14,6 +14,7 @@ import (
 
 // gate is a writer that blocks each Write until released.
 type gate struct {
+	nopConn
 	release chan struct{}
 	writes  int
 	err     error

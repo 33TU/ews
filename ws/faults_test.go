@@ -21,6 +21,7 @@ var errBoom = errors.New("boom")
 // faultRW is a transport that serves scripted reads, then a read error, and
 // allows a budget of writes before failing them.
 type faultRW struct {
+	nopConn
 	mu      sync.Mutex
 	reads   [][]byte
 	readErr error
@@ -79,7 +80,7 @@ type vecBlockingRW struct{ *blockingRW }
 
 func (vecBlockingRW) SyscallConn() (syscall.RawConn, error) { return nil, errors.New("fake") }
 
-func newConn(t *testing.T, rw io.ReadWriter, cfg ws.Config) *ws.Conn {
+func newConn(t *testing.T, rw net.Conn, cfg ws.Config) *ws.Conn {
 	t.Helper()
 	if cfg.Role != ws.Client {
 		cfg.Role = ws.Server
@@ -95,10 +96,10 @@ func TestWriteErrors(t *testing.T) {
 	large := bytes.Repeat([]byte("L"), 20<<10) // Above the coalescing limit: two writes.
 	for _, tc := range []struct {
 		name string
-		rw   func(writes int) io.ReadWriter
+		rw   func(writes int) net.Conn
 	}{
-		{"plain", func(n int) io.ReadWriter { return &faultRW{writes: n} }},
-		{"vectored", func(n int) io.ReadWriter { return vecRW{&faultRW{writes: n}} }},
+		{"plain", func(n int) net.Conn { return &faultRW{writes: n} }},
+		{"vectored", func(n int) net.Conn { return vecRW{&faultRW{writes: n}} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := newConn(t, tc.rw(0), ws.Config{})
@@ -161,7 +162,7 @@ func TestQueueFailure(t *testing.T) {
 func TestQueueCoalesces(t *testing.T) {
 	for _, vectored := range []bool{false, true} {
 		rw := &blockingRW{writes: 100, release: make(chan struct{})}
-		var transport io.ReadWriter = rw
+		var transport net.Conn = rw
 		if vectored {
 			transport = vecBlockingRW{rw}
 		}
@@ -266,10 +267,7 @@ func TestFragmentErrors(t *testing.T) {
 func wire(t *testing.T, comp *handshake.Compression, msgs ...[]byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
-	c, err := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{nil, &buf}, ws.Config{Role: ws.Client, Compression: comp})
+	c, err := ws.NewConn(rwConn{Writer: &buf}, ws.Config{Role: ws.Client, Compression: comp})
 	if err != nil {
 		t.Fatal(err)
 	}
