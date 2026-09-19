@@ -113,14 +113,18 @@ func (r *receiver) Next() (frameKind, error) {
 			return r.finishControl()
 		}
 
-		h, ok, err := r.dec.NextHeader()
+		// Decode straight into r.header. The previous data frame was drained
+		// before Next was called, so nothing still needs the old header.
+		h := &r.header
+		ok, err := r.dec.NextHeaderInto(h)
 		if err != nil {
 			return needInput, r.fail(1002, err)
 		}
 		if !ok {
 			return needInput, nil
 		}
-		if err := r.accept(h); err != nil {
+		length := h.PayloadLen()
+		if err := r.accept(h, length); err != nil {
 			return needInput, r.fail(1002, err)
 		}
 		r.masked, r.maskOffset = h.Masked(), 0
@@ -130,14 +134,14 @@ func (r *receiver) Next() (frameKind, error) {
 
 		if h.Opcode() >= codec.Close {
 			r.controlOpcode, r.controlLen = h.Opcode(), 0
-			if h.PayloadLen() == 0 {
+			if length == 0 {
 				return r.finishControl()
 			}
 			r.controlOpen = true
 			continue
 		}
 
-		r.header, r.remaining = h, h.PayloadLen()
+		r.remaining = length
 		if r.remaining == 0 {
 			r.finishFrame()
 		}
@@ -184,7 +188,7 @@ func (r *receiver) consumed(chunk []byte, done bool) ([]byte, bool, error) {
 	return chunk, done, nil
 }
 
-func (r *receiver) accept(h codec.Header) error {
+func (r *receiver) accept(h *codec.Header, length uint64) error {
 	if h.Masked() != (r.role == Server) || h.RSV2() || h.RSV3() {
 		return ErrProtocol
 	}
@@ -199,7 +203,7 @@ func (r *receiver) accept(h codec.Header) error {
 			return ErrProtocol
 		}
 	case codec.Close, codec.Ping, codec.Pong:
-		if !h.Final() || h.RSV1() || h.PayloadLen() > 125 {
+		if !h.Final() || h.RSV1() || length > 125 {
 			return ErrProtocol
 		}
 	default:
