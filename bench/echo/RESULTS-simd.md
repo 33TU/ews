@@ -28,7 +28,7 @@ Echo servers behind `httptest` on loopback TCP, all driven by the same ews clien
 
 - `ews`: `ws.Conn` with `ReadMessage` and `Write`, default 4 KiB read buffer. With compression it keeps a compressor attached per connection.
 - `ews-shared`: the same with `CompressionShared`, borrowing a pooled compressor per message as gws and coder do. Takeover table only; it is identical to `ews` otherwise.
-- `ews-stream`: `NextMessage` then `WriteFrom` reading the connection itself. Plain messages are not held whole; compressed input is currently inflated whole before being delivered in chunks. This is ews's streaming shape, against `gws-stream` and `coder-stream`.
+- `ews-stream`: `NextMessage` then `WriteFrom` reading the connection itself, so no message is held whole and compressed input is inflated as its frames arrive. Messages above `FragmentSize` (64 KiB) go out as several frames, each compressed chunk flushed on its own, and each chunk is copied out of the read buffer, which is what separates it from `ews` at 256 KiB. This is ews's streaming shape, against `gws-stream` and `coder-stream`.
 - `gws`: gws's `ReadMessage` and `WriteMessage` in a loop, the like-for-like shape against ews. Its event-driven `ReadLoop` shares the frame path and measured the same within noise.
 - `gws-stream`: gws's `NextReader` piped into `WriteFile`, so no message is held whole.
 - `coder`: coder/websocket with `Read` and `Write` in a loop.
