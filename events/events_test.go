@@ -141,7 +141,7 @@ type panicker struct {
 }
 
 func (p *panicker) OnMessage(*events.Conn, codec.Opcode, []byte) error { panic("boom") }
-func (p *panicker) OnClose(_ *events.Conn, err error)                 { p.closeErr <- err }
+func (p *panicker) OnClose(_ *events.Conn, err error)                  { p.closeErr <- err }
 
 func TestPanicEndsConnection(t *testing.T) {
 	sc, cc := tcpPair(t)
