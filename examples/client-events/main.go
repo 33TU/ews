@@ -46,6 +46,9 @@ func (chat) OnOpen(c *events.Conn) {
 				return
 			}
 		}
+		if err := sc.Err(); err != nil {
+			log.Printf("stdin: %v", err)
+		}
 		c.Close(1000, "")
 	}()
 }
