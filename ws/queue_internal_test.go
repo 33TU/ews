@@ -3,12 +3,14 @@ package ws
 import (
 	"bytes"
 	"io"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/33TU/ews/codec"
 )
 
-type sink struct{}
+type sink struct{ nopConn }
 
 func (sink) Read([]byte) (int, error)    { return 0, io.EOF }
 func (sink) Write(p []byte) (int, error) { return len(p), nil }
@@ -42,3 +44,13 @@ func TestQueueHoldsNoIdleArena(t *testing.T) {
 		}
 	}
 }
+
+// nopConn supplies the net.Conn methods a transport double never uses.
+type nopConn struct{}
+
+func (nopConn) Close() error                     { return nil }
+func (nopConn) LocalAddr() net.Addr              { return nil }
+func (nopConn) RemoteAddr() net.Addr             { return nil }
+func (nopConn) SetDeadline(time.Time) error      { return nil }
+func (nopConn) SetReadDeadline(time.Time) error  { return nil }
+func (nopConn) SetWriteDeadline(time.Time) error { return nil }

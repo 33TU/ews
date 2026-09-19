@@ -101,7 +101,8 @@ Writing from any goroutine:
 - `NetConn(c, op)` turns the connection into a `net.Conn` for tunneling.
 
 Pings are answered and close frames echoed by the default `ControlHandler`.
-Deadlines, keepalive and closing belong to the `net.Conn` you were given;
+Deadlines and addresses are forwarded from the `net.Conn` you were given;
+closing it is yours, through `Transport()` if you no longer hold it.
 `examples/broadcast` shows a hub with a read deadline and one ping ticker.
 
 ## Examples

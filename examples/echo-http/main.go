@@ -62,9 +62,9 @@ func echo(conn net.Conn, res handshake.Result) {
 		return
 	}
 
-	conn.SetDeadline(time.Now().Add(time.Minute))
+	c.SetDeadline(time.Now().Add(time.Minute))
 	err = ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []byte) error {
-		conn.SetDeadline(time.Now().Add(time.Minute))
+		c.SetDeadline(time.Now().Add(time.Minute))
 		return c.Write(op, payload)
 	}))
 	if _, ok := errors.AsType[*ws.CloseError](err); !ok {

@@ -31,9 +31,8 @@ const (
 // client is one connection: the connection for pings, the queue broadcasts
 // go to, and the transport for deadlines and closing.
 type client struct {
-	c    *ws.Conn
-	q    *ws.Queue
-	conn net.Conn
+	c *ws.Conn
+	q *ws.Queue
 }
 
 var clients sync.Map // Set of *client.
@@ -44,7 +43,7 @@ var clients sync.Map // Set of *client.
 func each(f func(*client) error) {
 	clients.Range(func(key, _ any) bool {
 		if cl := key.(*client); f(cl) != nil {
-			cl.conn.Close()
+			cl.c.Transport().Close()
 		}
 		return true
 	})
@@ -52,13 +51,10 @@ func each(f func(*client) error) {
 
 // keepalive refreshes the read deadline when a pong arrives, so a quiet but
 // live client stays connected.
-type keepalive struct {
-	ws.DefaultControlHandler
-	conn net.Conn
-}
+type keepalive struct{ ws.DefaultControlHandler }
 
-func (k keepalive) OnPong(*ws.Conn, []byte) error {
-	return k.conn.SetReadDeadline(time.Now().Add(idleTimeout))
+func (keepalive) OnPong(c *ws.Conn, _ []byte) error {
+	return c.SetReadDeadline(time.Now().Add(idleTimeout))
 }
 
 func main() {
@@ -74,18 +70,18 @@ func main() {
 				// Broadcasts are compressed once in Prepare, so per-connection
 				// compressors would sit idle at 800 KB each; share them.
 				CompressionShared: true,
-				ControlHandler:    keepalive{conn: conn},
+				ControlHandler:    keepalive{},
 			})
 			if err != nil {
 				return
 			}
 
-			cl := &client{c: c, q: c.NewQueue(1 << 20), conn: conn} // More than 1 MiB behind: dropped.
+			cl := &client{c: c, q: c.NewQueue(1 << 20)} // More than 1 MiB behind: dropped.
 			clients.Store(cl, nil)
 			defer clients.Delete(cl)
 
 			for {
-				conn.SetReadDeadline(time.Now().Add(idleTimeout))
+				c.SetReadDeadline(time.Now().Add(idleTimeout))
 				op, payload, err := c.ReadMessage()
 				if err != nil {
 					return

@@ -12,13 +12,13 @@ import (
 	"github.com/33TU/ews/ws"
 )
 
-// Conn is the connection the events receive. Value is free for the
+// Conn is the connection the events receive: the WebSocket with its
+// deadlines and addresses, the upgrade request, and Value, free for the
 // handler's per-connection state.
 type Conn struct {
 	*ws.Conn
-	Transport net.Conn
-	Request   transport.Request
-	Value     any
+	Request transport.Request
+	Value   any
 }
 
 // Handler receives a connection's events on its read goroutine. Payloads
@@ -66,7 +66,7 @@ func HTTP(h Handler, opts handshake.Options, cfg ws.Config) http.Handler {
 }
 
 func run(h Handler, cfg ws.Config, conn net.Conn, res handshake.Result, req transport.Request) {
-	ec := &Conn{Transport: conn, Request: req}
+	ec := &Conn{Request: req}
 	cfg.Role, cfg.Compression = ws.Server, res.Compression
 	cfg.ControlHandler = controls{h: h, c: ec}
 

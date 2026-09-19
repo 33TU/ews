@@ -418,7 +418,7 @@ func (c *Conn) fill() error {
 // not sticky: the receiver state is intact and the caller may retry.
 func (c *Conn) read(b []byte) (int, error) {
 	for range 100 { // Tolerate misbehaving readers like bufio does.
-		n, err := c.rw.Read(b)
+		n, err := c.conn.Read(b)
 		if n != 0 {
 			return n, nil
 		}

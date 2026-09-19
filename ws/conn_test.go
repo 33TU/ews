@@ -646,7 +646,10 @@ func TestConcurrentWriters(t *testing.T) {
 }
 
 // recorder is a writer without writev that records each Write call.
-type recorder struct{ writes [][]byte }
+type recorder struct {
+	nopConn
+	writes [][]byte
+}
 
 func (r *recorder) Read([]byte) (int, error) { return 0, io.EOF }
 func (r *recorder) Write(p []byte) (int, error) {
@@ -724,6 +727,7 @@ func TestInvalidConfig(t *testing.T) {
 
 // replay serves the same wire bytes forever, like a socket that never idles.
 type replay struct {
+	nopConn
 	wire []byte
 	off  int
 }
@@ -739,17 +743,17 @@ func (r *replay) Read(b []byte) (int, error) {
 
 func (r *replay) Write(b []byte) (int, error) { return len(b), nil }
 
-type discard struct{ io.Reader }
+type discard struct {
+	io.Reader
+	nopConn
+}
 
 func (discard) Write(b []byte) (int, error) { return len(b), nil }
 
 // encodeWire captures one frame as the given role would send it.
 func encodeWire(b *testing.B, role ws.Role, payload []byte) []byte {
 	var buf bytes.Buffer
-	c, err := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{nil, &buf}, ws.Config{Role: role})
+	c, err := ws.NewConn(rwConn{Writer: &buf}, ws.Config{Role: role})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1420,10 +1424,7 @@ func benchmarkCompressed(b *testing.B, size int) {
 	payload := compressiblePayload(size)
 	wire := func(role ws.Role) []byte {
 		var buf bytes.Buffer
-		c, err := ws.NewConn(struct {
-			io.Reader
-			io.Writer
-		}{nil, &buf}, ws.Config{Role: role, Compression: comp})
+		c, err := ws.NewConn(rwConn{Writer: &buf}, ws.Config{Role: role, Compression: comp})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -1485,4 +1486,22 @@ func benchmarkCompressed(b *testing.B, size int) {
 			b.Fatal(err)
 		}
 	})
+}
+
+// nopConn supplies the net.Conn methods a transport double never uses;
+// embed it beside Read and Write.
+type nopConn struct{}
+
+func (nopConn) Close() error                     { return nil }
+func (nopConn) LocalAddr() net.Addr              { return nil }
+func (nopConn) RemoteAddr() net.Addr             { return nil }
+func (nopConn) SetDeadline(time.Time) error      { return nil }
+func (nopConn) SetReadDeadline(time.Time) error  { return nil }
+func (nopConn) SetWriteDeadline(time.Time) error { return nil }
+
+// rwConn joins a reader and a writer into a transport double.
+type rwConn struct {
+	io.Reader
+	io.Writer
+	nopConn
 }

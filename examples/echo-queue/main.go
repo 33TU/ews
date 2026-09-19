@@ -42,7 +42,7 @@ func main() {
 			q := c.NewQueue(*limit)
 
 			for {
-				conn.SetReadDeadline(time.Now().Add(time.Minute))
+				c.SetReadDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
 				if err != nil {
 					// A peer close arrives after its echo has gone out behind

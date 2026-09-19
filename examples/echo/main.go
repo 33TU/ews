@@ -36,7 +36,7 @@ func main() {
 			}
 
 			for {
-				conn.SetDeadline(time.Now().Add(time.Minute))
+				c.SetDeadline(time.Now().Add(time.Minute))
 				op, p, err := c.ReadMessage()
 				if err != nil {
 					if _, ok := errors.AsType[*ws.CloseError](err); !ok {

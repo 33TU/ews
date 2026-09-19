@@ -172,10 +172,7 @@ func TestServeBufferedInput(t *testing.T) {
 	if err != nil || resp.StatusCode != 101 || resp.Header.Get("Sec-WebSocket-Accept") != handshake.Accept(key) {
 		t.Fatalf("%v %v", resp, err)
 	}
-	c, _ := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{br, nc}, ws.Config{Role: ws.Client})
+	c, _ := ws.NewConn(bufConn{nc, br}, ws.Config{Role: ws.Client})
 	if op, p, err := c.ReadMessage(); err != nil || op != codec.Binary || string(p) != "early" {
 		t.Fatalf("%d %q %v", op, p, err)
 	}
@@ -208,3 +205,21 @@ func TestServeClose(t *testing.T) {
 		t.Fatal("nil handler accepted")
 	}
 }
+
+// bufConn reads through the bufio.Reader that parsed the response, so bytes
+// the client sent right behind the request are not lost.
+type bufConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (b bufConn) Read(p []byte) (int, error) { return b.r.Read(p) }
+
+// bodyConn makes the protocol-switch body of an http.Response a transport.
+type bodyConn struct{ io.ReadWriteCloser }
+
+func (bodyConn) LocalAddr() net.Addr              { return nil }
+func (bodyConn) RemoteAddr() net.Addr             { return nil }
+func (bodyConn) SetDeadline(time.Time) error      { return nil }
+func (bodyConn) SetReadDeadline(time.Time) error  { return nil }
+func (bodyConn) SetWriteDeadline(time.Time) error { return nil }

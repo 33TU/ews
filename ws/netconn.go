@@ -18,12 +18,10 @@ import (
 // every later Read with ErrUnexpectedType. A peer close with code 1000 or
 // 1001 reads as io.EOF; any other close code is returned as the CloseError.
 //
-// Deadlines and addresses are the transport's when it is a net.Conn, so a
-// read deadline interrupts a blocked Read and leaves the connection usable,
-// while a write deadline that expires mid-frame ends it, as it would any
-// framed protocol. Other transports report errors.ErrUnsupported for
-// deadlines and a placeholder address. Close sends a normal close frame and
-// closes the transport.
+// Deadlines and addresses are the transport's, so a read deadline
+// interrupts a blocked Read and leaves the connection usable, while a write
+// deadline that expires mid-frame ends it, as it would any framed protocol.
+// Close sends a normal close frame and closes the transport.
 //
 // Reads are serialized; writes may come from any goroutine, as on Conn.
 func NetConn(c *Conn, op codec.Opcode) net.Conn {
@@ -118,57 +116,15 @@ func (nc *netConn) Close() error {
 		if err := nc.c.Close(1000, ""); err != nil && err != ErrClosing {
 			nc.closeErr = err
 		}
-		if cl, ok := nc.c.rw.(io.Closer); ok {
-			if err := cl.Close(); err != nil && nc.closeErr == nil {
-				nc.closeErr = err
-			}
+		if err := nc.c.conn.Close(); err != nil && nc.closeErr == nil {
+			nc.closeErr = err
 		}
 	})
 	return nc.closeErr
 }
 
-func (nc *netConn) transport() (net.Conn, bool) {
-	t, ok := nc.c.rw.(net.Conn)
-	return t, ok
-}
-
-func (nc *netConn) LocalAddr() net.Addr {
-	if t, ok := nc.transport(); ok {
-		return t.LocalAddr()
-	}
-	return websocketAddr{}
-}
-
-func (nc *netConn) RemoteAddr() net.Addr {
-	if t, ok := nc.transport(); ok {
-		return t.RemoteAddr()
-	}
-	return websocketAddr{}
-}
-
-func (nc *netConn) SetDeadline(t time.Time) error {
-	if tr, ok := nc.transport(); ok {
-		return tr.SetDeadline(t)
-	}
-	return errors.ErrUnsupported
-}
-
-func (nc *netConn) SetReadDeadline(t time.Time) error {
-	if tr, ok := nc.transport(); ok {
-		return tr.SetReadDeadline(t)
-	}
-	return errors.ErrUnsupported
-}
-
-func (nc *netConn) SetWriteDeadline(t time.Time) error {
-	if tr, ok := nc.transport(); ok {
-		return tr.SetWriteDeadline(t)
-	}
-	return errors.ErrUnsupported
-}
-
-// websocketAddr stands in when the transport is not a net.Conn.
-type websocketAddr struct{}
-
-func (websocketAddr) Network() string { return "websocket" }
-func (websocketAddr) String() string  { return "websocket/unknown-addr" }
+func (nc *netConn) LocalAddr() net.Addr                { return nc.c.conn.LocalAddr() }
+func (nc *netConn) RemoteAddr() net.Addr               { return nc.c.conn.RemoteAddr() }
+func (nc *netConn) SetDeadline(t time.Time) error      { return nc.c.conn.SetDeadline(t) }
+func (nc *netConn) SetReadDeadline(t time.Time) error  { return nc.c.conn.SetReadDeadline(t) }
+func (nc *netConn) SetWriteDeadline(t time.Time) error { return nc.c.conn.SetWriteDeadline(t) }

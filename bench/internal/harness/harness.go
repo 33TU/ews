@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"math/rand/v2"
 	"net"
 	"net/http"
@@ -104,10 +103,7 @@ func Dial(tb testing.TB, url string, mode Mode) *ws.Conn {
 	if mode.Compressed() && (res.Compression.SendContextTakeover || res.Compression.ReceiveContextTakeover) != (mode == Takeover) {
 		tb.Fatalf("takeover negotiated as %+v in mode %s", res.Compression, mode)
 	}
-	c, err := ws.NewConn(struct {
-		io.Reader
-		io.Writer
-	}{br, nc}, ws.Config{Role: ws.Client, MaxMessageSize: 64 << 20, Compression: res.Compression})
+	c, err := ws.NewConn(bufConn{nc, br}, ws.Config{Role: ws.Client, MaxMessageSize: 64 << 20, Compression: res.Compression})
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -156,3 +152,12 @@ func CPUTime() time.Duration {
 	}
 	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
 }
+
+// bufConn reads through the bufio.Reader that parsed the handshake response,
+// so frames the server sent right behind it are not lost.
+type bufConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (b bufConn) Read(p []byte) (int, error) { return b.r.Read(p) }

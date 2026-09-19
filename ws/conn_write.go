@@ -299,24 +299,24 @@ func (c *Conn) write(header, body []byte) error {
 	defer c.iomu.Unlock()
 	switch {
 	case len(body) == 0:
-		_, err := c.rw.Write(header)
+		_, err := c.conn.Write(header)
 		return err
 	case c.vectored:
 		c.out.bufs = append(net.Buffers(c.out.arr[:0]), header, body)
-		_, err := c.out.bufs.WriteTo(c.rw)
+		_, err := c.out.bufs.WriteTo(c.conn)
 		c.out.arr = [2][]byte{} // Do not retain the caller's payload.
 		return err
 	case len(body) <= coalesceLimit:
 		buf := writePool.Get().(*[]byte)
 		*buf = append(append((*buf)[:0], header...), body...)
-		_, err := c.rw.Write(*buf)
+		_, err := c.conn.Write(*buf)
 		writePool.Put(buf)
 		return err
 	default:
-		if _, err := c.rw.Write(header); err != nil {
+		if _, err := c.conn.Write(header); err != nil {
 			return err
 		}
-		_, err := c.rw.Write(body)
+		_, err := c.conn.Write(body)
 		return err
 	}
 }

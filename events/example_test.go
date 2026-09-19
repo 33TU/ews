@@ -18,7 +18,7 @@ type echo struct{ events.Base }
 
 func (echo) OnOpen(c *events.Conn) {
 	log.Printf("%s connected to %s", c.Request.RemoteAddr, c.Request.Path)
-	c.Transport.SetReadDeadline(time.Now().Add(time.Minute))
+	c.SetReadDeadline(time.Now().Add(time.Minute))
 }
 
 func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
@@ -26,7 +26,7 @@ func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
 }
 
 func (echo) OnPong(c *events.Conn, _ []byte) error {
-	return c.Transport.SetReadDeadline(time.Now().Add(time.Minute))
+	return c.SetReadDeadline(time.Now().Add(time.Minute))
 }
 
 func (echo) OnClose(c *events.Conn, err error) { log.Printf("closed: %v", err) }

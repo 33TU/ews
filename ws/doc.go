@@ -1,8 +1,9 @@
 // Package ws provides message I/O over already-upgraded WebSocket connections.
 //
-// A Conn wraps any io.ReadWriter; the caller keeps the net.Conn for deadlines,
-// TLS and closing, and NetConn hands it back as a net.Conn view. The handshake
-// is elsewhere: ws takes the negotiated result through Config.
+// A Conn wraps a net.Conn and forwards its deadlines and addresses; closing
+// the transport stays with the caller, and NetConn hands the whole thing back
+// as a net.Conn view. The handshake is elsewhere: ws takes the negotiated
+// result through Config.
 //
 // # Reading
 //

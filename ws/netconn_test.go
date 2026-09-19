@@ -143,22 +143,3 @@ func TestNetConnAbnormalClose(t *testing.T) {
 	}
 	wait()
 }
-
-// TestNetConnNonNetTransport covers a transport that is only an io.ReadWriter.
-func TestNetConnNonNetTransport(t *testing.T) {
-	type rw struct{ io.ReadWriter }
-	c, err := ws.NewConn(rw{&bytes.Buffer{}}, ws.Config{Role: ws.Server})
-	if err != nil {
-		t.Fatal(err)
-	}
-	nc := ws.NetConn(c, codec.Binary)
-	if nc.RemoteAddr().Network() != "websocket" || nc.LocalAddr().String() != "websocket/unknown-addr" {
-		t.Fatal(nc.RemoteAddr(), nc.LocalAddr())
-	}
-	if err := nc.SetDeadline(time.Now()); !errors.Is(err, errors.ErrUnsupported) {
-		t.Fatal(err)
-	}
-	if err := nc.Close(); err != nil {
-		t.Fatal(err)
-	}
-}

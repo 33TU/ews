@@ -26,16 +26,16 @@ type echo struct{ events.Base }
 
 func (echo) OnOpen(c *events.Conn) {
 	log.Printf("%s connected", c.Request.RemoteAddr)
-	c.Transport.SetReadDeadline(time.Now().Add(time.Minute))
+	c.SetReadDeadline(time.Now().Add(time.Minute))
 }
 
 func (echo) OnMessage(c *events.Conn, op codec.Opcode, payload []byte) error {
-	c.Transport.SetReadDeadline(time.Now().Add(time.Minute))
+	c.SetReadDeadline(time.Now().Add(time.Minute))
 	return c.Write(op, payload)
 }
 
 func (echo) OnPong(c *events.Conn, _ []byte) error {
-	return c.Transport.SetReadDeadline(time.Now().Add(time.Minute))
+	return c.SetReadDeadline(time.Now().Add(time.Minute))
 }
 
 func (echo) OnClose(c *events.Conn, err error) {
