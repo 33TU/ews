@@ -75,6 +75,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	err := events.Dial(ctx, *url, transport.DialOptions{}, chat{}, ws.Config{UserData: &session{name: *name}})
 	if _, ok := errors.AsType[*ws.CloseError](err); !ok {
 		log.Fatal(err)
