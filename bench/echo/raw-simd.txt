@@ -1,3 +1,6 @@
+# go: go1.27.1-X:simd
+# kernel: 7.2.2-1-cachyos
+# commit: 955c34d
 goos: linux
 goarch: amd64
 pkg: github.com/33TU/ews/bench/echo

@@ -9,6 +9,13 @@ go get github.com/33TU/ews@latest
 
 Requires Go 1.27. Passes the full Autobahn test suite.
 
+![Echo by payload size, compressed with context takeover, 128 connections](bench/echo/echo-sizes-compressed.svg)
+
+Echo throughput against gws and coder/websocket with permessage-deflate on,
+one round trip at a time per connection, on a 9950X3D. Uncompressed, every
+well-built Go library ties on this test up to 16 KiB and ews pulls ahead at
+256 KiB; [bench/](bench/README.md) has that chart and the rest.
+
 ## Packages
 
 | package | what it does |

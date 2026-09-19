@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Generated 2026-09-17 from `go test -run '^$' -bench Broadcast -benchtime 1s | go run ../cmd/results` at ews commit `955c34d`.
+Run at ews commit `955c34d` with `go test -run '^$' -bench Broadcast -benchtime 1s`; tables and charts generated from the saved output by `go run ../cmd/results` on 2026-09-19.
 
 ![broadcast-plain-simd](broadcast-plain-simd.svg)
 
@@ -13,7 +13,7 @@ Generated 2026-09-17 from `go test -run '^$' -bench Broadcast -benchtime 1s | go
 - CPU: AMD Ryzen 9 9950X3D 16-Core Processor
 - Kernel: 7.2.2-1-cachyos
 - Go: go1.27.1-X:simd, `GOEXPERIMENT=simd`: SIMD masking and, on amd64, SIMD UTF-8 validation
-- GOMAXPROCS: 32
+- GOMAXPROCS: 8
 - gws: v1.10.2
 - coder/websocket: v1.8.15
 - gorilla/websocket: v1.5.3

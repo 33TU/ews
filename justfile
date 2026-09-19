@@ -7,6 +7,9 @@ scratch := "/tmp/ews-autobahn"
 # measure the same shape; the results header records it. Override with
 # GOMAXPROCS=n just bench-echo.
 procs := env("GOMAXPROCS", "8")
+# Lines the results tool reads back as provenance, so regenerating a results
+# file on another machine keeps the labels of the run that produced it.
+provenance := 'provenance() { echo "# go: $(go run ../cmd/goversion)"; echo "# kernel: $(uname -r)"; echo "# commit: $(git rev-parse --short HEAD)"; }'
 
 default:
     @just --list
@@ -51,26 +54,26 @@ results:
 
 # End-to-end echo comparison against other libraries; regenerates bench/echo/RESULTS.md and its charts.
 bench-echo benchtime="1s":
-    export GOMAXPROCS={{ procs }} && cd bench/echo && go test -run '^$' -bench Echo -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
+    export GOMAXPROCS={{ procs }} && cd bench/echo && {{ provenance }} && { provenance; go test -run '^$' -bench Echo -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
 
 # The echo comparison built with GOEXPERIMENT=simd, written to bench/echo/RESULTS-simd.md.
 bench-echo-simd benchtime="1s":
-    export GOMAXPROCS={{ procs }} && cd bench/echo && GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
+    export GOMAXPROCS={{ procs }} && cd bench/echo && {{ provenance }} && { GOEXPERIMENT=simd provenance; GOEXPERIMENT=simd go test -run '^$' -bench Echo -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
 
 # Broadcast comparison, one message to many connections; regenerates bench/broadcast/RESULTS.md.
 bench-broadcast benchtime="1s":
-    export GOMAXPROCS={{ procs }} && cd bench/broadcast && go test -run '^$' -bench Broadcast -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
+    export GOMAXPROCS={{ procs }} && cd bench/broadcast && {{ provenance }} && { provenance; go test -run '^$' -bench Broadcast -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
 
 # The broadcast comparison built with GOEXPERIMENT=simd, written to bench/broadcast/RESULTS-simd.md.
 bench-broadcast-simd benchtime="1s":
-    export GOMAXPROCS={{ procs }} && cd bench/broadcast && GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
+    export GOMAXPROCS={{ procs }} && cd bench/broadcast && {{ provenance }} && { GOEXPERIMENT=simd provenance; GOEXPERIMENT=simd go test -run '^$' -bench Broadcast -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
 
 # Text echo with UTF-8 validation enabled; regenerates bench/utf8/RESULTS.md, or RESULTS-simd.md with the experiment.
 bench-utf8 benchtime="2s":
-    export GOMAXPROCS={{ procs }} && cd bench/utf8 && go test -run '^$' -bench UTF8 -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
+    export GOMAXPROCS={{ procs }} && cd bench/utf8 && {{ provenance }} && { provenance; go test -run '^$' -bench UTF8 -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw.txt | go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS.md
 
 bench-utf8-simd benchtime="2s":
-    export GOMAXPROCS={{ procs }} && cd bench/utf8 && GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{ benchtime }} -timeout 3600s | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
+    export GOMAXPROCS={{ procs }} && cd bench/utf8 && {{ provenance }} && { GOEXPERIMENT=simd provenance; GOEXPERIMENT=simd go test -run '^$' -bench UTF8 -benchtime {{ benchtime }} -timeout 3600s; } | sed 's/[[:space:]]*$//' | tee raw-simd.txt | GOEXPERIMENT=simd go run ../cmd/results -benchtime {{ benchtime }} -svg . > RESULTS-simd.md
 
 # Fan-out benchmark: bursts of small messages per event, written directly or through a queue.
 bench-fanout:

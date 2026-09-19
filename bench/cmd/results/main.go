@@ -100,7 +100,53 @@ Compression is permessage-deflate at flate level 1 with 15-bit windows, with and
 	},
 }
 
-var line = regexp.MustCompile(`^Benchmark(\w+)/(\S+?)-\d+\s+\d+\s+([\d.]+) ns/op(.*)$`)
+var line = regexp.MustCompile(`^Benchmark(\w+)/(\S+?)-(\d+)\s+\d+\s+([\d.]+) ns/op(.*)$`)
+
+// provenance is where the numbers come from, read from the benchmark output
+// rather than the machine running this tool, so regenerating a results file
+// elsewhere keeps the right labels. go test prints the cpu line and appends
+// GOMAXPROCS to every benchmark name; the justfile recipes prepend the rest
+// as "# key: value" lines. Anything missing falls back to this machine.
+type provenance struct {
+	cpu, goVersion, kernel, commit string
+	procs                          int
+}
+
+func (pv *provenance) note(text string) {
+	if v, ok := strings.CutPrefix(text, "cpu: "); ok {
+		pv.cpu = strings.TrimSpace(v)
+	}
+	if v, ok := strings.CutPrefix(text, "# "); ok {
+		k, val, _ := strings.Cut(v, ":")
+		val = strings.TrimSpace(val)
+		switch k {
+		case "go":
+			pv.goVersion = val
+		case "kernel":
+			pv.kernel = val
+		case "commit":
+			pv.commit = val
+		}
+	}
+}
+
+func (pv *provenance) fill() {
+	if pv.cpu == "" {
+		pv.cpu = cpu()
+	}
+	if pv.goVersion == "" {
+		pv.goVersion = runtime.Version()
+	}
+	if pv.kernel == "" {
+		pv.kernel = run("uname", "-r")
+	}
+	if pv.commit == "" {
+		pv.commit = run("git", "rev-parse", "--short", "HEAD")
+	}
+	if pv.procs == 0 {
+		pv.procs = runtime.GOMAXPROCS(0)
+	}
+}
 
 func main() {
 	benchtime := flag.String("benchtime", "1s", "the -benchtime the results were produced with, for the header")
@@ -114,13 +160,16 @@ func main() {
 	rowLabels := map[string][]string{} // family+comp -> row dims joined, first-seen order
 	seen := map[string]bool{}
 
+	var pv provenance
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		m := line.FindStringSubmatch(sc.Text())
 		if m == nil {
+			pv.note(sc.Text())
 			continue
 		}
-		fam, name, ns, rest := m[1], m[2], m[3], m[4]
+		fam, name, ns, rest := m[1], m[2], m[4], m[5]
+		pv.procs, _ = strconv.Atoi(m[3])
 		segs := strings.Split(name, "/")
 		if strings.Contains(segs[len(segs)-1], "=") {
 			continue // No server column; not a comparison.
@@ -182,6 +231,7 @@ func main() {
 		os.Exit(1)
 	}
 	checkBaseline(records)
+	pv.fill()
 
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
@@ -190,8 +240,8 @@ func main() {
 		if f.title == "" {
 			f.title = fam + " benchmark results"
 		}
-		fmt.Fprintf(w, "# %s\n\nGenerated %s from `go test -run '^$' -bench %s -benchtime %s | go run ../cmd/results` at ews commit `%s`.\n\n",
-			f.title, time.Now().Format("2006-01-02"), fam, *benchtime, run("git", "rev-parse", "--short", "HEAD"))
+		fmt.Fprintf(w, "# %s\n\nRun at ews commit `%s` with `go test -run '^$' -bench %s -benchtime %s`; tables and charts generated from the saved output by `go run ../cmd/results` on %s.\n\n",
+			f.title, pv.commit, fam, *benchtime, time.Now().Format("2006-01-02"))
 		build := "default build: SWAR masking and the shift-based UTF-8 validator"
 		short := "default build"
 		if strings.Contains(os.Getenv("GOEXPERIMENT"), "simd") {
@@ -199,7 +249,7 @@ func main() {
 			short = "GOEXPERIMENT=simd"
 		}
 		if *svgDir != "" {
-			subtitle := fmt.Sprintf("%s · %s · %s · %s benchtime", runtime.Version(), short, shortCPU(cpu()), *benchtime)
+			subtitle := fmt.Sprintf("%s · %s · %s · GOMAXPROCS=%d · %s benchtime", pv.goVersion, short, shortCPU(pv.cpu), pv.procs, *benchtime)
 			var famRecords []record
 			for _, r := range records {
 				if r.family == fam {
@@ -215,7 +265,7 @@ func main() {
 				fmt.Fprintf(w, "![%s](%s)\n\n", strings.TrimSuffix(name, ".svg"), name)
 			}
 		}
-		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- GOMAXPROCS: %d\n- gws: %s\n- coder/websocket: %s\n- gorilla/websocket: %s\n\n%s\n", cpu(), run("uname", "-r"), runtime.Version(), build, runtime.GOMAXPROCS(0), modVersion("lxzan/gws"), modVersion("coder/websocket"), modVersion("gorilla/websocket"), f.setup)
+		fmt.Fprintf(w, "## Setup\n\n- CPU: %s\n- Kernel: %s\n- Go: %s, %s\n- GOMAXPROCS: %d\n- gws: %s\n- coder/websocket: %s\n- gorilla/websocket: %s\n\n%s\n", pv.cpu, pv.kernel, pv.goVersion, build, pv.procs, modVersion("lxzan/gws"), modVersion("coder/websocket"), modVersion("gorilla/websocket"), f.setup)
 		comps := []string{""}
 		if _, ok := rowLabels[fam+"/false"]; ok {
 			comps = comps[:0]
@@ -384,11 +434,14 @@ func run(name string, args ...string) string {
 
 // shortCPU trims vendor boilerplate from a CPU model name for chart subtitles.
 func shortCPU(name string) string {
+	name = coreCount.ReplaceAllString(name, "")
 	for _, junk := range []string{"(R)", "(TM)", "CPU", "Processor", "Core "} {
 		name = strings.ReplaceAll(name, junk, "")
 	}
 	return strings.Join(strings.Fields(name), " ")
 }
+
+var coreCount = regexp.MustCompile(`\s\d+-Core`)
 
 func cpu() string {
 	data, err := os.ReadFile("/proc/cpuinfo")
