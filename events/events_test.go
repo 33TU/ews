@@ -132,3 +132,45 @@ func TestServe(t *testing.T) {
 		t.Fatalf("opened %d, ponged %d", h.opened, h.ponged)
 	}
 }
+
+// panicker panics on the first message; the peer sees the connection end
+// and OnClose sees the PanicError.
+type panicker struct {
+	events.Base
+	closeErr chan error
+}
+
+func (p *panicker) OnMessage(*events.Conn, codec.Opcode, []byte) error { panic("boom") }
+func (p *panicker) OnClose(_ *events.Conn, err error)                 { p.closeErr <- err }
+
+func TestPanicEndsConnection(t *testing.T) {
+	sc, cc := tcpPair(t)
+	cc.SetDeadline(time.Now().Add(10 * time.Second))
+	h := &panicker{closeErr: make(chan error, 1)}
+	done := make(chan struct{})
+	go func() {
+		events.Serve(h, ws.Config{})(sc, handshake.Result{}, &transport.Request{})
+		sc.Close() // As transport.Server does when the handler returns.
+		close(done)
+	}()
+	client, err := ws.NewConn(cc, ws.Config{Role: ws.Client})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Write(codec.Text, []byte("hi")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-h.closeErr:
+		pe, ok := errors.AsType[*events.PanicError](err)
+		if !ok || pe.Value != "boom" || len(pe.Stack) == 0 {
+			t.Fatalf("OnClose got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("OnClose not called")
+	}
+	<-done
+	if _, _, err := client.ReadMessage(); err == nil {
+		t.Fatal("connection still open after the panic")
+	}
+}
