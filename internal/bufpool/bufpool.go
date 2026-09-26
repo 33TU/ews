@@ -15,6 +15,10 @@ const (
 	MaxBits = 26
 )
 
+// Buffer is a pooled slice. B is the working slice, extended within its
+// capacity; the holder keeps the Buffer and gives it back with Put.
+type Buffer struct{ B []byte }
+
 var classes [MaxBits + 1]sync.Pool
 
 // class is the smallest c with 1<<c >= n, at least MinBits.
@@ -22,26 +26,31 @@ func class(n int) int {
 	return max(MinBits, bits.Len(uint(n-1)))
 }
 
-// Get returns a slice of length 0 and capacity at least n, a power of two
-// when pooled. Contents are whatever the previous holder left.
-func Get(n int) []byte {
+// Get returns a Buffer whose B has length 0 and capacity at least n, a
+// power of two when pooled. Contents are whatever the previous holder left.
+func Get(n int) *Buffer {
 	if n > 1<<MaxBits {
-		return make([]byte, 0, n)
+		return &Buffer{B: make([]byte, 0, n)}
 	}
 	c := class(n)
-	if b, ok := classes[c].Get().(*[]byte); ok {
-		return (*b)[:0]
+	if b, ok := classes[c].Get().(*Buffer); ok {
+		b.B = b.B[:0]
+		return b
 	}
-	return make([]byte, 0, 1<<c)
+	return &Buffer{B: make([]byte, 0, 1<<c)}
 }
 
-// Put returns b to the class of its capacity. A capacity that is not a
-// power of two in range did not come from Get and is left to the GC.
-func Put(b []byte) {
-	c := cap(b)
+// Put returns b to the class of its capacity. nil is ignored, and a
+// capacity that is not a power of two in range did not come from Get and
+// is left to the GC.
+func Put(b *Buffer) {
+	if b == nil {
+		return
+	}
+	c := cap(b.B)
 	if c < 1<<MinBits || c > 1<<MaxBits || c&(c-1) != 0 {
 		return
 	}
-	b = b[:0]
-	classes[bits.Len(uint(c))-1].Put(&b)
+	b.B = b.B[:0]
+	classes[bits.Len(uint(c))-1].Put(b)
 }

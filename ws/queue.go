@@ -60,7 +60,10 @@ type segment struct {
 // idle, so memory scales with connections that are busy at the same moment
 // rather than with every connection. The handle is reused, so a burst costs
 // no allocation.
-type arena struct{ b []byte }
+type arena struct {
+	b     []byte
+	large *bufpool.Buffer // The size-class buffer b lives in past poolKeep.
+}
 
 var arenaPool = sync.Pool{New: func() any { return &arena{b: make([]byte, 0, 4<<10)} }}
 
@@ -201,9 +204,10 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 		start := len(q.cur.b)
 		if need := start + n; need > cap(q.cur.b) && need > poolKeep {
 			// Past poolKeep the arena moves to size-class storage.
-			b := append(bufpool.Get(need), q.cur.b...)
-			bufpool.Put(q.cur.b)
-			q.cur.b = b
+			large := bufpool.Get(need)
+			large.B = append(large.B, q.cur.b...)
+			bufpool.Put(q.cur.large)
+			q.cur.large, q.cur.b = large, large.B
 		}
 		q.cur.b = append(append(q.cur.b, header...), body...)
 		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
@@ -266,11 +270,11 @@ func (q *Queue) run() {
 		q.written += uint64(len(q.flushSegments))
 		if a := q.flushing; a != nil {
 			q.flushing = nil
-			if cap(a.b) <= poolKeep {
+			if a.large == nil {
 				a.b = a.b[:0]
 				arenaPool.Put(a)
 			} else {
-				bufpool.Put(a.b)
+				bufpool.Put(a.large)
 			}
 		}
 
@@ -329,9 +333,10 @@ func (q *Queue) flush() error {
 	// is served from the size-class pool for the one write.
 	buf := writePool.Get().(*[]byte)
 	out := (*buf)[:0]
-	pooled := total > cap(out)
-	if pooled {
-		out = bufpool.Get(total)
+	var large *bufpool.Buffer
+	if total > cap(out) {
+		large = bufpool.Get(total)
+		out = large.B
 	}
 	for _, s := range q.flushSegments {
 		if s.ext != nil {
@@ -341,8 +346,8 @@ func (q *Queue) flush() error {
 		}
 	}
 	_, err := c.conn.Write(out)
-	if pooled {
-		bufpool.Put(out)
+	if large != nil {
+		bufpool.Put(large)
 	} else {
 		*buf = out
 	}

@@ -98,6 +98,7 @@ type Conn struct {
 	rx        receiver
 	buf       []byte  // Transport read buffer.
 	msg       *msgBuf // ReadMessage assembly, pooled; held until the next read.
+	msgHint   int     // Size of the last assembled message, reserved past poolKeep.
 	inMessage bool    // NextMessage returned and Read has not reached io.EOF.
 	readErr   error   // Terminal read state.
 	decomp    decompressorContext

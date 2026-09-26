@@ -1,6 +1,6 @@
 # Broadcast benchmark results
 
-Run at ews commit `9186b3e` with `go test -run '^$' -bench Broadcast -benchtime 1s`; tables and charts generated from the saved output by `go run ../cmd/results` on 2026-09-26.
+Run at ews commit `5387555` with `go test -run '^$' -bench Broadcast -benchtime 1s`; tables and charts generated from the saved output by `go run ../cmd/results` on 2026-09-26.
 
 ![broadcast-plain](broadcast-plain.svg)
 
@@ -31,70 +31,70 @@ Compression is permessage-deflate at flate level 1 with 15-bit windows, with and
 
 | Size | Conns | ews | ews-sync | gws | gorilla | CPU/msg ews / ews-sync / gws / gorilla | allocs/op ews / ews-sync / gws / gorilla |
 |---|---|---|---|---|---|---|---|
-| 256 B | 128 | 1.64M msgs/s | 712k msgs/s | 1.61M msgs/s | 664k msgs/s | 2.5 µs / 3.1 µs / 2.5 µs / 3.3 µs | 2 / 2 / 259 (9 KB) / 15 (11 KB) |
-| 256 B | 512 | 2.02M msgs/s | 737k msgs/s | 2.01M msgs/s | 696k msgs/s | 2.4 µs / 3.1 µs / 2.4 µs / 3.2 µs | 2 / 2 / 1027 (36 KB) / 15 (11 KB) |
-| 256 B | 2048 | 2.13M msgs/s | 764k msgs/s | 2.15M msgs/s | 721k msgs/s | 2.3 µs / 3.1 µs / 2.3 µs / 3.2 µs | 2 / 2 / 4099 (144 KB) / 15 (11 KB) |
-| 256 B | 8192 | 1.71M msgs/s | 681k msgs/s | 1.70M msgs/s | 635k msgs/s | 3.1 µs / 3.3 µs / 3.1 µs / 3.5 µs | 2 / 2 / 16390 (578 KB) / 15 (11 KB) |
-| 4 KiB | 128 | 1.46M msgs/s | 649k msgs/s | 1.47M msgs/s | 609k msgs/s | 2.9 µs / 3.5 µs / 2.9 µs / 3.7 µs | 2 (4 KB) / 2 (4 KB) / 259 (9 KB) / 15 (20 KB) |
-| 4 KiB | 512 | 1.79M msgs/s | 688k msgs/s | 1.80M msgs/s | 648k msgs/s | 2.7 µs / 3.5 µs / 2.8 µs / 3.6 µs | 2 (4 KB) / 2 (4 KB) / 1027 (36 KB) / 15 (20 KB) |
-| 4 KiB | 2048 | 1.89M msgs/s | 691k msgs/s | 1.91M msgs/s | 652k msgs/s | 2.7 µs / 3.4 µs / 2.8 µs / 3.6 µs | 2 (4 KB) / 2 (4 KB) / 4099 (144 KB) / 15 (20 KB) |
-| 4 KiB | 8192 | 1.13M msgs/s | 553k msgs/s | 1.13M msgs/s | 512k msgs/s | 4.9 µs / 4.1 µs / 4.9 µs / 4.4 µs | 2 (4 KB) / 2 (4 KB) / 16387 (576 KB) / 15 (20 KB) |
-| 64 KiB | 128 | 761k msgs/s | 175k msgs/s | 771k msgs/s | 175k msgs/s | 6.1 µs / 7.5 µs / 5.9 µs / 7.9 µs | 2 (72 KB) / 2 (72 KB) / 259 (9 KB) / 21 (165 KB) |
-| 64 KiB | 512 | 1.02M msgs/s | 184k msgs/s | 1.02M msgs/s | 182k msgs/s | 5.1 µs / 7.2 µs / 5.1 µs / 7.4 µs | 2 (72 KB) / 2 (73 KB) / 1027 (36 KB) / 21 (164 KB) |
-| 64 KiB | 2048 | 426k msgs/s | 183k msgs/s | 429k msgs/s | 184k msgs/s | 14.3 µs / 7.2 µs / 14.3 µs / 7.3 µs | 2 (72 KB) / 2 (72 KB) / 4099 (146 KB) / 21 (165 KB) |
-| 64 KiB | 8192 | 264k msgs/s | 170k msgs/s | 268k msgs/s | 171k msgs/s | 24.9 µs / 7.8 µs / 24.9 µs / 7.9 µs | 5 (73 KB) / 2 (74 KB) / 16387 (579 KB) / 21 (164 KB) |
-| 256 KiB | 128 | 323k msgs/s | 75k msgs/s | 320k msgs/s | 74k msgs/s | 17.0 µs / 21.2 µs / 17.1 µs / 22.0 µs | 2 (268 KB) / 2 (276 KB) / 261 (278 KB) / 21 (578 KB) |
-| 256 KiB | 512 | 208k msgs/s | 71k msgs/s | 208k msgs/s | 70k msgs/s | 31.1 µs / 21.8 µs / 31.1 µs / 22.2 µs | 2 (265 KB) / 2 (265 KB) / 1029 (302 KB) / 21 (570 KB) |
-| 256 KiB | 2048 | 77k msgs/s | 67k msgs/s | 76k msgs/s | 69k msgs/s | 92.4 µs / 22.5 µs / 93.5 µs / 22.1 µs | 2 (275 KB) / 2 (277 KB) / 4101 (448 KB) / 21 (561 KB) |
-| 256 KiB | 8192 | 71k msgs/s | 70k msgs/s | 71k msgs/s | 67k msgs/s | 99.4 µs / 21.8 µs / 98.0 µs / 22.4 µs | 2 (264 KB) / 2 (292 KB) / 16389 (840 KB) / 21 (548 KB) |
-| 2 MiB | 128 | 32k msgs/s | 10k msgs/s | 34k msgs/s | 9k msgs/s | 206.2 µs / 163.4 µs / 194.0 µs / 180.3 µs | 132 (2296 KB) / 131 (2491 KB) / 390 (2276 KB) / 151 (5021 KB) |
-| 6 MiB | 128 | 3k msgs/s | 3k msgs/s | 3k msgs/s | 3k msgs/s | 2567.2 µs / 494.7 µs / 2633.0 µs / 474.9 µs | 130 (6155 KB) / 131 (9373 KB) / 393 (14100 KB) / 149 (12327 KB) |
+| 256 B | 128 | 1.64M msgs/s | 709k msgs/s | 1.62M msgs/s | 667k msgs/s | 2.5 µs / 3.1 µs / 2.5 µs / 3.2 µs | 2 / 2 / 259 (9 KB) / 15 (11 KB) |
+| 256 B | 512 | 2.04M msgs/s | 738k msgs/s | 2.01M msgs/s | 697k msgs/s | 2.3 µs / 3.1 µs / 2.4 µs / 3.2 µs | 2 / 2 / 1027 (36 KB) / 15 (11 KB) |
+| 256 B | 2048 | 2.12M msgs/s | 763k msgs/s | 2.14M msgs/s | 720k msgs/s | 2.3 µs / 3.1 µs / 2.3 µs / 3.2 µs | 2 / 2 / 4099 (144 KB) / 15 (11 KB) |
+| 256 B | 8192 | 1.66M msgs/s | 673k msgs/s | 1.66M msgs/s | 627k msgs/s | 3.2 µs / 3.4 µs / 3.1 µs / 3.5 µs | 2 / 2 / 16391 (579 KB) / 15 (11 KB) |
+| 4 KiB | 128 | 1.47M msgs/s | 650k msgs/s | 1.47M msgs/s | 608k msgs/s | 2.9 µs / 3.5 µs / 2.9 µs / 3.7 µs | 2 (4 KB) / 2 (4 KB) / 259 (9 KB) / 15 (20 KB) |
+| 4 KiB | 512 | 1.79M msgs/s | 688k msgs/s | 1.80M msgs/s | 641k msgs/s | 2.7 µs / 3.4 µs / 2.8 µs / 3.6 µs | 2 (4 KB) / 2 (4 KB) / 1027 (36 KB) / 15 (20 KB) |
+| 4 KiB | 2048 | 1.87M msgs/s | 693k msgs/s | 1.89M msgs/s | 650k msgs/s | 2.7 µs / 3.4 µs / 2.8 µs / 3.6 µs | 2 (4 KB) / 2 (4 KB) / 4099 (144 KB) / 15 (20 KB) |
+| 4 KiB | 8192 | 1.09M msgs/s | 549k msgs/s | 1.13M msgs/s | 507k msgs/s | 5.1 µs / 4.2 µs / 4.9 µs / 4.4 µs | 2 (4 KB) / 2 (4 KB) / 16387 (576 KB) / 15 (20 KB) |
+| 64 KiB | 128 | 767k msgs/s | 174k msgs/s | 778k msgs/s | 171k msgs/s | 6.0 µs / 7.6 µs / 5.9 µs / 8.0 µs | 2 (72 KB) / 2 (72 KB) / 259 (9 KB) / 21 (164 KB) |
+| 64 KiB | 512 | 1.02M msgs/s | 181k msgs/s | 1.01M msgs/s | 176k msgs/s | 5.1 µs / 7.3 µs / 5.1 µs / 7.5 µs | 2 (72 KB) / 2 (72 KB) / 1027 (36 KB) / 21 (164 KB) |
+| 64 KiB | 2048 | 417k msgs/s | 191k msgs/s | 419k msgs/s | 187k msgs/s | 14.6 µs / 7.1 µs / 14.8 µs / 7.3 µs | 2 (72 KB) / 2 (72 KB) / 4099 (149 KB) / 21 (164 KB) |
+| 64 KiB | 8192 | 265k msgs/s | 178k msgs/s | 270k msgs/s | 175k msgs/s | 25.2 µs / 7.7 µs / 25.2 µs / 7.8 µs | 2 (73 KB) / 2 (72 KB) / 16387 (576 KB) / 21 (164 KB) |
+| 256 KiB | 128 | 323k msgs/s | 74k msgs/s | 321k msgs/s | 74k msgs/s | 16.9 µs / 21.3 µs / 17.1 µs / 21.9 µs | 2 (268 KB) / 2 (275 KB) / 261 (277 KB) / 21 (603 KB) |
+| 256 KiB | 512 | 198k msgs/s | 74k msgs/s | 196k msgs/s | 73k msgs/s | 33.0 µs / 21.0 µs / 33.2 µs / 21.3 µs | 2 (266 KB) / 2 (267 KB) / 1029 (304 KB) / 21 (572 KB) |
+| 256 KiB | 2048 | 77k msgs/s | 73k msgs/s | 77k msgs/s | 67k msgs/s | 93.1 µs / 21.0 µs / 93.1 µs / 23.2 µs | 2 (264 KB) / 2 (275 KB) / 4101 (460 KB) / 21 (548 KB) |
+| 256 KiB | 8192 | 71k msgs/s | 66k msgs/s | 71k msgs/s | 65k msgs/s | 99.1 µs / 22.6 µs / 98.9 µs / 22.9 µs | 2 (292 KB) / 2 (264 KB) / 16398 (845 KB) / 21 (548 KB) |
+| 2 MiB | 128 | 32k msgs/s | 10k msgs/s | 35k msgs/s | 9k msgs/s | 207.6 µs / 160.7 µs / 186.5 µs / 172.4 µs | 3 (2262 KB) / 3 (2492 KB) / 262 (2234 KB) / 24 (4960 KB) |
+| 6 MiB | 128 | 3k msgs/s | 3k msgs/s | 3k msgs/s | 3k msgs/s | 2541.5 µs / 469.1 µs / 2832.1 µs / 457.3 µs | 2 (6152 KB) / 4 (8002 KB) / 262 (6162 KB) / 21 (12324 KB) |
 
 ## Compressed with context takeover
 
 | Size | Conns | ews | ews-sync | gws | CPU/msg ews / ews-sync / gws | allocs/op ews / ews-sync / gws |
 |---|---|---|---|---|---|---|
-| 256 B | 128 | 1.30M msgs/s | 714k msgs/s | 1.21M msgs/s | 3.4 µs / 3.6 µs / 3.8 µs | 4 / 4 / 259 (9 KB) |
-| 256 B | 512 | 1.59M msgs/s | 762k msgs/s | 1.47M msgs/s | 3.2 µs / 3.6 µs / 3.6 µs | 4 / 4 (3 KB) / 1027 (36 KB) |
-| 256 B | 2048 | 1.47M msgs/s | 695k msgs/s | 876k msgs/s | 3.9 µs / 3.9 µs / 7.1 µs | 4 (1 KB) / 4 (11 KB) / 4099 (144 KB) |
-| 256 B | 8192 | 1.01M msgs/s | 492k msgs/s | 787k msgs/s | 5.9 µs / 4.8 µs / 7.8 µs | 4 / 4 (20 KB) / 16387 (576 KB) |
-| 4 KiB | 128 | 1.07M msgs/s | 711k msgs/s | 1.02M msgs/s | 4.6 µs / 4.7 µs / 5.0 µs | 4 (5 KB) / 4 (5 KB) / 259 (9 KB) |
-| 4 KiB | 512 | 1.29M msgs/s | 774k msgs/s | 1.19M msgs/s | 4.4 µs / 4.6 µs / 4.8 µs | 4 (4 KB) / 4 (9 KB) / 1027 (36 KB) |
-| 4 KiB | 2048 | 1.11M msgs/s | 695k msgs/s | 706k msgs/s | 5.6 µs / 5.4 µs / 9.2 µs | 4 (6 KB) / 4 (12 KB) / 4099 (144 KB) |
-| 4 KiB | 8192 | 766k msgs/s | 415k msgs/s | 436k msgs/s | 8.3 µs / 7.2 µs / 14.9 µs | 4 (12 KB) / 4 (17 KB) / 16387 (576 KB) |
-| 64 KiB | 128 | 640k msgs/s | 650k msgs/s | 627k msgs/s | 9.1 µs / 8.7 µs / 9.5 µs | 4 (74 KB) / 4 (72 KB) / 259 (9 KB) |
-| 64 KiB | 512 | 743k msgs/s | 705k msgs/s | 715k msgs/s | 8.8 µs / 8.5 µs / 9.2 µs | 4 (72 KB) / 4 (76 KB) / 1027 (36 KB) |
-| 64 KiB | 2048 | 708k msgs/s | 675k msgs/s | 480k msgs/s | 9.5 µs / 8.8 µs / 14.1 µs | 4 (72 KB) / 4 (82 KB) / 4099 (144 KB) |
-| 64 KiB | 8192 | 516k msgs/s | 358k msgs/s | 345k msgs/s | 12.9 µs / 12.0 µs / 19.7 µs | 4 (72 KB) / 4 (88 KB) / 16387 (581 KB) |
-| 256 KiB | 128 | 281k msgs/s | 270k msgs/s | 277k msgs/s | 23.5 µs / 23.4 µs / 24.0 µs | 4 (271 KB) / 5 (304 KB) / 261 (297 KB) |
-| 256 KiB | 512 | 313k msgs/s | 304k msgs/s | 307k msgs/s | 23.1 µs / 22.7 µs / 23.5 µs | 4 (273 KB) / 4 (267 KB) / 1030 (353 KB) |
-| 256 KiB | 2048 | 301k msgs/s | 308k msgs/s | 258k msgs/s | 23.8 µs / 23.3 µs / 28.2 µs | 4 (269 KB) / 4 (265 KB) / 4101 (408 KB) |
-| 256 KiB | 8192 | 277k msgs/s | 289k msgs/s | 222k msgs/s | 26.0 µs / 25.2 µs / 32.4 µs | 4 (265 KB) / 4 (284 KB) / 16389 (840 KB) |
-| 2 MiB | 128 | 12k msgs/s | 12k msgs/s | 12k msgs/s | 616.6 µs / 605.8 µs / 621.0 µs | 780 (3202 KB) / 779 (3361 KB) / 1032 (2996 KB) |
-| 6 MiB | 128 | 15k msgs/s | 14k msgs/s | 15k msgs/s | 463.1 µs / 467.6 µs / 466.5 µs | 656 (7688 KB) / 658 (9469 KB) / 909 (8745 KB) |
+| 256 B | 128 | 1.30M msgs/s | 713k msgs/s | 1.20M msgs/s | 3.4 µs / 3.6 µs / 3.8 µs | 4 / 4 / 259 (9 KB) |
+| 256 B | 512 | 1.58M msgs/s | 758k msgs/s | 1.48M msgs/s | 3.2 µs / 3.6 µs / 3.6 µs | 4 / 4 (3 KB) / 1027 (36 KB) |
+| 256 B | 2048 | 1.44M msgs/s | 700k msgs/s | 848k msgs/s | 4.0 µs / 3.9 µs / 7.4 µs | 4 (2 KB) / 4 (11 KB) / 4099 (144 KB) |
+| 256 B | 8192 | 1.02M msgs/s | 468k msgs/s | 789k msgs/s | 5.9 µs / 4.9 µs / 7.9 µs | 4 (10 KB) / 4 (51 KB) / 16387 (576 KB) |
+| 4 KiB | 128 | 1.07M msgs/s | 705k msgs/s | 1.02M msgs/s | 4.6 µs / 4.7 µs / 5.0 µs | 4 (5 KB) / 4 (5 KB) / 259 (9 KB) |
+| 4 KiB | 512 | 1.28M msgs/s | 771k msgs/s | 1.20M msgs/s | 4.4 µs / 4.5 µs / 4.8 µs | 4 (5 KB) / 4 (7 KB) / 1027 (36 KB) |
+| 4 KiB | 2048 | 1.09M msgs/s | 703k msgs/s | 702k msgs/s | 5.8 µs / 5.4 µs / 9.2 µs | 4 (6 KB) / 4 (12 KB) / 4099 (144 KB) |
+| 4 KiB | 8192 | 747k msgs/s | 407k msgs/s | 437k msgs/s | 8.4 µs / 7.1 µs / 15.0 µs | 4 (4 KB) / 4 (4 KB) / 16387 (576 KB) |
+| 64 KiB | 128 | 640k msgs/s | 653k msgs/s | 633k msgs/s | 9.1 µs / 8.6 µs / 9.4 µs | 4 (75 KB) / 4 (72 KB) / 259 (9 KB) |
+| 64 KiB | 512 | 739k msgs/s | 705k msgs/s | 712k msgs/s | 8.8 µs / 8.4 µs / 9.2 µs | 4 (73 KB) / 4 (75 KB) / 1027 (37 KB) |
+| 64 KiB | 2048 | 711k msgs/s | 676k msgs/s | 476k msgs/s | 9.6 µs / 8.8 µs / 14.3 µs | 4 (72 KB) / 4 (76 KB) / 4099 (154 KB) |
+| 64 KiB | 8192 | 514k msgs/s | 380k msgs/s | 348k msgs/s | 12.8 µs / 11.6 µs / 19.6 µs | 4 (72 KB) / 4 (72 KB) / 16387 (576 KB) |
+| 256 KiB | 128 | 285k msgs/s | 271k msgs/s | 277k msgs/s | 23.1 µs / 23.4 µs / 23.9 µs | 4 (265 KB) / 4 (302 KB) / 261 (292 KB) |
+| 256 KiB | 512 | 310k msgs/s | 303k msgs/s | 305k msgs/s | 23.0 µs / 22.7 µs / 23.5 µs | 4 (285 KB) / 4 (268 KB) / 1029 (320 KB) |
+| 256 KiB | 2048 | 303k msgs/s | 309k msgs/s | 254k msgs/s | 23.7 µs / 23.2 µs / 28.3 µs | 4 (265 KB) / 4 (265 KB) / 4102 (504 KB) |
+| 256 KiB | 8192 | 276k msgs/s | 290k msgs/s | 222k msgs/s | 26.1 µs / 25.2 µs / 32.8 µs | 4 (265 KB) / 4 (283 KB) / 16389 (840 KB) |
+| 2 MiB | 128 | 12k msgs/s | 12k msgs/s | 12k msgs/s | 623.8 µs / 610.0 µs / 623.9 µs | 8 (2665 KB) / 8 (2935 KB) / 265 (2913 KB) |
+| 6 MiB | 128 | 15k msgs/s | 14k msgs/s | 15k msgs/s | 467.7 µs / 467.0 µs / 464.0 µs | 15 (8346 KB) / 13 (9373 KB) / 263 (6640 KB) |
 
 ## Compressed without context takeover
 
 | Size | Conns | ews | ews-sync | gws | gorilla | CPU/msg ews / ews-sync / gws / gorilla | allocs/op ews / ews-sync / gws / gorilla |
 |---|---|---|---|---|---|---|---|
-| 256 B | 128 | 1.46M msgs/s | 694k msgs/s | 1.45M msgs/s | 649k msgs/s | 2.8 µs / 3.3 µs / 2.8 µs / 3.5 µs | 4 / 4 (1 KB) / 258 (9 KB) / 18 (12 KB) |
-| 256 B | 512 | 1.81M msgs/s | 741k msgs/s | 1.80M msgs/s | 699k msgs/s | 2.7 µs / 3.2 µs / 2.7 µs / 3.4 µs | 4 / 4 (2 KB) / 1027 (36 KB) / 18 (13 KB) |
-| 256 B | 2048 | 1.94M msgs/s | 765k msgs/s | 1.97M msgs/s | 725k msgs/s | 2.6 µs / 3.1 µs / 2.7 µs / 3.3 µs | 4 (1 KB) / 4 (9 KB) / 4099 (144 KB) / 18 (20 KB) |
-| 256 B | 8192 | 1.62M msgs/s | 681k msgs/s | 1.64M msgs/s | 635k msgs/s | 3.3 µs / 3.5 µs / 3.3 µs / 3.7 µs | 4 / 4 (8 KB) / 16389 (577 KB) / 18 (29 KB) |
-| 4 KiB | 128 | 1.19M msgs/s | 678k msgs/s | 1.20M msgs/s | 640k msgs/s | 4.0 µs / 4.5 µs / 4.0 µs / 4.6 µs | 4 (5 KB) / 4 (5 KB) / 259 (9 KB) / 18 (16 KB) |
-| 4 KiB | 512 | 1.42M msgs/s | 741k msgs/s | 1.42M msgs/s | 699k msgs/s | 3.8 µs / 4.3 µs / 3.8 µs / 4.5 µs | 4 (5 KB) / 4 (7 KB) / 1027 (36 KB) / 20 (42 KB) |
-| 4 KiB | 2048 | 1.53M msgs/s | 767k msgs/s | 1.52M msgs/s | 723k msgs/s | 3.8 µs / 4.2 µs / 3.8 µs / 4.4 µs | 4 (4 KB) / 4 (13 KB) / 4099 (146 KB) / 18 (23 KB) |
-| 4 KiB | 8192 | 1.30M msgs/s | 672k msgs/s | 1.28M msgs/s | 631k msgs/s | 4.5 µs / 4.6 µs / 4.5 µs / 4.7 µs | 4 (4 KB) / 4 (13 KB) / 16387 (576 KB) / 18 (15 KB) |
-| 64 KiB | 128 | 683k msgs/s | 638k msgs/s | 700k msgs/s | 586k msgs/s | 8.4 µs / 8.3 µs / 8.2 µs / 8.6 µs | 4 (79 KB) / 4 (82 KB) / 259 (9 KB) / 21 (99 KB) |
-| 64 KiB | 512 | 795k msgs/s | 715k msgs/s | 796k msgs/s | 654k msgs/s | 8.0 µs / 7.8 µs / 8.0 µs / 8.0 µs | 4 (74 KB) / 4 (75 KB) / 1027 (37 KB) / 21 (91 KB) |
-| 64 KiB | 2048 | 833k msgs/s | 751k msgs/s | 839k msgs/s | 691k msgs/s | 8.0 µs / 7.6 µs / 8.0 µs / 7.7 µs | 4 (77 KB) / 4 (76 KB) / 4099 (148 KB) / 21 (94 KB) |
-| 64 KiB | 8192 | 742k msgs/s | 602k msgs/s | 732k msgs/s | 555k msgs/s | 8.8 µs / 8.4 µs / 8.8 µs / 8.7 µs | 4 (80 KB) / 4 (92 KB) / 16387 (577 KB) / 21 (88 KB) |
-| 256 KiB | 128 | 285k msgs/s | 274k msgs/s | 288k msgs/s | 267k msgs/s | 23.0 µs / 22.7 µs / 22.9 µs / 23.0 µs | 5 (316 KB) / 5 (333 KB) / 261 (297 KB) / 21 (316 KB) |
-| 256 KiB | 512 | 321k msgs/s | 316k msgs/s | 322k msgs/s | 306k msgs/s | 22.4 µs / 22.0 µs / 22.4 µs / 22.3 µs | 5 (318 KB) / 5 (333 KB) / 1029 (322 KB) / 25 (474 KB) |
-| 256 KiB | 2048 | 327k msgs/s | 325k msgs/s | 331k msgs/s | 333k msgs/s | 22.2 µs / 21.7 µs / 22.1 µs / 21.9 µs | 5 (325 KB) / 20 (920 KB) / 4104 (529 KB) / 21 (311 KB) |
-| 256 KiB | 8192 | 310k msgs/s | 335k msgs/s | 314k msgs/s | 331k msgs/s | 23.4 µs / 22.3 µs / 23.1 µs / 22.4 µs | 4 (283 KB) / 4 (282 KB) / 16389 (840 KB) / 21 (280 KB) |
-| 2 MiB | 128 | 13k msgs/s | 13k msgs/s | 13k msgs/s | 13k msgs/s | 567.2 µs / 563.6 µs / 563.1 µs / 564.6 µs | 782 (3122 KB) / 781 (3113 KB) / 1033 (2526 KB) / 800 (3176 KB) |
-| 6 MiB | 128 | 15k msgs/s | 14k msgs/s | 15k msgs/s | 14k msgs/s | 464.1 µs / 461.8 µs / 462.2 µs / 467.2 µs | 655 (7415 KB) / 651 (7222 KB) / 908 (8870 KB) / 677 (8758 KB) |
+| 256 B | 128 | 1.46M msgs/s | 689k msgs/s | 1.45M msgs/s | 647k msgs/s | 2.8 µs / 3.3 µs / 2.8 µs / 3.5 µs | 4 / 4 (1 KB) / 258 (9 KB) / 18 (12 KB) |
+| 256 B | 512 | 1.81M msgs/s | 738k msgs/s | 1.81M msgs/s | 696k msgs/s | 2.7 µs / 3.2 µs / 2.7 µs / 3.4 µs | 4 / 4 (3 KB) / 1027 (36 KB) / 18 (14 KB) |
+| 256 B | 2048 | 1.97M msgs/s | 763k msgs/s | 1.97M msgs/s | 724k msgs/s | 2.6 µs / 3.1 µs / 2.7 µs / 3.3 µs | 4 (1 KB) / 4 (7 KB) / 4099 (144 KB) / 18 (20 KB) |
+| 256 B | 8192 | 1.59M msgs/s | 674k msgs/s | 1.60M msgs/s | 634k msgs/s | 3.4 µs / 3.5 µs / 3.4 µs / 3.7 µs | 4 / 4 (8 KB) / 16387 (576 KB) / 18 (20 KB) |
+| 4 KiB | 128 | 1.18M msgs/s | 676k msgs/s | 1.20M msgs/s | 640k msgs/s | 4.0 µs / 4.5 µs / 3.9 µs / 4.6 µs | 4 (5 KB) / 4 (5 KB) / 259 (9 KB) / 18 (16 KB) |
+| 4 KiB | 512 | 1.42M msgs/s | 737k msgs/s | 1.43M msgs/s | 698k msgs/s | 3.8 µs / 4.3 µs / 3.8 µs / 4.5 µs | 4 (5 KB) / 4 (7 KB) / 1027 (36 KB) / 18 (20 KB) |
+| 4 KiB | 2048 | 1.53M msgs/s | 765k msgs/s | 1.52M msgs/s | 723k msgs/s | 3.8 µs / 4.2 µs / 3.8 µs / 4.4 µs | 4 (4 KB) / 4 (12 KB) / 4099 (145 KB) / 18 (25 KB) |
+| 4 KiB | 8192 | 1.27M msgs/s | 670k msgs/s | 1.26M msgs/s | 627k msgs/s | 4.5 µs / 4.6 µs / 4.5 µs / 4.8 µs | 4 (4 KB) / 4 (21 KB) / 16387 (576 KB) / 18 (33 KB) |
+| 64 KiB | 128 | 683k msgs/s | 636k msgs/s | 701k msgs/s | 585k msgs/s | 8.3 µs / 8.3 µs / 8.2 µs / 8.6 µs | 4 (76 KB) / 4 (78 KB) / 259 (9 KB) / 21 (93 KB) |
+| 64 KiB | 512 | 798k msgs/s | 719k msgs/s | 799k msgs/s | 652k msgs/s | 8.1 µs / 7.8 µs / 8.0 µs / 8.0 µs | 4 (75 KB) / 4 (76 KB) / 1027 (37 KB) / 21 (92 KB) |
+| 64 KiB | 2048 | 834k msgs/s | 751k msgs/s | 834k msgs/s | 695k msgs/s | 8.0 µs / 7.6 µs / 8.0 µs / 7.7 µs | 4 (84 KB) / 4 (79 KB) / 4099 (145 KB) / 21 (91 KB) |
+| 64 KiB | 8192 | 727k msgs/s | 592k msgs/s | 731k msgs/s | 544k msgs/s | 8.9 µs / 8.4 µs / 8.8 µs / 8.8 µs | 4 (72 KB) / 4 (81 KB) / 16387 (578 KB) / 21 (88 KB) |
+| 256 KiB | 128 | 284k msgs/s | 276k msgs/s | 289k msgs/s | 267k msgs/s | 23.0 µs / 22.6 µs / 22.8 µs / 22.9 µs | 5 (322 KB) / 5 (319 KB) / 261 (301 KB) / 22 (336 KB) |
+| 256 KiB | 512 | 321k msgs/s | 316k msgs/s | 321k msgs/s | 312k msgs/s | 22.4 µs / 21.9 µs / 22.3 µs / 22.0 µs | 5 (330 KB) / 4 (290 KB) / 1029 (322 KB) / 21 (299 KB) |
+| 256 KiB | 2048 | 326k msgs/s | 330k msgs/s | 334k msgs/s | 329k msgs/s | 22.3 µs / 21.6 µs / 22.1 µs / 21.8 µs | 4 (269 KB) / 5 (326 KB) / 4102 (487 KB) / 21 (319 KB) |
+| 256 KiB | 8192 | 312k msgs/s | 331k msgs/s | 314k msgs/s | 332k msgs/s | 23.4 µs / 22.4 µs / 23.1 µs / 22.4 µs | 14 (738 KB) / 4 (281 KB) / 16389 (840 KB) / 21 (297 KB) |
+| 2 MiB | 128 | 13k msgs/s | 13k msgs/s | 13k msgs/s | 13k msgs/s | 564.5 µs / 564.2 µs / 566.5 µs / 557.4 µs | 10 (3000 KB) / 13 (3097 KB) / 266 (3491 KB) / 32 (3209 KB) |
+| 6 MiB | 128 | 15k msgs/s | 14k msgs/s | 15k msgs/s | 14k msgs/s | 465.3 µs / 464.4 µs / 458.5 µs / 468.2 µs | 25 (9264 KB) / 14 (8285 KB) / 265 (7095 KB) / 34 (8623 KB) |
 
 ## Reading the numbers
 

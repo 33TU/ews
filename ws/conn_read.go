@@ -210,10 +210,11 @@ var msgPool sync.Pool
 
 type msgBuf struct {
 	b []byte
-	// home is the buffer within poolKeep set aside while b is a larger one
-	// from the size-class pool; releaseMsg restores it, so the next message
-	// grows from it rather than from nothing.
-	home []byte
+	// large is the size-class buffer b lives in past poolKeep, and home the
+	// buffer within poolKeep set aside meanwhile; releaseMsg restores home,
+	// so the next message grows from it rather than from nothing.
+	large *bufpool.Buffer
+	home  []byte
 }
 
 func (c *Conn) growMsg(msg []byte, n int) []byte {
@@ -237,13 +238,18 @@ func (c *Conn) growMsg(msg []byte, n int) []byte {
 	if need <= poolKeep {
 		msg = append(make([]byte, 0, min(max(need, 2*cap(msg)), poolKeep)), msg...)
 	} else {
-		grown := append(bufpool.Get(need), msg...)
-		if cap(msg) > poolKeep {
-			bufpool.Put(msg)
+		// A fragmented message's total is unknown, so the last assembled
+		// message's size is the reservation, and a repeat of it is gathered
+		// with one copy instead of one per class.
+		grown := bufpool.Get(max(need, c.msgHint))
+		grown.B = append(grown.B, msg...)
+		if c.msg.large != nil {
+			bufpool.Put(c.msg.large)
 		} else {
 			c.msg.home = msg[:0]
 		}
-		msg = grown
+		c.msg.large = grown
+		msg = grown.B
 	}
 	c.msg.b = msg
 	return msg
@@ -261,8 +267,9 @@ func (c *Conn) appendMsg(msg, chunk []byte) []byte {
 
 func (c *Conn) releaseMsg() {
 	if c.msg != nil {
-		if cap(c.msg.b) > poolKeep {
-			bufpool.Put(c.msg.b)
+		if c.msg.large != nil {
+			bufpool.Put(c.msg.large)
+			c.msg.large = nil
 			c.msg.b, c.msg.home = c.msg.home, nil
 		}
 		c.msg.b = c.msg.b[:0]
@@ -322,6 +329,7 @@ func (c *Conn) assemble() ([]byte, error) {
 				return nil, c.fail(err)
 			}
 			if done && len(msg) == 0 && !c.rx.MessageOpen() {
+				c.msgHint = 0
 				return chunk, nil
 			}
 			if len(chunk) != 0 || done {
@@ -347,6 +355,7 @@ func (c *Conn) assemble() ([]byte, error) {
 		}
 
 		if !c.rx.MessageOpen() {
+			c.msgHint = len(msg)
 			return msg, nil
 		}
 		if err := c.nextFrame(); err != nil {

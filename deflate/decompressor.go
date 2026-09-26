@@ -46,11 +46,13 @@ type Decompressor struct {
 	// costs a call per byte. Streaming feeds it input, chunk by chunk.
 	slice     bytes.Reader
 	in        []byte
+	inBuf     *bufpool.Buffer // The pooled storage behind in.
 	input     messageReader
-	output    []byte  // Decompress result; also the reset dictionary in slice mode.
-	window    *Window // The current message's direction history, or nil.
-	scratch   Window  // Within-message history for streaming without a window.
-	kept      int     // Output already added to the window in slice mode.
+	output    []byte          // Decompress result; also the reset dictionary in slice mode.
+	outBuf    *bufpool.Buffer // The pooled storage behind output.
+	window    *Window         // The current message's direction history, or nil.
+	scratch   Window          // Within-message history for streaming without a window.
+	kept      int             // Output already added to the window in slice mode.
 	streaming bool
 	active    bool
 	done      bool // Last byte delivered; the next Read returns io.EOF.
@@ -77,8 +79,9 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 	// doubling. One extra byte lets a result at the limit be told apart
 	// from one past it.
 	if hint := min(4*len(payload), maxSize+1); cap(d.output) < hint {
-		bufpool.Put(d.output)
-		d.output = bufpool.Get(hint)
+		bufpool.Put(d.outBuf)
+		d.outBuf = bufpool.Get(hint)
+		d.output = d.outBuf.B
 	}
 	for {
 		// Each read fills the spare capacity, and the buffer grows once that
@@ -92,7 +95,7 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 		// times over on the way out.
 		if cap(d.output) == len(d.output) {
 			projected := d.projected()
-			d.output = grow(d.output, max(32<<10, len(d.output)/2, projected+projected/16))
+			d.grow(max(32<<10, len(d.output)/2, projected+projected/16))
 		}
 		size := cap(d.output) - len(d.output)
 		if remaining := maxSize - len(d.output); remaining < size {
@@ -190,9 +193,10 @@ func (d *Decompressor) Reset() {
 // not a large result. The inflater and its window are kept.
 func (d *Decompressor) ReleaseOutput() {
 	d.Reset()
-	bufpool.Put(d.output)
-	bufpool.Put(d.in)
-	d.output, d.in = nil, nil
+	bufpool.Put(d.outBuf)
+	bufpool.Put(d.inBuf)
+	d.output, d.outBuf = nil, nil
+	d.in, d.inBuf = nil, nil
 }
 
 // source is the reader the inflater draws from in the current mode.
@@ -221,8 +225,9 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 		d.input = messageReader{src: src, tail: inflateTail[:]}
 	} else {
 		if n := len(payload) + len(inflateTail); cap(d.in) < n {
-			bufpool.Put(d.in)
-			d.in = bufpool.Get(n)
+			bufpool.Put(d.inBuf)
+			d.inBuf = bufpool.Get(n)
+			d.in = d.inBuf.B
 		}
 		d.in = append(append(d.in[:0], payload...), inflateTail[:]...)
 		d.slice.Reset(d.in)
@@ -301,15 +306,16 @@ func (d *Decompressor) projected() int {
 	return int(int64(len(d.output)) * int64(remaining) / int64(consumed))
 }
 
-// grow returns b with room for n more bytes, from the pool, and returns the
-// old storage to it.
-func grow(b []byte, n int) []byte {
-	if cap(b)-len(b) >= n {
-		return b
+// grow gives the output room for n more bytes, from the pool, and returns
+// the old storage to it.
+func (d *Decompressor) grow(n int) {
+	if cap(d.output)-len(d.output) >= n {
+		return
 	}
-	nb := append(bufpool.Get(len(b)+n), b...)
-	bufpool.Put(b)
-	return nb
+	nb := bufpool.Get(len(d.output) + n)
+	nb.B = append(nb.B, d.output...)
+	bufpool.Put(d.outBuf)
+	d.outBuf, d.output = nb, nb.B
 }
 
 // Restore the stripped sync-flush tail, then terminate the DEFLATE stream.
