@@ -100,8 +100,13 @@ the message size.
 
 Over TLS the record buffers level the memory column and encryption takes a
 quarter off everyone's echo rate; ews and gws then tie within three percent
-at 1 KiB, and ews still moves 256 KiB messages on the least CPU. The fork's
-results directory has the TLS tables.
+at 1 KiB, and ews still moves 256 KiB messages on the least CPU. In the rate
+test over TLS, ews is the only one of the three that answers the whole
+offered load with nothing dropped, on 341 percent CPU against gws's 445,
+1.36 times the echoes per CPU point rather than the 1.8 of the plain run:
+encryption is a cost none of them avoid, and it narrows the gap while
+pushing the other two past what the client will keep sending them. The
+fork's results directory has the TLS tables.
 
 Above about 30,000 connections the harness's client, built on nbio, becomes
 the bottleneck and the rate test stops measuring the server; the results
