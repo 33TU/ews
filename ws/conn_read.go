@@ -3,7 +3,6 @@ package ws
 import (
 	"github.com/33TU/ews/internal/bufpool"
 	"io"
-	"slices"
 	"sync"
 
 	"github.com/33TU/ews/codec"
@@ -209,7 +208,13 @@ func (c *Conn) readInto(msg []byte, n int) ([]byte, error) {
 // read, so idle connections keep no assembly storage.
 var msgPool sync.Pool
 
-type msgBuf struct{ b []byte }
+type msgBuf struct {
+	b []byte
+	// home is the buffer within poolKeep set aside while b is a larger one
+	// from the size-class pool; releaseMsg restores it, so the next message
+	// grows from it rather than from nothing.
+	home []byte
+}
 
 func (c *Conn) growMsg(msg []byte, n int) []byte {
 	if c.msg == nil {
@@ -221,13 +226,24 @@ func (c *Conn) growMsg(msg []byte, n int) []byte {
 		msg = c.msg.b[:0]
 	}
 
-	// Past poolKeep the storage comes from the size-class pool, and the
-	// buffer it replaces goes back there when it came from there.
-	if need := len(msg) + n; need > cap(msg) && need > poolKeep {
-		msg = append(bufpool.Get(need), msg...)
-		bufpool.Put(c.msg.b)
+	// Within poolKeep the buffer doubles, clamped there so it never leaves
+	// the class the pool keeps. Past it the storage comes from the
+	// size-class pool; the buffer it replaces goes back there when it came
+	// from there and is kept as home otherwise.
+	need := len(msg) + n
+	if need <= cap(msg) {
+		return msg
+	}
+	if need <= poolKeep {
+		msg = append(make([]byte, 0, min(max(need, 2*cap(msg)), poolKeep)), msg...)
 	} else {
-		msg = slices.Grow(msg, n)
+		grown := append(bufpool.Get(need), msg...)
+		if cap(msg) > poolKeep {
+			bufpool.Put(msg)
+		} else {
+			c.msg.home = msg[:0]
+		}
+		msg = grown
 	}
 	c.msg.b = msg
 	return msg
@@ -247,7 +263,7 @@ func (c *Conn) releaseMsg() {
 	if c.msg != nil {
 		if cap(c.msg.b) > poolKeep {
 			bufpool.Put(c.msg.b)
-			c.msg.b = nil
+			c.msg.b, c.msg.home = c.msg.home, nil
 		}
 		c.msg.b = c.msg.b[:0]
 		msgPool.Put(c.msg)
