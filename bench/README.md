@@ -70,6 +70,15 @@ price of never letting one client slow another. A loop of `WritePrepared`
 over the connections is cheaper there only by giving that isolation up: it
 stalls on the first slow socket.
 
+At that ceiling the socket send buffer decides more than either shape does.
+Linux autotunes it into the megabytes, and capping it keeps a large payload
+cache-resident on the way through rather than sending it to memory and
+fetching it back: delivering 6 MiB to 128 loopback connections, a cap
+around 128 to 256 KiB doubled throughput on this machine. The optimum moves
+with the message size, so it belongs in a deployment rather than in a
+library default, and no library measured here sets it. The top-level README
+has the numbers and where to put it.
+
 ## Text validation
 
 `ValidateUTF8` costs one pass over each text message. The SWAR validator is

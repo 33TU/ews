@@ -301,6 +301,47 @@ the fork's results directory.
 SIMD build's results, the TLS results and what is behind each number, with raw
 output committed so every table can be regenerated.
 
+## Tuning the socket
+
+Sending large messages to many connections at once, the socket send buffer
+is a larger lever than anything in this library, and the useful direction
+is to cap it rather than raise it. Linux autotunes it into the megabytes; a
+sender that fills one puts more in flight than the reader consumes while it
+is still cache-resident, so the payload makes a round trip to memory on the
+way. Delivering 6 MiB to 128 loopback connections, with no WebSocket work
+at all so that only the socket varies:
+
+| `SO_SNDBUF` | throughput |
+|---|---|
+| autotuned | 50.6 GB/s |
+| 64 KiB | 96.7 GB/s |
+| 128 KiB | 107.8 GB/s |
+| 256 KiB | 109.2 GB/s |
+| 512 KiB | 94.5 GB/s |
+| 2 MiB | 68.8 GB/s |
+
+It is the send buffer alone: capping it and leaving the receive buffer
+autotuned measured 112.7 GB/s, and doing the opposite measured 50.9, which
+is what the default already gives. Below about 64 KiB the extra syscalls
+cost more than the cache saves.
+
+ews never sets this. Every path hands you the socket, so a cap goes in
+`net.ListenConfig.Control` for a whole listener, or beside `NewConn` for
+one connection:
+
+```go
+if tc, ok := conn.(*net.TCPConn); ok {
+	tc.SetWriteBuffer(256 << 10)
+}
+```
+
+Measure it on your own traffic rather than adopting a number. The optimum
+moves with the message size, and past it the cap costs more than it buys:
+on the broadcast benchmark that same 256 KiB took the 6 MiB cell at 128
+connections from 44 ms per round to 32, and the 2 MiB cell from 3.8 to 10.
+Over a real network a small send buffer also caps throughput on any path
+with a bandwidth-delay product above it.
+
 ## Development
 
 ```sh
