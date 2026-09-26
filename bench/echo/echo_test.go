@@ -328,8 +328,7 @@ func BenchmarkEcho(b *testing.B) {
 						// over several round trips per connection.
 						for range 5 {
 							for _, c := range clients {
-								c.Write(codec.Binary, msg)
-								c.ReadMessage()
+								roundTrip(c, msg)
 							}
 						}
 						b.ReportAllocs()
@@ -345,12 +344,8 @@ func BenchmarkEcho(b *testing.B) {
 							}
 							wg.Go(func() {
 								for range per {
-									if err := c.Write(codec.Binary, msg); err != nil {
+									if err := roundTrip(c, msg); err != nil {
 										errs <- err
-										return
-									}
-									if _, p, err := c.ReadMessage(); err != nil || len(p) != size {
-										errs <- fmt.Errorf("read: %v (%d bytes)", err, len(p))
 										return
 									}
 								}
@@ -371,4 +366,32 @@ func BenchmarkEcho(b *testing.B) {
 			}
 		}
 	}
+}
+
+// roundTrip sends msg and reads the echo. A streaming server echoes while it
+// reads, so a message past what the loopback socket buffers hold would
+// deadlock against a client that writes it whole before reading; for those
+// the write overlaps the read, as a peer of a streaming server does.
+func roundTrip(c *ws.Conn, msg []byte) error {
+	if len(msg) <= 1<<20 {
+		if err := c.Write(codec.Binary, msg); err != nil {
+			return err
+		}
+		return readEcho(c, len(msg))
+	}
+	werr := make(chan error, 1)
+	go func() { werr <- c.Write(codec.Binary, msg) }()
+	rerr := readEcho(c, len(msg))
+	if err := <-werr; err != nil {
+		return err
+	}
+	return rerr
+}
+
+func readEcho(c *ws.Conn, size int) error {
+	_, p, err := c.ReadMessage()
+	if err != nil || len(p) != size {
+		return fmt.Errorf("read: %v (%d bytes)", err, len(p))
+	}
+	return nil
 }
