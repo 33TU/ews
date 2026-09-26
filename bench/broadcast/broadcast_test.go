@@ -28,8 +28,13 @@ import (
 func BenchmarkBroadcast(b *testing.B) {
 	rng := rand.New(rand.NewPCG(7, 11))
 	for _, mode := range []harness.Mode{harness.Plain, harness.Takeover, harness.NoTakeover} {
-		for _, size := range []int{256, 4 << 10, 64 << 10, 256 << 10} {
+		for _, size := range []int{256, 4 << 10, 64 << 10, 256 << 10, 2 << 20, 6 << 20} {
 			for _, conns := range []int{128, 512, 2048, 8192} {
+				// Every client holds a message of this size, so the large ones
+				// stop at 128 connections: past that they measure memory.
+				if size > 1<<20 && conns > 128 {
+					continue
+				}
 				libs := []string{"ews", "ews-sync", "gws", "gorilla"}
 				if mode == harness.Takeover {
 					libs = libs[:3] // gorilla supports only no_context_takeover.
