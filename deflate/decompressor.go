@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/33TU/ews/internal/bufpool"
 	"github.com/klauspost/compress/flate"
 )
 
@@ -76,7 +77,8 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 	// doubling. One extra byte lets a result at the limit be told apart
 	// from one past it.
 	if hint := min(4*len(payload), maxSize+1); cap(d.output) < hint {
-		d.output = make([]byte, 0, hint)
+		bufpool.Put(d.output)
+		d.output = bufpool.Get(hint)
 	}
 	for {
 		// Each read fills the spare capacity, and the buffer grows once that
@@ -183,13 +185,14 @@ func (d *Decompressor) Reset() {
 	d.output = d.output[:0]
 }
 
-// ReleaseOutput is Reset that also frees the output storage, for a caller
-// that keeps the decompressor across messages but not a large result. The
-// inflater and its window are kept.
+// ReleaseOutput is Reset that also gives the output and input storage back
+// to the pool, for a caller that keeps the decompressor across messages but
+// not a large result. The inflater and its window are kept.
 func (d *Decompressor) ReleaseOutput() {
 	d.Reset()
-	d.output = nil
-	d.in = nil
+	bufpool.Put(d.output)
+	bufpool.Put(d.in)
+	d.output, d.in = nil, nil
 }
 
 // source is the reader the inflater draws from in the current mode.
@@ -217,6 +220,10 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 	if d.streaming {
 		d.input = messageReader{src: src, tail: inflateTail[:]}
 	} else {
+		if n := len(payload) + len(inflateTail); cap(d.in) < n {
+			bufpool.Put(d.in)
+			d.in = bufpool.Get(n)
+		}
 		d.in = append(append(d.in[:0], payload...), inflateTail[:]...)
 		d.slice.Reset(d.in)
 	}
@@ -294,15 +301,14 @@ func (d *Decompressor) projected() int {
 	return int(int64(len(d.output)) * int64(remaining) / int64(consumed))
 }
 
-// grow returns b with room for exactly n more bytes. slices.Grow would take
-// the append rule past that, and the size asked for here is already the
-// estimate.
+// grow returns b with room for n more bytes, from the pool, and returns the
+// old storage to it.
 func grow(b []byte, n int) []byte {
 	if cap(b)-len(b) >= n {
 		return b
 	}
-	nb := make([]byte, len(b), len(b)+n)
-	copy(nb, b)
+	nb := append(bufpool.Get(len(b)+n), b...)
+	bufpool.Put(b)
 	return nb
 }
 

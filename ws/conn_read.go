@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"github.com/33TU/ews/internal/bufpool"
 	"io"
 	"slices"
 	"sync"
@@ -220,13 +221,23 @@ func (c *Conn) growMsg(msg []byte, n int) []byte {
 		msg = c.msg.b[:0]
 	}
 
-	msg = slices.Grow(msg, n)
+	// Past poolKeep the storage comes from the size-class pool, and the
+	// buffer it replaces goes back there when it came from there.
+	if need := len(msg) + n; need > cap(msg) && need > poolKeep {
+		msg = append(bufpool.Get(need), msg...)
+		bufpool.Put(c.msg.b)
+	} else {
+		msg = slices.Grow(msg, n)
+	}
 	c.msg.b = msg
 	return msg
 }
 
+// appendMsg adds a chunk, reserving the rest of its frame as well: the
+// header says how much is still to come, so a message in one frame is
+// assembled with one allocation whatever its size.
 func (c *Conn) appendMsg(msg, chunk []byte) []byte {
-	msg = c.growMsg(msg, len(chunk))
+	msg = c.growMsg(msg, len(chunk)+int(c.rx.Remaining()))
 	msg = append(msg, chunk...)
 	c.msg.b = msg
 	return msg
@@ -234,10 +245,12 @@ func (c *Conn) appendMsg(msg, chunk []byte) []byte {
 
 func (c *Conn) releaseMsg() {
 	if c.msg != nil {
-		if cap(c.msg.b) <= poolKeep {
-			c.msg.b = c.msg.b[:0]
-			msgPool.Put(c.msg)
+		if cap(c.msg.b) > poolKeep {
+			bufpool.Put(c.msg.b)
+			c.msg.b = nil
 		}
+		c.msg.b = c.msg.b[:0]
+		msgPool.Put(c.msg)
 		c.msg = nil
 	}
 }

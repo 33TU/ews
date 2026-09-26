@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"github.com/33TU/ews/internal/bufpool"
 	"net"
 	"sync"
 
@@ -198,6 +199,12 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 			q.cur = arenaPool.Get().(*arena)
 		}
 		start := len(q.cur.b)
+		if need := start + n; need > cap(q.cur.b) && need > poolKeep {
+			// Past poolKeep the arena moves to size-class storage.
+			b := append(bufpool.Get(need), q.cur.b...)
+			bufpool.Put(q.cur.b)
+			q.cur.b = b
+		}
 		q.cur.b = append(append(q.cur.b, header...), body...)
 		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
 	}
@@ -262,6 +269,8 @@ func (q *Queue) run() {
 			if cap(a.b) <= poolKeep {
 				a.b = a.b[:0]
 				arenaPool.Put(a)
+			} else {
+				bufpool.Put(a.b)
 			}
 		}
 
@@ -312,8 +321,18 @@ func (q *Queue) flush() error {
 		return err
 	}
 
+	total := 0
+	for _, s := range q.flushSegments {
+		total += len(s.ext) + s.end - s.start
+	}
+	// A coalescing buffer holds a burst of small frames; anything larger
+	// is served from the size-class pool for the one write.
 	buf := writePool.Get().(*[]byte)
 	out := (*buf)[:0]
+	pooled := total > cap(out)
+	if pooled {
+		out = bufpool.Get(total)
+	}
 	for _, s := range q.flushSegments {
 		if s.ext != nil {
 			out = append(out, s.ext...)
@@ -321,10 +340,12 @@ func (q *Queue) flush() error {
 			out = append(out, q.flushing.b[s.start:s.end]...)
 		}
 	}
-	*buf = out
 	_, err := c.conn.Write(out)
-	if cap(out) <= poolKeep {
-		writePool.Put(buf)
+	if pooled {
+		bufpool.Put(out)
+	} else {
+		*buf = out
 	}
+	writePool.Put(buf)
 	return err
 }
