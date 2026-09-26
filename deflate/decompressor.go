@@ -1,9 +1,9 @@
 package deflate
 
 import (
+	"bytes"
 	"errors"
 	"io"
-	"slices"
 
 	"github.com/klauspost/compress/flate"
 )
@@ -39,7 +39,12 @@ type resetReader interface {
 // turn; context takeover lives in the Window passed to each call.
 // The zero value is ready to use.
 type Decompressor struct {
-	reader    resetReader
+	reader resetReader
+	// Slice mode feeds the inflater a bytes.Reader over the payload and tail
+	// copied into in, which selects its fast path; the generic reader path
+	// costs a call per byte. Streaming feeds it input, chunk by chunk.
+	slice     bytes.Reader
+	in        []byte
 	input     messageReader
 	output    []byte  // Decompress result; also the reset dictionary in slice mode.
 	window    *Window // The current message's direction history, or nil.
@@ -71,15 +76,21 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 	// doubling. One extra byte lets a result at the limit be told apart
 	// from one past it.
 	if hint := min(4*len(payload), maxSize+1); cap(d.output) < hint {
-		d.output = slices.Grow(d.output, hint)
+		d.output = make([]byte, 0, hint)
 	}
 	for {
-		// Each read fills the spare capacity, and the buffer doubles when
-		// that runs low. A fixed step past a few hundred KB would leave the
-		// append rule adding a quarter per reallocation, and a large message
-		// then copies itself several times over on the way out.
-		if cap(d.output)-len(d.output) < 32<<10 {
-			d.output = slices.Grow(d.output, max(32<<10, len(d.output)))
+		// Each read fills the spare capacity, and the buffer grows once that
+		// is used up, not before: a message ending a few KB short of the
+		// capacity must not pay for room it never fills. It grows to the
+		// output the input consumed so far projects, with a sixteenth of
+		// slack, and by at least half again so a message that compresses
+		// unevenly still gets there in a few steps. A fixed step past a few
+		// hundred KB would leave the append rule adding a quarter per
+		// reallocation, and a large message then copies itself several
+		// times over on the way out.
+		if cap(d.output) == len(d.output) {
+			projected := d.projected()
+			d.output = grow(d.output, max(32<<10, len(d.output)/2, projected+projected/16))
 		}
 		size := cap(d.output) - len(d.output)
 		if remaining := maxSize - len(d.output); remaining < size {
@@ -92,7 +103,11 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 			d.finish(false)
 			return nil, ErrMessageTooLarge
 		}
-		if err == io.EOF {
+		if err == io.EOF || d.done {
+			// The inflater reports the end together with the last bytes.
+			// Finishing here, rather than on the next read, spares a full
+			// buffer a doubling that would only ever hold io.EOF.
+			d.finish(true)
 			return d.output, nil
 		}
 		if err != nil {
@@ -133,7 +148,7 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 			}
 		}
 		if err == io.EOF {
-			if d.input.exhausted() {
+			if d.exhausted() {
 				if n == 0 {
 					d.finish(true)
 					return 0, io.EOF
@@ -144,7 +159,7 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 
 			// RFC 7692 permits final DEFLATE blocks within a message; continue
 			// with the message so far as the dictionary.
-			if err := d.reader.Reset(&d.input, d.dict(n)); err != nil {
+			if err := d.reader.Reset(d.source(), d.dict(n)); err != nil {
 				return 0, d.fail(err)
 			}
 			if n != 0 {
@@ -174,6 +189,22 @@ func (d *Decompressor) Reset() {
 func (d *Decompressor) ReleaseOutput() {
 	d.Reset()
 	d.output = nil
+	d.in = nil
+}
+
+// source is the reader the inflater draws from in the current mode.
+func (d *Decompressor) source() io.Reader {
+	if d.streaming {
+		return &d.input
+	}
+	return &d.slice
+}
+
+func (d *Decompressor) exhausted() bool {
+	if d.streaming {
+		return d.input.exhausted()
+	}
+	return d.slice.Len() == 0
 }
 
 func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
@@ -182,16 +213,21 @@ func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {
 	}
 	d.window = w
 	d.scratch.Reset()
-	d.input = messageReader{src: src, payload: payload, tail: inflateTail[:], eof: src == nil}
 	d.streaming = src != nil
+	if d.streaming {
+		d.input = messageReader{src: src, tail: inflateTail[:]}
+	} else {
+		d.in = append(append(d.in[:0], payload...), inflateTail[:]...)
+		d.slice.Reset(d.in)
+	}
 	d.kept = 0
 	d.active, d.done = true, false
 
 	if d.reader == nil {
-		d.reader = flate.NewReaderDict(&d.input, w.dict()).(resetReader)
+		d.reader = flate.NewReaderDict(d.source(), w.dict()).(resetReader)
 		return nil
 	}
-	if err := d.reader.Reset(&d.input, w.dict()); err != nil {
+	if err := d.reader.Reset(d.source(), w.dict()); err != nil {
 		return d.fail(err)
 	}
 	return nil
@@ -239,13 +275,41 @@ func (d *Decompressor) finish(ok bool) {
 
 	d.window = nil
 	d.input = messageReader{}
+	d.slice.Reset(nil)
 	d.active, d.done, d.streaming = false, false, false
+}
+
+// projected estimates the output still to come in slice mode from the
+// ratio of output to input so far. Before the first byte, or streaming, it
+// is zero.
+func (d *Decompressor) projected() int {
+	if d.streaming {
+		return 0
+	}
+	remaining := d.slice.Len()
+	consumed := len(d.in) - remaining
+	if consumed <= 0 {
+		return 0
+	}
+	return int(int64(len(d.output)) * int64(remaining) / int64(consumed))
+}
+
+// grow returns b with room for exactly n more bytes. slices.Grow would take
+// the append rule past that, and the size asked for here is already the
+// estimate.
+func grow(b []byte, n int) []byte {
+	if cap(b)-len(b) >= n {
+		return b
+	}
+	nb := make([]byte, len(b), len(b)+n)
+	copy(nb, b)
+	return nb
 }
 
 // Restore the stripped sync-flush tail, then terminate the DEFLATE stream.
 var inflateTail = [...]byte{0, 0, 0xff, 0xff, 1, 0, 0, 0xff, 0xff}
 
-// messageReader feeds the inflater from a slice or a ChunkSource, then the tail.
+// messageReader feeds the inflater from a ChunkSource, then the tail.
 type messageReader struct {
 	src     ChunkSource
 	payload []byte
