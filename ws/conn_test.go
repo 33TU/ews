@@ -1505,3 +1505,63 @@ type rwConn struct {
 	io.Writer
 	nopConn
 }
+
+// TestLargeMessagesPooled round trips messages past poolKeep, plain and
+// compressed, written directly and through a Queue, and checks every byte.
+// Their storage comes from the size-class pool and is reused across
+// messages of different classes, so stale contents would show here.
+func TestLargeMessagesPooled(t *testing.T) {
+	sizes := []int{2<<20 + 123, 3<<20 + 7, 1<<20 + 1, 2<<20 + 123}
+	msgs := make([][]byte, len(sizes))
+	for i, size := range sizes {
+		// Distinct per message and compressible.
+		msgs[i] = make([]byte, size)
+		for j := range msgs[i] {
+			msgs[i][j] = byte(j*7 + i*13)
+		}
+	}
+	for _, compressed := range []bool{false, true} {
+		for _, queued := range []bool{false, true} {
+			t.Run(fmt.Sprintf("compressed=%t/queued=%t", compressed, queued), func(t *testing.T) {
+				var sc, cc ws.Config
+				if compressed {
+					sc.Compression = &handshake.Compression{Level: flate.BestSpeed, MinSize: 1, SendContextTakeover: true, ReceiveContextTakeover: true}
+					cc.Compression = &handshake.Compression{Level: flate.BestSpeed, MinSize: 1, SendContextTakeover: true, ReceiveContextTakeover: true}
+				}
+				server, client := pair(t, sc, cc)
+				wait := run(t, func() error {
+					var q *ws.Queue
+					if queued {
+						q = client.NewQueue(64 << 20)
+					}
+					for range 2 {
+						for _, m := range msgs {
+							var err error
+							if queued {
+								err = q.Send(codec.Binary, m)
+							} else {
+								err = client.Write(codec.Binary, m)
+							}
+							if err != nil {
+								return err
+							}
+						}
+					}
+					if queued {
+						return q.Wait()
+					}
+					return nil
+				})
+				for round := range 2 {
+					for i, m := range msgs {
+						op, got, err := server.ReadMessage()
+						if err != nil || op != codec.Binary || !bytes.Equal(got, m) {
+							t.Fatalf("round %d message %d: op %d, %d bytes, %v", round, i, op, len(got), err)
+						}
+					}
+				}
+				wait()
+			})
+		}
+	}
+}

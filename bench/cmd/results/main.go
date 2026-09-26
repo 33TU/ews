@@ -383,10 +383,13 @@ func rowCells(label string) string {
 	for d := range strings.SplitSeq(label, "/") {
 		k, v, _ := strings.Cut(d, "=")
 		if n, err := strconv.Atoi(v); err == nil && k == "size" {
-			if n < 1024 {
+			switch {
+			case n < 1024:
 				v = fmt.Sprintf("%d B", n)
-			} else {
+			case n < 1<<20:
 				v = fmt.Sprintf("%d KiB", n/1024)
+			default:
+				v = fmt.Sprintf("%d MiB", n/(1<<20))
 			}
 		}
 		out = append(out, v)

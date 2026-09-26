@@ -32,10 +32,11 @@ const (
 	DefaultMinSize = 128
 )
 
-// poolKeep is the largest buffer returned to a pool. An arena, message
-// buffer, decompressor or coalescing buffer that grew past it is dropped
-// instead, so a rare huge message or burst does not pin memory in every
-// pool it touched.
+// poolKeep is the largest buffer kept by the pools of small, frequent
+// buffers. An arena, message buffer or decompressor output that grew past
+// it goes to the size-class pool in internal/bufpool instead, so a huge
+// message is served from storage of its own class and does not pin memory
+// in a pool meant for small ones.
 const poolKeep = 1 << 20
 
 // Config describes the local endpoint and negotiated parameters.
