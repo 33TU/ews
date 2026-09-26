@@ -17,53 +17,53 @@
     <rect x="74" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
     <text class="value" x="107" y="46.0" text-anchor="middle">77 MB/s</text>
     <text class="series" x="107" y="62.0" text-anchor="middle">0 allocs</text>
-    <rect x="149" y="70.2" width="66" height="299.8" rx="4" fill="#ef8354"/>
-    <text class="value" x="182" y="46.2" text-anchor="middle">77 MB/s</text>
-    <text class="series" x="182" y="62.2" text-anchor="middle">1 alloc</text>
-    <rect x="224" y="131.3" width="66" height="238.7" rx="4" fill="#b388eb"/>
-    <text class="value" x="257" y="107.3" text-anchor="middle">61 MB/s</text>
-    <text class="series" x="257" y="123.3" text-anchor="middle">13 allocs</text>
-    <rect x="299" y="93.6" width="66" height="276.4" rx="4" fill="#c9a86a"/>
-    <text class="value" x="332" y="69.6" text-anchor="middle">71 MB/s</text>
-    <text class="series" x="332" y="85.6" text-anchor="middle">9 allocs</text>
+    <rect x="149" y="71.2" width="66" height="298.8" rx="4" fill="#ef8354"/>
+    <text class="value" x="182" y="47.2" text-anchor="middle">77 MB/s</text>
+    <text class="series" x="182" y="63.2" text-anchor="middle">1 alloc</text>
+    <rect x="224" y="133.0" width="66" height="237.0" rx="4" fill="#b388eb"/>
+    <text class="value" x="257" y="109.0" text-anchor="middle">61 MB/s</text>
+    <text class="series" x="257" y="125.0" text-anchor="middle">13 allocs</text>
+    <rect x="299" y="93.4" width="66" height="276.6" rx="4" fill="#c9a86a"/>
+    <text class="value" x="332" y="69.4" text-anchor="middle">71 MB/s</text>
+    <text class="series" x="332" y="85.4" text-anchor="middle">9 allocs</text>
     <text class="group" x="573" y="400" text-anchor="middle">1 KiB messages</text>
     <rect x="426" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
-    <text class="value" x="459" y="46.0" text-anchor="middle">926 MB/s</text>
+    <text class="value" x="459" y="46.0" text-anchor="middle">923 MB/s</text>
     <text class="series" x="459" y="62.0" text-anchor="middle">0 allocs</text>
-    <rect x="501" y="75.8" width="66" height="294.2" rx="4" fill="#ef8354"/>
-    <text class="value" x="534" y="51.8" text-anchor="middle">908 MB/s</text>
-    <text class="series" x="534" y="67.8" text-anchor="middle">1 alloc</text>
-    <rect x="576" y="139.4" width="66" height="230.6" rx="4" fill="#b388eb"/>
-    <text class="value" x="609" y="115.4" text-anchor="middle">712 MB/s</text>
-    <text class="series" x="609" y="131.4" text-anchor="middle">16 allocs</text>
-    <rect x="651" y="109.9" width="66" height="260.1" rx="4" fill="#c9a86a"/>
-    <text class="value" x="684" y="85.9" text-anchor="middle">803 MB/s</text>
-    <text class="series" x="684" y="101.9" text-anchor="middle">12 allocs</text>
+    <rect x="501" y="73.7" width="66" height="296.3" rx="4" fill="#ef8354"/>
+    <text class="value" x="534" y="49.7" text-anchor="middle">912 MB/s</text>
+    <text class="series" x="534" y="65.7" text-anchor="middle">1 alloc</text>
+    <rect x="576" y="140.3" width="66" height="229.7" rx="4" fill="#b388eb"/>
+    <text class="value" x="609" y="116.3" text-anchor="middle">707 MB/s</text>
+    <text class="series" x="609" y="132.3" text-anchor="middle">16 allocs</text>
+    <rect x="651" y="111.2" width="66" height="258.8" rx="4" fill="#c9a86a"/>
+    <text class="value" x="684" y="87.2" text-anchor="middle">796 MB/s</text>
+    <text class="series" x="684" y="103.2" text-anchor="middle">12 allocs</text>
     <text class="group" x="925" y="400" text-anchor="middle">16 KiB messages</text>
     <rect x="778" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
-    <text class="value" x="811" y="46.0" text-anchor="middle">7.8 GB/s</text>
+    <text class="value" x="811" y="46.0" text-anchor="middle">7.7 GB/s</text>
     <text class="series" x="811" y="62.0" text-anchor="middle">0 allocs</text>
-    <rect x="853" y="75.5" width="66" height="294.5" rx="4" fill="#ef8354"/>
-    <text class="value" x="886" y="51.5" text-anchor="middle">7.7 GB/s</text>
-    <text class="series" x="886" y="67.5" text-anchor="middle">1 alloc</text>
-    <rect x="928" y="194.2" width="66" height="175.8" rx="4" fill="#b388eb"/>
-    <text class="value" x="961" y="170.2" text-anchor="middle">4.6 GB/s</text>
-    <text class="series" x="961" y="186.2" text-anchor="middle">25 allocs</text>
-    <rect x="1003" y="184.6" width="66" height="185.4" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1036" y="160.6" text-anchor="middle">4.8 GB/s</text>
-    <text class="series" x="1036" y="176.6" text-anchor="middle">21 allocs</text>
+    <rect x="853" y="73.9" width="66" height="296.1" rx="4" fill="#ef8354"/>
+    <text class="value" x="886" y="49.9" text-anchor="middle">7.6 GB/s</text>
+    <text class="series" x="886" y="65.9" text-anchor="middle">1 alloc</text>
+    <rect x="928" y="196.8" width="66" height="173.2" rx="4" fill="#b388eb"/>
+    <text class="value" x="961" y="172.8" text-anchor="middle">4.5 GB/s</text>
+    <text class="series" x="961" y="188.8" text-anchor="middle">25 allocs</text>
+    <rect x="1003" y="185.4" width="66" height="184.6" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1036" y="161.4" text-anchor="middle">4.8 GB/s</text>
+    <text class="series" x="1036" y="177.4" text-anchor="middle">21 allocs</text>
     <text class="group" x="1277" y="400" text-anchor="middle">256 KiB messages</text>
     <rect x="1130" y="70.0" width="66" height="300.0" rx="4" fill="#50c878"/>
-    <text class="value" x="1163" y="46.0" text-anchor="middle">23.1 GB/s</text>
+    <text class="value" x="1163" y="46.0" text-anchor="middle">23.0 GB/s</text>
     <text class="series" x="1163" y="62.0" text-anchor="middle">0 allocs</text>
-    <rect x="1205" y="272.4" width="66" height="97.6" rx="4" fill="#ef8354"/>
-    <text class="value" x="1238" y="248.4" text-anchor="middle">7.5 GB/s</text>
-    <text class="series" x="1238" y="264.4" text-anchor="middle">18 allocs</text>
-    <rect x="1280" y="231.4" width="66" height="138.6" rx="4" fill="#b388eb"/>
-    <text class="value" x="1313" y="207.4" text-anchor="middle">10.7 GB/s</text>
-    <text class="series" x="1313" y="223.4" text-anchor="middle">35 allocs</text>
-    <rect x="1355" y="230.9" width="66" height="139.1" rx="4" fill="#c9a86a"/>
-    <text class="value" x="1388" y="206.9" text-anchor="middle">10.7 GB/s</text>
-    <text class="series" x="1388" y="222.9" text-anchor="middle">31 allocs</text>
+    <rect x="1205" y="269.5" width="66" height="100.5" rx="4" fill="#ef8354"/>
+    <text class="value" x="1238" y="245.5" text-anchor="middle">7.7 GB/s</text>
+    <text class="series" x="1238" y="261.5" text-anchor="middle">18 allocs</text>
+    <rect x="1280" y="232.9" width="66" height="137.1" rx="4" fill="#b388eb"/>
+    <text class="value" x="1313" y="208.9" text-anchor="middle">10.5 GB/s</text>
+    <text class="series" x="1313" y="224.9" text-anchor="middle">35 allocs</text>
+    <rect x="1355" y="231.6" width="66" height="138.4" rx="4" fill="#c9a86a"/>
+    <text class="value" x="1388" y="207.6" text-anchor="middle">10.6 GB/s</text>
+    <text class="series" x="1388" y="223.6" text-anchor="middle">31 allocs</text>
   </g>
 </svg>
