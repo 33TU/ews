@@ -277,6 +277,12 @@ it takes:
 | gws_std  | 5,809                             | 343% |
 | gws      | 5,719                             | 348% |
 
+That table is plaintext. The same test over TLS narrows it, since encryption
+is a cost none of them avoid: ews answers the whole offered load on 341
+percent CPU while gws and ews_sync sit near 445 and fall far enough behind
+that the client stops writing to them, so the lead becomes 1.36 times the
+echoes per CPU point rather than 1.8.
+
 And at 256 KiB payloads over 10,000 connections, where every library reaches the
 loopback ceiling, memory follows what each holds per message:
 
