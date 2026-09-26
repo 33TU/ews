@@ -308,8 +308,17 @@ is a larger lever than anything in this library, and the useful direction
 is to cap it rather than raise it. Linux autotunes it into the megabytes; a
 sender that fills one puts more in flight than the reader consumes while it
 is still cache-resident, so the payload makes a round trip to memory on the
-way. Delivering 6 MiB to 128 loopback connections, with no WebSocket work
-at all so that only the socket varies:
+way.
+
+This needs a connection to be backlogged past a buffer's worth before it
+applies, which means fan-out or streaming. A request-response server never
+gets there, whatever its messages weigh: with one message in flight per
+connection the buffer never fills, autotuning never grows it, and a cap has
+nothing to take away. Capping both buffers on every server in the 10k-
+connection echo harness moved nothing at 1 KiB or at 256 KiB.
+
+Where it does apply, delivering 6 MiB to 128 loopback connections, with no
+WebSocket work at all so that only the socket varies:
 
 | `SO_SNDBUF` | throughput |
 |---|---|
@@ -320,10 +329,12 @@ at all so that only the socket varies:
 | 512 KiB | 94.5 GB/s |
 | 2 MiB | 68.8 GB/s |
 
-It is the send buffer alone: capping it and leaving the receive buffer
-autotuned measured 112.7 GB/s, and doing the opposite measured 50.9, which
-is what the default already gives. Below about 64 KiB the extra syscalls
-cost more than the cache saves.
+In that one-directional shape it is the send buffer that does the work:
+capping it and leaving the receive buffer autotuned measured 112.7 GB/s,
+and doing the opposite measured 50.9, which is what the default already
+gives. Traffic that carries payload both ways puts the receive buffer in
+the other leg, so the two are usually set together. Below about 64 KiB the
+extra syscalls cost more than the cache saves.
 
 ews never sets this. Every path hands you the socket, so a cap goes in
 `net.ListenConfig.Control` for a whole listener, or beside `NewConn` for
