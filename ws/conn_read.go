@@ -237,7 +237,10 @@ func (c *Conn) growMsg(msg []byte, n int) []byte {
 	if need <= poolKeep {
 		msg = append(make([]byte, 0, min(max(need, 2*cap(msg)), poolKeep)), msg...)
 	} else {
-		grown := append(bufpool.Get(need), msg...)
+		// A fragmented message's total is unknown, so the last assembled
+		// message's size is the reservation, and a repeat of it is gathered
+		// with one copy instead of one per class.
+		grown := append(bufpool.Get(max(need, c.msgHint)), msg...)
 		if cap(msg) > poolKeep {
 			bufpool.Put(msg)
 		} else {
@@ -322,6 +325,7 @@ func (c *Conn) assemble() ([]byte, error) {
 				return nil, c.fail(err)
 			}
 			if done && len(msg) == 0 && !c.rx.MessageOpen() {
+				c.msgHint = 0
 				return chunk, nil
 			}
 			if len(chunk) != 0 || done {
@@ -347,6 +351,7 @@ func (c *Conn) assemble() ([]byte, error) {
 		}
 
 		if !c.rx.MessageOpen() {
+			c.msgHint = len(msg)
 			return msg, nil
 		}
 		if err := c.nextFrame(); err != nil {
