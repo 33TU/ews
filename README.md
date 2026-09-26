@@ -14,22 +14,22 @@ Requires Go 1.27. Passes the full Autobahn test suite.
 ![Echo by payload size, compressed without context takeover, 128 connections](bench/echo/echo-sizes-nocontext.svg)
 
 Echo throughput with permessage-deflate on, one round trip at a time per
-connection, on a 9950X3D. With context takeover the lead is the compressor
-that stays attached to the connection; without it the libraries tie until
-the allocations of a 256 KiB message separate them. Uncompressed, every
-well-built Go library ties on this test up to 16 KiB and ews pulls ahead at
-256 KiB; [bench/](bench/README.md) has that chart and the rest.
+connection, on a 9950X3D. With context takeover the lead is the compressor that
+stays attached to the connection; without it the libraries tie until the
+allocations of a 256 KiB message separate them. Uncompressed, every well-built
+Go library ties on this test up to 16 KiB and ews pulls ahead at 256 KiB;
+[bench/](bench/README.md) has that chart and the rest.
 
 ## Packages
 
-| package | what it does |
-|---|---|
-| `ws` | connections: read and write messages over an upgraded transport |
-| `transport` | get a connection: `Upgrade` inside `net/http`, `Server` without it, `Dial` for clients |
-| `events` | serve connections through a handler with one method per event, over `transport` and `ws.Serve` |
-| `handshake` | the opening handshake rules, including `permessage-deflate` negotiation |
-| `codec` | frame encoding and decoding |
-| `deflate` | per-message compression with context takeover |
+| package     | what it does                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `ws`        | connections: read and write messages over an upgraded transport                                |
+| `transport` | get a connection: `Upgrade` inside `net/http`, `Server` without it, `Dial` for clients         |
+| `events`    | serve connections through a handler with one method per event, over `transport` and `ws.Serve` |
+| `handshake` | the opening handshake rules, including `permessage-deflate` negotiation                        |
+| `codec`     | frame encoding and decoding                                                                    |
+| `deflate`   | per-message compression with context takeover                                                  |
 
 ## Server
 
@@ -58,8 +58,8 @@ ln, _ := net.Listen("tcp", ":8080")
 log.Fatal(server.Serve(ln))
 ```
 
-Inside an existing `net/http` handler, `transport.Upgrade(w, r, opts)` returns the
-same `conn, res` pair. Read on a goroutine of your own and return from the
+Inside an existing `net/http` handler, `transport.Upgrade(w, r, opts)` returns
+the same `conn, res` pair. Read on a goroutine of your own and return from the
 handler: `net/http` keeps about 10 KB of request state alive until it returns,
 100 MB at ten thousand connections. The read loop above is what `ws.Serve` does:
 
@@ -69,10 +69,10 @@ err := ws.Serve(c, ws.MessageFunc(func(c *ws.Conn, op codec.Opcode, payload []by
 }))
 ```
 
-Or as a handler with one method per event, the shape a gws handler takes.
-Every event is written out below to show the interface; `events.Base`
-supplies defaults for whatever a handler leaves out, and a panic in a handler
-ends that connection rather than the process. The whole `echo-events` example:
+Or as a handler with one method per event, the shape a gws handler takes. Every
+event is written out below to show the interface; `events.Base` supplies
+defaults for whatever a handler leaves out, and a panic in a handler ends that
+connection rather than the process. The whole `echo-events` example:
 
 ```go
 // echo serves every connection. The read deadline set on open is refreshed
@@ -139,8 +139,8 @@ c, err := ws.NewConn(conn, ws.Config{Role: ws.Client, Compression: res.Compressi
 ```
 
 Or with the events shape, where `Dial` runs the handler until the connection
-ends and returns the error `OnClose` saw, so a reconnect loop is a loop over
-it. State you have at dial time reaches `OnOpen` through `Config.UserData`:
+ends and returns the error `OnClose` saw, so a reconnect loop is a loop over it.
+State you have at dial time reaches `OnOpen` through `Config.UserData`:
 
 ```go
 type client struct{ events.Base }
@@ -162,20 +162,20 @@ Three ways to read, one goroutine at a time:
 - `ReadMessage()` returns the whole message, valid until the next read.
 - `NextMessage()` then `Read(b)` delivers it in chunks as frames arrive, ending
   with `io.EOF`. Compressed messages inflate as they stream.
-- `WriteTo(w)` relays the rest of the message to an `io.Writer`; `io.Copy`
-  uses it.
+- `WriteTo(w)` relays the rest of the message to an `io.Writer`; `io.Copy` uses
+  it.
 
 Writing from any goroutine:
 
 - `Write(op, p)` sends one message.
-- `BeginMessage`, `WriteChunk`, `EndMessage` send a message of unknown length
-  as fragments; `WriteFrom(op, r)` does that for an `io.Reader`.
-- `NewQueue(limit)` gives an asynchronous queue that coalesces a burst into
-  one write and refuses with `ErrQueueFull` past its limit instead of
-  blocking on a slow peer.
+- `BeginMessage`, `WriteChunk`, `EndMessage` send a message of unknown length as
+  fragments; `WriteFrom(op, r)` does that for an `io.Reader`.
+- `NewQueue(limit)` gives an asynchronous queue that coalesces a burst into one
+  write and refuses with `ErrQueueFull` past its limit instead of blocking on a
+  slow peer.
 - `Prepare(op, p)` encodes a message once for every recipient; hand it to
-  `WritePrepared` or a queue's `SendPrepared`. `PrepareAppend` lets an
-  encoder marshal straight into the frame.
+  `WritePrepared` or a queue's `SendPrepared`. `PrepareAppend` lets an encoder
+  marshal straight into the frame.
 - `NetConn(c, op)` turns the connection into a `net.Conn` for tunneling.
 
 Pings are answered and close frames echoed by the default `ControlHandler`.
@@ -185,25 +185,27 @@ closing it is yours, through `Transport()` if you no longer hold it.
 
 ## Examples
 
-Runnable programs under `examples/`, each started with `go run ./examples/<name>`:
+Runnable programs under `examples/`, each started with
+`go run ./examples/<name>`:
 
-| Program | Shows |
-|---|---|
-| `echo` | `transport.Server` with the synchronous read and write loop; the shape the Autobahn suite tests |
-| `echo-http` | the same behind an `http.Handler` through `transport.Upgrade`, using `ws.Serve`, with optional TLS |
-| `echo-stream` | relaying each message frame by frame with `NextMessage` and `WriteFrom`, memory bounded by `FragmentSize` |
-| `echo-queue` | replies through a `Queue`, so a slow peer is dropped at its limit instead of stalling the reader |
-| `echo-events` | the same server as an `events.Handler`, one method per event, the shape a gws handler takes |
-| `broadcast` | a hub with a queue per connection, one ping ticker, and a read deadline |
-| `client` | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo |
-| `client-events` | the chat client as an `events.Handler` through `events.Dial`, with dial-time state in `UserData` |
-| `tunnel` | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
+| Program         | Shows                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `echo`          | `transport.Server` with the synchronous read and write loop; the shape the Autobahn suite tests                |
+| `echo-http`     | the same behind an `http.Handler` through `transport.Upgrade`, using `ws.Serve`, with optional TLS             |
+| `echo-stream`   | relaying each message frame by frame with `NextMessage` and `WriteFrom`, memory bounded by `FragmentSize`      |
+| `echo-queue`    | replies through a `Queue`, so a slow peer is dropped at its limit instead of stalling the reader               |
+| `echo-events`   | the same server as an `events.Handler`, one method per event, the shape a gws handler takes                    |
+| `broadcast`     | a hub with a queue per connection, one ping ticker, and a read deadline                                        |
+| `client`        | `transport.Dial`; types lines to any of the servers, or streams a file through one and checks the echo         |
+| `client-events` | the chat client as an `events.Handler` through `events.Dial`, with dial-time state in `UserData`               |
+| `tunnel`        | TCP over WebSocket both ways with `NetConn`, so `io.Copy` carries any protocol; `ssh` through a WebSocket port |
 
 The read, write, queue, prepare and tunnel methods have runnable examples on
-[pkg.go.dev](https://pkg.go.dev/github.com/33TU/ews/ws#pkg-examples). Four
-that show what is particular to ews:
+[pkg.go.dev](https://pkg.go.dev/github.com/33TU/ews/ws#pkg-examples). Four that
+show what is particular to ews:
 
-Read a message in chunks as its frames arrive, inflating compressed ones on the way:
+Read a message in chunks as its frames arrive, inflating compressed ones on the
+way:
 
 ```go
 op, err := c.NextMessage()
@@ -217,7 +219,8 @@ for {
 }
 ```
 
-Send a burst without waiting on the peer; a client more than 1 MiB behind is dropped:
+Send a burst without waiting on the peer; a client more than 1 MiB behind is
+dropped:
 
 ```go
 q := c.NewQueue(1 << 20)
@@ -248,97 +251,95 @@ io.Copy(upstream, nc)
 
 ## Compression
 
-Pass the negotiated `res.Compression` into `ws.Config` and messages of at
-least `MinSize` bytes, 128 by default, are compressed. A connection with
-send context takeover keeps a compressor attached, about 800 KB, and is
-fastest on small messages; `CompressionShared: true` borrows a pooled one per
-message instead and wins on large messages once hundreds of connections
-compete for cache.
+Pass the negotiated `res.Compression` into `ws.Config` and messages of at least
+`MinSize` bytes, 128 by default, are compressed. A connection with send context
+takeover keeps a compressor attached, about 800 KB, and is fastest on small
+messages; `CompressionShared: true` borrows a pooled one per message instead and
+wins on large messages once hundreds of connections compete for cache.
 
 ## Performance
 
 Uncompressed echo sits within a few percent of a raw TCP echo for every
 well-built Go library; the differences are in compression, large messages,
-fan-out, memory and allocations, where ews allocates nothing on the hot
-paths. Two results stand out. In lxzan's
-[go-websocket-benchmark](https://github.com/33TU/go-websocket-benchmark),
-the harness behind gws's published chart, every server below answers the
-full offered load of the rate test at 10k connections, and the difference is
-the CPU it takes:
+fan-out, memory and allocations, where ews allocates nothing on the hot paths.
+Two results stand out. In lxzan's
+[go-websocket-benchmark](https://github.com/33TU/go-websocket-benchmark), the
+harness behind gws's published chart, every server below answers the full
+offered load of the rate test at 10k connections, and the difference is the CPU
+it takes:
 
-| server | echoes per second per CPU percent | CPU |
-|---|---|---|
-| ews | 10,222 | 195% |
-| ews_sync | 6,008 | 331% |
-| quickws | 5,897 | 337% |
-| nbio_std | 5,851 | 341% |
-| gws_std | 5,809 | 343% |
-| gws | 5,719 | 348% |
+| server   | echoes per second per CPU percent | CPU  |
+| -------- | --------------------------------- | ---- |
+| ews      | 10,222                            | 195% |
+| ews_sync | 6,008                             | 331% |
+| quickws  | 5,897                             | 337% |
+| nbio_std | 5,851                             | 341% |
+| gws_std  | 5,809                             | 343% |
+| gws      | 5,719                             | 348% |
 
-And at 256 KiB payloads over 10,000 connections, where every library reaches
-the loopback ceiling, memory follows what each holds per message:
+And at 256 KiB payloads over 10,000 connections, where every library reaches the
+loopback ceiling, memory follows what each holds per message:
 
-| server | echoes/s | median round trip | CPU | memory |
-|---|---|---|---|---|
-| ews | 16,506 | 9.5 ms | 158% | 147 MB |
-| ews_sync | 16,681 | 7.1 ms | 163% | 162 MB |
-| nbio_std | 16,706 | 9.9 ms | 177% | 331 MB |
-| gws | 13,362 | 17.5 ms | 423% | 326 MB |
-| gorilla | 14,874 | 8.3 ms | 111% | 4.99 GB |
-| quickws | 14,202 | 14.5 ms | 231% | 5.35 GB |
-| nettyws | 12,995 | 14.5 ms | 208% | 9.99 GB |
+| server   | echoes/s | median round trip | CPU  | memory  |
+| -------- | -------- | ----------------- | ---- | ------- |
+| ews      | 16,506   | 9.5 ms            | 158% | 147 MB  |
+| ews_sync | 16,681   | 7.1 ms            | 163% | 162 MB  |
+| nbio_std | 16,706   | 9.9 ms            | 177% | 331 MB  |
+| gws      | 13,362   | 17.5 ms           | 423% | 326 MB  |
+| gorilla  | 14,874   | 8.3 ms            | 111% | 4.99 GB |
+| quickws  | 14,202   | 14.5 ms           | 231% | 5.35 GB |
+| nettyws  | 12,995   | 14.5 ms           | 208% | 9.99 GB |
 
-The ews, ews_sync and gws rows are from a 2026-09-27 rerun at the PR #11
-merge, with gws before and after as drift check; the other rows are from the
-2026-09-17 suite on the same machine, pinned the same way. Every run is in
-the fork's results directory.
+The ews, ews_sync and gws rows are from a 2026-09-27 rerun at the PR #11 merge,
+with gws before and after as drift check; the other rows are from the 2026-09-17
+suite on the same machine, pinned the same way. Every run is in the fork's
+results directory.
 
 ![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
 
 ![Text validation, 128 connections](bench/utf8/utf8-128conn.svg)
 
-[bench/](bench/README.md) has the method, the compressed echo charts, the
-SIMD build's results, the TLS results and what is behind each number, with raw
-output committed so every table can be regenerated.
+[bench/](bench/README.md) has the method, the compressed echo charts, the SIMD
+build's results, the TLS results and what is behind each number, with raw output
+committed so every table can be regenerated.
 
 ## Tuning the socket
 
-Sending large messages to many connections at once, the socket send buffer
-is a larger lever than anything in this library, and the useful direction
-is to cap it rather than raise it. Linux autotunes it into the megabytes; a
-sender that fills one puts more in flight than the reader consumes while it
-is still cache-resident, so the payload makes a round trip to memory on the
-way.
+Sending large messages to many connections at once, the socket send buffer is a
+larger lever than anything in this library, and the useful direction is to cap
+it rather than raise it. Linux autotunes it into the megabytes; a sender that
+fills one puts more in flight than the reader consumes while it is still
+cache-resident, so the payload makes a round trip to memory on the way.
 
 This needs a connection to be backlogged past a buffer's worth before it
-applies, which means fan-out or streaming. A request-response server never
-gets there, whatever its messages weigh: with one message in flight per
-connection the buffer never fills, autotuning never grows it, and a cap has
-nothing to take away. Capping both buffers on every server in the 10k-
-connection echo harness moved nothing at 1 KiB or at 256 KiB.
+applies, which means fan-out or streaming. A request-response server never gets
+there, whatever its messages weigh: with one message in flight per connection
+the buffer never fills, autotuning never grows it, and a cap has nothing to take
+away. Capping both buffers on every server in the 10k- connection echo harness
+moved nothing at 1 KiB or at 256 KiB.
 
 Where it does apply, delivering 6 MiB to 128 loopback connections, with no
 WebSocket work at all so that only the socket varies:
 
 | `SO_SNDBUF` | throughput |
-|---|---|
-| autotuned | 50.6 GB/s |
-| 64 KiB | 96.7 GB/s |
-| 128 KiB | 107.8 GB/s |
-| 256 KiB | 109.2 GB/s |
-| 512 KiB | 94.5 GB/s |
-| 2 MiB | 68.8 GB/s |
+| ----------- | ---------- |
+| autotuned   | 50.6 GB/s  |
+| 64 KiB      | 96.7 GB/s  |
+| 128 KiB     | 107.8 GB/s |
+| 256 KiB     | 109.2 GB/s |
+| 512 KiB     | 94.5 GB/s  |
+| 2 MiB       | 68.8 GB/s  |
 
-In that one-directional shape it is the send buffer that does the work:
-capping it and leaving the receive buffer autotuned measured 112.7 GB/s,
-and doing the opposite measured 50.9, which is what the default already
-gives. Traffic that carries payload both ways puts the receive buffer in
-the other leg, so the two are usually set together. Below about 64 KiB the
-extra syscalls cost more than the cache saves.
+In that one-directional shape it is the send buffer that does the work: capping
+it and leaving the receive buffer autotuned measured 112.7 GB/s, and doing the
+opposite measured 50.9, which is what the default already gives. Traffic that
+carries payload both ways puts the receive buffer in the other leg, so the two
+are usually set together. Below about 64 KiB the extra syscalls cost more than
+the cache saves.
 
 ews never sets this. Every path hands you the socket, so a cap goes in
-`net.ListenConfig.Control` for a whole listener, or beside `NewConn` for
-one connection:
+`net.ListenConfig.Control` for a whole listener, or beside `NewConn` for one
+connection:
 
 ```go
 if tc, ok := conn.(*net.TCPConn); ok {
@@ -346,12 +347,12 @@ if tc, ok := conn.(*net.TCPConn); ok {
 }
 ```
 
-Measure it on your own traffic rather than adopting a number. The optimum
-moves with the message size, and past it the cap costs more than it buys:
-on the broadcast benchmark that same 256 KiB took the 6 MiB cell at 128
-connections from 44 ms per round to 32, and the 2 MiB cell from 3.8 to 10.
-Over a real network a small send buffer also caps throughput on any path
-with a bandwidth-delay product above it.
+Measure it on your own traffic rather than adopting a number. The optimum moves
+with the message size, and past it the cap costs more than it buys: on the
+broadcast benchmark that same 256 KiB took the 6 MiB cell at 128 connections
+from 44 ms per round to 32, and the 2 MiB cell from 3.8 to 10. Over a real
+network a small send buffer also caps throughput on any path with a
+bandwidth-delay product above it.
 
 ## Development
 
@@ -362,7 +363,7 @@ just autobahn        # needs podman or docker
 just bench-echo      # also bench-broadcast, bench-utf8, and -simd variants
 ```
 
-The benchmark recipes run at `GOMAXPROCS=8` so results from different
-machines measure the same shape; each results file records the thread count
-and library versions. The committed tables were run pinned to the eight cores
-of one die (`taskset -c 0-7`), so the threads share one L3.
+The benchmark recipes run at `GOMAXPROCS=8` so results from different machines
+measure the same shape; each results file records the thread count and library
+versions. The committed tables were run pinned to the eight cores of one die
+(`taskset -c 0-7`), so the threads share one L3.
