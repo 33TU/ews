@@ -66,6 +66,13 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 	}
 
 	d.output = d.output[:0]
+	// Reserve for the likely result up front: text and protobuf deflate to
+	// a quarter or less, so a message that size skips every intermediate
+	// doubling. One extra byte lets a result at the limit be told apart
+	// from one past it.
+	if hint := min(4*len(payload), maxSize+1); cap(d.output) < hint {
+		d.output = slices.Grow(d.output, hint)
+	}
 	for {
 		// Each read fills the spare capacity, and the buffer doubles when
 		// that runs low. A fixed step past a few hundred KB would leave the
@@ -159,6 +166,14 @@ func (d *Decompressor) Read(p []byte) (int, error) {
 func (d *Decompressor) Reset() {
 	d.finish(false)
 	d.output = d.output[:0]
+}
+
+// ReleaseOutput is Reset that also frees the output storage, for a caller
+// that keeps the decompressor across messages but not a large result. The
+// inflater and its window are kept.
+func (d *Decompressor) ReleaseOutput() {
+	d.Reset()
+	d.output = nil
 }
 
 func (d *Decompressor) begin(src ChunkSource, payload []byte, w *Window) error {

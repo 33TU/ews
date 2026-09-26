@@ -40,7 +40,7 @@ type decompressorContext struct {
 	dec       *deflate.Decompressor // Pooled; attached until the next read so borrowed output holds.
 	window    *deflate.Window       // Receive-direction history when takeover is negotiated.
 	streaming bool                  // Read is streaming the current message through the inflater.
-	large     bool                  // The last output outgrew poolKeep, so dec is dropped rather than pooled.
+	large     bool                  // The last output outgrew poolKeep, so dec is pooled without it.
 	srcErr    error                 // Transport error raised while feeding the inflater.
 }
 
@@ -173,14 +173,17 @@ func (c *Conn) acquireDecompressor() *deflate.Decompressor {
 	return c.decomp.dec
 }
 
+// A result that outgrew poolKeep is freed, the inflater behind it is
+// pooled either way: rebuilding it costs more than the window it holds.
 func (c *Conn) releaseDecompressor() {
 	if d := c.decomp.dec; d != nil {
 		c.decomp.dec = nil
 		if c.decomp.large {
 			c.decomp.large = false
-			return
+			d.ReleaseOutput()
+		} else {
+			d.Reset()
 		}
-		d.Reset()
 		decompressorPool.Put(d)
 	}
 }
