@@ -67,11 +67,17 @@ func (d *Decompressor) Decompress(payload []byte, maxSize int, w *Window) ([]byt
 
 	d.output = d.output[:0]
 	for {
-		size := 32 << 10
+		// Each read fills the spare capacity, and the buffer doubles when
+		// that runs low. A fixed step past a few hundred KB would leave the
+		// append rule adding a quarter per reallocation, and a large message
+		// then copies itself several times over on the way out.
+		if cap(d.output)-len(d.output) < 32<<10 {
+			d.output = slices.Grow(d.output, max(32<<10, len(d.output)))
+		}
+		size := cap(d.output) - len(d.output)
 		if remaining := maxSize - len(d.output); remaining < size {
 			size = remaining + 1
 		}
-		d.output = slices.Grow(d.output, size)
 
 		n, err := d.Read(d.output[len(d.output) : len(d.output)+size])
 		d.output = d.output[:len(d.output)+n]
