@@ -268,30 +268,30 @@ the CPU it takes:
 
 | server | echoes per second per CPU percent | CPU |
 |---|---|---|
-| ews | 10,432 | 191% |
-| ews_sync | 6,098 | 326% |
+| ews | 10,222 | 195% |
+| ews_sync | 6,008 | 331% |
 | quickws | 5,897 | 337% |
 | nbio_std | 5,851 | 341% |
 | gws_std | 5,809 | 343% |
-| gws | 5,765 | 346% |
+| gws | 5,719 | 348% |
 
 And at 256 KiB payloads over 10,000 connections, where every library reaches
 the loopback ceiling, memory follows what each holds per message:
 
 | server | echoes/s | median round trip | CPU | memory |
 |---|---|---|---|---|
-| ews | 16,375 | 8.5 ms | 156% | 151 MB |
-| ews_sync | 16,649 | 7.3 ms | 135% | 160 MB |
+| ews | 16,506 | 9.5 ms | 158% | 147 MB |
+| ews_sync | 16,681 | 7.1 ms | 163% | 162 MB |
 | nbio_std | 16,706 | 9.9 ms | 177% | 331 MB |
-| gws | 13,470 | 15.8 ms | 405% | 321 MB |
+| gws | 13,362 | 17.5 ms | 423% | 326 MB |
 | gorilla | 14,874 | 8.3 ms | 111% | 4.99 GB |
 | quickws | 14,202 | 14.5 ms | 231% | 5.35 GB |
 | nettyws | 12,995 | 14.5 ms | 208% | 9.99 GB |
 
-The ews, ews_sync and gws rows are from a 2026-09-26 rerun at v0.4.1, with
-gws before and after as drift check; the other rows are from the 2026-09-17
-suite on the same machine, pinned the same way. Both runs are in the fork's
-results directory.
+The ews, ews_sync and gws rows are from a 2026-09-27 rerun at the PR #11
+merge, with gws before and after as drift check; the other rows are from the
+2026-09-17 suite on the same machine, pinned the same way. Every run is in
+the fork's results directory.
 
 ![Broadcast, compressed](bench/broadcast/broadcast-compressed.svg)
 
