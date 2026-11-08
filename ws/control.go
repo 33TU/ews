@@ -30,7 +30,8 @@ func (DefaultControlHandler) OnPong(*Conn, []byte) error { return nil }
 //
 // On a connection with a Queue the echo goes out behind the queued data and
 // Close waits for it, so the reader waits until the backlog is written or
-// the queue fails.
+// the queue fails; Config.WriteTimeout bounds that wait for a peer that
+// stopped reading.
 func (DefaultControlHandler) OnClose(c *Conn, code uint16, _ []byte) error {
 	if code == NoStatus {
 		code = 0

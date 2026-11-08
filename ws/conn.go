@@ -76,6 +76,16 @@ type Config struct {
 	// UserData is the initial value of Conn.UserData, for state a caller has
 	// before the connection exists.
 	UserData any
+	// WriteTimeout bounds each transport write: before every write, direct
+	// or a Queue's flush, the write deadline is set this far ahead, so a peer
+	// that stops reading fails the write instead of holding it until the
+	// kernel gives up. It applies to each write, not to a backlog: a Queue
+	// flushing a megabyte gets the whole timeout for that write. A write
+	// fails after at least the timeout and at most half again, since the
+	// deadline is moved in steps rather than on every write. While it is set
+	// the connection owns the write deadline, and the next write replaces
+	// one set with SetWriteDeadline. Zero sets no deadline.
+	WriteTimeout time.Duration
 }
 
 // Conn is a WebSocket connection over an upgraded transport.
@@ -94,6 +104,8 @@ type Conn struct {
 	limit        int  // MaxMessageSize.
 	fragmentSize int  // WriteFrom chunk size.
 	validateUTF8 bool // Check text messages in ReadMessage.
+	// Deadline each transport write sets ahead of itself; zero sets none.
+	writeTimeout time.Duration
 
 	// Read side, used by the one goroutine reading at a time.
 	rx        receiver
@@ -118,6 +130,12 @@ type Conn struct {
 	// failed is the Queue's write error, stored before the writer closes
 	// the transport, so the reader returns it in place of the closed read.
 	failed atomic.Pointer[error]
+
+	// armed is the write deadline armWrite last set, as an offset from
+	// epoch on the monotonic clock, or zero once the application has set
+	// its own.
+	epoch time.Time
+	armed atomic.Int64
 }
 
 // NewConn wraps an upgraded transport. Deadlines and addresses are the
@@ -125,7 +143,7 @@ type Conn struct {
 // since Close on a Conn sends the close frame. The one exception is a Queue
 // whose write fails, which closes the transport so that reads end too.
 func NewConn(conn net.Conn, cfg Config) (*Conn, error) {
-	if conn == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
+	if conn == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 || cfg.WriteTimeout < 0 {
 		return nil, ErrInvalidConfig
 	}
 	comp := cfg.Compression
@@ -141,7 +159,11 @@ func NewConn(conn net.Conn, cfg Config) (*Conn, error) {
 		limit:          cmp.Or(cfg.MaxMessageSize, DefaultMaxMessageSize),
 		fragmentSize:   cmp.Or(cfg.FragmentSize, DefaultFragmentSize),
 		validateUTF8:   cfg.ValidateUTF8,
+		writeTimeout:   cfg.WriteTimeout,
 		buf:            make([]byte, cmp.Or(cfg.ReadBufferSize, DefaultReadBufferSize)),
+	}
+	if cfg.WriteTimeout > 0 {
+		c.epoch = time.Now()
 	}
 	_, c.vectored = conn.(interface {
 		SyscallConn() (syscall.RawConn, error)
@@ -181,7 +203,10 @@ func (c *Conn) LocalAddr() net.Addr { return c.conn.LocalAddr() }
 func (c *Conn) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
 // SetDeadline sets the transport's read and write deadlines.
-func (c *Conn) SetDeadline(t time.Time) error { return c.conn.SetDeadline(t) }
+func (c *Conn) SetDeadline(t time.Time) error {
+	c.armed.Store(0)
+	return c.conn.SetDeadline(t)
+}
 
 // SetReadDeadline sets the transport's read deadline. An expired read
 // deadline interrupts the blocked read with a timeout error and leaves the
@@ -190,5 +215,9 @@ func (c *Conn) SetReadDeadline(t time.Time) error { return c.conn.SetReadDeadlin
 
 // SetWriteDeadline sets the transport's write deadline. A deadline that
 // expires mid-frame ends the connection, as it would any framed protocol;
-// with a Queue, the writer goroutine is what it interrupts.
-func (c *Conn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
+// with a Queue, the writer goroutine is what it interrupts. With
+// Config.WriteTimeout set, the next write replaces it with its own.
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	c.armed.Store(0)
+	return c.conn.SetWriteDeadline(t)
+}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net"
+	"os"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -715,6 +716,7 @@ func TestInvalidConfig(t *testing.T) {
 		{Compression: &handshake.Compression{SendWindowBits: 7}},
 		{Compression: &handshake.Compression{ReceiveWindowBits: 16}},
 		{FragmentSize: -1},
+		{WriteTimeout: -1},
 	} {
 		if _, err := ws.NewConn(sc, cfg); err != ws.ErrInvalidConfig {
 			t.Fatalf("%+v accepted", cfg)
@@ -1564,4 +1566,62 @@ func TestLargeMessagesPooled(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestWriteTimeout: with Config.WriteTimeout a direct write to a peer that
+// stops reading fails at the timeout, and the deadline is set per write, so
+// a peer that reads slowly but steadily is not cut off once the writes
+// together take longer than the timeout.
+func TestWriteTimeout(t *testing.T) {
+	const timeout = 100 * time.Millisecond
+	server, client := pair(t, ws.Config{WriteTimeout: timeout}, ws.Config{})
+	wait := run(t, func() error {
+		for i := range 5 {
+			time.Sleep(timeout / 2)
+			if _, _, err := client.ReadMessage(); err != nil {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+		}
+		return nil
+	})
+	start := time.Now()
+	for i := range 5 {
+		if err := server.Write(codec.Binary, []byte("slow")); err != nil {
+			t.Fatalf("write %d after %v: %v", i, time.Since(start), err)
+		}
+	}
+	wait()
+
+	// The client stops reading.
+	start = time.Now()
+	err := server.Write(codec.Binary, []byte("stalled"))
+	if !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("write to a stalled peer: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 10*timeout {
+		t.Fatalf("write failed after %v, want about %v", elapsed, timeout)
+	}
+}
+
+// TestWriteTimeoutReplacesDeadline: with Config.WriteTimeout the next write
+// replaces a deadline the application set, even one already past, rather
+// than trusting the deadline it set itself before.
+func TestWriteTimeoutReplacesDeadline(t *testing.T) {
+	server, client := pair(t, ws.Config{WriteTimeout: time.Minute}, ws.Config{})
+	wait := run(t, func() error {
+		for i := range 2 {
+			if _, _, err := client.ReadMessage(); err != nil {
+				return fmt.Errorf("message %d: %v", i, err)
+			}
+		}
+		return nil
+	})
+	if err := server.Write(codec.Binary, []byte("armed")); err != nil {
+		t.Fatal(err)
+	}
+	server.SetWriteDeadline(time.Now().Add(-time.Second))
+	if err := server.Write(codec.Binary, []byte("rearmed")); err != nil {
+		t.Fatalf("write after an expired application deadline: %v", err)
+	}
+	wait()
 }

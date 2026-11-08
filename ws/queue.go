@@ -365,6 +365,9 @@ func (q *Queue) flush() error {
 	c := q.c
 	c.iomu.Lock()
 	defer c.iomu.Unlock()
+	if err := c.armWrite(); err != nil {
+		return err
+	}
 	if len(q.flushSegments) == 1 {
 		// One frame, the common case: a plain write costs less than a
 		// one-element writev.
