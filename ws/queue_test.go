@@ -371,3 +371,35 @@ func TestQueueFailureEndsRead(t *testing.T) {
 		t.Fatal("the flush failed but the read is still blocked")
 	}
 }
+
+// TestQueueFailureCloseWritten: the close a protocol error sends goes out
+// behind the data queued before it and is written before the read returns,
+// so a handler that closes the transport when its read ends does not cut
+// either off.
+func TestQueueFailureCloseWritten(t *testing.T) {
+	server, peer := raw(t, ws.Config{})
+	got := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(peer)
+		got <- b
+	}()
+	q := server.NewQueue(0)
+	if err := q.Send(codec.Binary, []byte("queued")); err != nil {
+		t.Fatal(err)
+	}
+	go peer.Write([]byte{0x81, 1, 'a'}) // Unmasked: a protocol error.
+	if _, _, err := server.ReadMessage(); err == nil {
+		t.Fatal("unmasked frame accepted")
+	}
+	server.Transport().Close()
+
+	want := []byte{0x82, 6, 'q', 'u', 'e', 'u', 'e', 'd', 0x88, 2, 0x03, 0xea}
+	select {
+	case b := <-got:
+		if !bytes.Equal(b, want) {
+			t.Fatalf("peer read % x, want % x", b, want)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("peer read did not end")
+	}
+}

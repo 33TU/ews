@@ -277,7 +277,7 @@ func (c *Conn) send(op codec.Opcode, payload []byte) error {
 	return c.sendControl(op, header, body)
 }
 
-// sendControl writes a control frame directly, or on a connection with a
+// sendControl writes a ping or pong directly, or on a connection with a
 // Queue queues it without waiting. A direct write would wait for the
 // transport lock while holding wmu, so a flush stalled on a peer that stops
 // reading would block every sender behind a reply to that peer's ping.
@@ -343,14 +343,22 @@ func (c *Conn) write(header, body []byte) error {
 // writePool holds coalescing buffers for transports without writev.
 var writePool = sync.Pool{New: func() any { b := make([]byte, 0, coalesceLimit+codec.MaxHeaderSize); return &b }}
 
-// sendClose is the best-effort close frame that accompanies a protocol failure.
+// sendClose is the best-effort close frame that accompanies a protocol
+// failure. Like Close, on a connection with a Queue it waits for the frame
+// with wmu released, so it is written before the failed read returns and a
+// caller that then closes the transport does not cut it off.
 func (c *Conn) sendClose(code uint16) {
 	c.wmu.Lock()
-	defer c.wmu.Unlock()
 	if c.tx.CloseSent() {
+		c.wmu.Unlock()
 		return
 	}
-	if header, body, err := c.tx.EncodeClose(code, ""); err == nil {
-		_ = c.sendControl(codec.Close, header, body)
+	header, body, err := c.tx.EncodeClose(code, "")
+	if err != nil {
+		c.wmu.Unlock()
+		return
 	}
+	q, seq, err := c.sendFrame(header, body)
+	c.wmu.Unlock()
+	_ = await(q, seq, err)
 }

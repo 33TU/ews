@@ -192,10 +192,10 @@ func (q *Queue) reserve(n int) error {
 	return nil
 }
 
-// control queues a control frame without waiting for it. Control frames
-// skip the limit, except that past it a pong replaces one the writer has not
-// taken yet: RFC 6455 allows answering only the most recent ping, and a peer
-// that pings without reading then adds one pong rather than one per ping.
+// control queues a ping or pong without waiting for it. Both skip the
+// limit, except that past it a pong replaces one the writer has not taken
+// yet: RFC 6455 allows answering only the most recent ping, and a peer that
+// pings without reading then adds one pong rather than one per ping.
 // Callers hold wmu.
 func (q *Queue) control(op codec.Opcode, header, body []byte) error {
 	if op == codec.Pong && q.replacePong(header, body) {
