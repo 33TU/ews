@@ -126,6 +126,6 @@ func (nc *netConn) Close() error {
 
 func (nc *netConn) LocalAddr() net.Addr                { return nc.c.conn.LocalAddr() }
 func (nc *netConn) RemoteAddr() net.Addr               { return nc.c.conn.RemoteAddr() }
-func (nc *netConn) SetDeadline(t time.Time) error      { return nc.c.conn.SetDeadline(t) }
+func (nc *netConn) SetDeadline(t time.Time) error      { return nc.c.SetDeadline(t) }
 func (nc *netConn) SetReadDeadline(t time.Time) error  { return nc.c.conn.SetReadDeadline(t) }
-func (nc *netConn) SetWriteDeadline(t time.Time) error { return nc.c.conn.SetWriteDeadline(t) }
+func (nc *netConn) SetWriteDeadline(t time.Time) error { return nc.c.SetWriteDeadline(t) }

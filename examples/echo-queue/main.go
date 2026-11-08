@@ -30,15 +30,23 @@ func main() {
 	server := &transport.Server{
 		Handshake: handshake.Options{Compression: &handshake.Compress{Level: flate.BestSpeed, ContextTakeover: true}},
 		Handler: func(conn net.Conn, res handshake.Result, _ *transport.Request) {
-			c, err := ws.NewConn(conn, ws.Config{Role: ws.Server, Compression: res.Compression, ValidateUTF8: true})
+			c, err := ws.NewConn(conn, ws.Config{
+				Role:         ws.Server,
+				Compression:  res.Compression,
+				ValidateUTF8: true,
+				// A write that makes no headway for 10s fails the queue, which
+				// closes the transport and ends the read loop below.
+				WriteTimeout: 10 * time.Second,
+			})
 			if err != nil {
 				log.Print(err)
 				return
 			}
 
 			// From here on every write, including the close echo, goes through
-			// the queue's goroutine, so only the read deadline is set: a write
-			// deadline would fire on the writer while the peer is merely slow.
+			// the queue's goroutine. WriteTimeout sets the write deadline before
+			// each of its writes; a single deadline set here would instead fire
+			// on the writer while the peer is merely slow.
 			q := c.NewQueue(*limit)
 
 			for {

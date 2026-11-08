@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/33TU/ews/codec"
 )
@@ -316,6 +317,9 @@ const coalesceLimit = 16 << 10
 func (c *Conn) write(header, body []byte) error {
 	c.iomu.Lock()
 	defer c.iomu.Unlock()
+	if err := c.armWrite(); err != nil {
+		return err
+	}
 	switch {
 	case len(body) == 0:
 		_, err := c.conn.Write(header)
@@ -338,6 +342,26 @@ func (c *Conn) write(header, body []byte) error {
 		_, err := c.conn.Write(body)
 		return err
 	}
+}
+
+// armWrite sets the write deadline for one transport write when
+// Config.WriteTimeout is set. Moving the deadline is a timer update, which
+// on every small flush costs a broadcast several percent of its CPU, so it
+// moves only once less than the timeout remains, to one and a half
+// timeouts ahead: each write gets at least the timeout and at most half
+// again, and the timer moves about twice per timeout at most.
+// Callers hold iomu.
+func (c *Conn) armWrite() error {
+	if c.writeTimeout == 0 {
+		return nil
+	}
+	now := time.Since(c.epoch)
+	if time.Duration(c.armed.Load())-now >= c.writeTimeout {
+		return nil
+	}
+	at := now + c.writeTimeout + c.writeTimeout/2
+	c.armed.Store(int64(at))
+	return c.conn.SetWriteDeadline(c.epoch.Add(at))
 }
 
 // writePool holds coalescing buffers for transports without writev.

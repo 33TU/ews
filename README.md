@@ -182,7 +182,9 @@ Pings are answered and close frames echoed by the default `ControlHandler`.
 Deadlines and addresses are forwarded from the `net.Conn` you were given;
 closing it is yours, through `Transport()` if you no longer hold it. The one
 exception is a queue whose write fails: it closes the transport, so a blocked
-read returns the write error.
+read returns the write error. `Config.WriteTimeout` sets the write deadline
+before each write, so a peer that stops reading fails the write instead of
+holding it until the kernel gives up.
 `examples/broadcast` shows a hub with a read deadline and one ping ticker.
 
 ## Examples
