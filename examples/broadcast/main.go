@@ -112,8 +112,9 @@ func broadcast(op codec.Opcode, payload []byte) {
 	each(func(cl *client) error { return cl.q.SendPrepared(p) })
 }
 
-// pingAll pings every client from one ticker. Ping writes beside the
-// queue's writer, and a failed ping closes the client.
+// pingAll pings every client from one ticker. Ping joins the queue without
+// waiting, so a client that stops reading cannot hold up the ticker, and a
+// failed ping (the queue's write error) closes the client.
 func pingAll() {
 	for range time.Tick(pingInterval) {
 		each(func(cl *client) error { return cl.c.Ping(nil) })

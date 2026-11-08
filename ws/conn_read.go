@@ -465,6 +465,11 @@ func (c *Conn) read(b []byte) (int, error) {
 		if n != 0 {
 			return n, nil
 		}
+		if err != nil {
+			if failed := c.failed.Load(); failed != nil {
+				return 0, *failed // The Queue closed the transport after this error.
+			}
+		}
 		if err == io.EOF && !c.rx.Idle() {
 			return 0, io.ErrUnexpectedEOF
 		}

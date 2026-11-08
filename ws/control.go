@@ -27,6 +27,10 @@ func (DefaultControlHandler) OnPong(*Conn, []byte) error { return nil }
 // peer has closed and may already have dropped the transport, and the read
 // that dispatched this frame returns the peer's code, which is what the
 // caller needs. Callers who care about the echo itself send their own.
+//
+// On a connection with a Queue the echo goes out behind the queued data and
+// Close waits for it, so the reader waits until the backlog is written or
+// the queue fails.
 func (DefaultControlHandler) OnClose(c *Conn, code uint16, _ []byte) error {
 	if code == NoStatus {
 		code = 0

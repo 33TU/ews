@@ -229,10 +229,13 @@ func (c *Conn) endFragmented(err error) error {
 	return err
 }
 
-// Ping sends a ping with at most 125 payload bytes.
+// Ping sends a ping with at most 125 payload bytes. On a connection with a
+// Queue the ping is queued, and Ping returns without waiting for the write.
 func (c *Conn) Ping(payload []byte) error { return c.send(codec.Ping, payload) }
 
-// Pong sends a pong with at most 125 payload bytes. Pongs are allowed after Close.
+// Pong sends a pong with at most 125 payload bytes. Pongs are allowed after
+// Close. On a connection with a Queue the pong is queued, and Pong returns
+// without waiting for the write.
 func (c *Conn) Pong(payload []byte) error { return c.send(codec.Pong, payload) }
 
 // Close sends a close frame once. Code zero sends an empty payload and
@@ -270,6 +273,18 @@ func (c *Conn) send(op codec.Opcode, payload []byte) error {
 	header, body, err := c.tx.Encode(op, payload)
 	if err != nil {
 		return err
+	}
+	return c.sendControl(op, header, body)
+}
+
+// sendControl writes a ping or pong directly, or on a connection with a
+// Queue queues it without waiting. A direct write would wait for the
+// transport lock while holding wmu, so a flush stalled on a peer that stops
+// reading would block every sender behind a reply to that peer's ping.
+// Callers hold wmu.
+func (c *Conn) sendControl(op codec.Opcode, header, body []byte) error {
+	if q := c.queue; q != nil {
+		return q.control(op, header, body)
 	}
 	return c.write(header, body)
 }
@@ -328,14 +343,22 @@ func (c *Conn) write(header, body []byte) error {
 // writePool holds coalescing buffers for transports without writev.
 var writePool = sync.Pool{New: func() any { b := make([]byte, 0, coalesceLimit+codec.MaxHeaderSize); return &b }}
 
-// sendClose is the best-effort close frame that accompanies a protocol failure.
+// sendClose is the best-effort close frame that accompanies a protocol
+// failure. Like Close, on a connection with a Queue it waits for the frame
+// with wmu released, so it is written before the failed read returns and a
+// caller that then closes the transport does not cut it off.
 func (c *Conn) sendClose(code uint16) {
 	c.wmu.Lock()
-	defer c.wmu.Unlock()
 	if c.tx.CloseSent() {
+		c.wmu.Unlock()
 		return
 	}
-	if header, body, err := c.tx.EncodeClose(code, ""); err == nil {
-		_ = c.write(header, body)
+	header, body, err := c.tx.EncodeClose(code, "")
+	if err != nil {
+		c.wmu.Unlock()
+		return
 	}
+	q, seq, err := c.sendFrame(header, body)
+	c.wmu.Unlock()
+	_ = await(q, seq, err)
 }

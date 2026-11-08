@@ -18,7 +18,13 @@ import (
 // submission order and return when those frames have been written, so
 // message order and compressed-stream order are preserved and the two
 // styles mix freely. Close joins it as well, so the close frame follows
-// every message queued before it. Pings and pongs bypass the queue.
+// every message queued before it. Pings and pongs join it too, but Ping and
+// Pong return once the frame is queued, so a reader answering pings never
+// waits on a slow peer.
+//
+// A write error fails the queue for good: every later send returns it, and
+// the queue closes the transport, so a read in progress returns it too and
+// the connection ends even when the peer is silent.
 //
 // A Queue is safe for concurrent use.
 type Queue struct {
@@ -34,6 +40,7 @@ type Queue struct {
 	err      error
 	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
 	written  uint64 // Frames written so far.
+	pong     uint64 // Sequence number of the latest pong. Guarded by wmu.
 	// start is q.run as a func value, made once here so that starting the
 	// writer allocates nothing: a go statement with a receiver or arguments
 	// heap-allocates a closure to carry them, one with none does not.
@@ -147,7 +154,8 @@ func (q *Queue) SendPrepared(p *Prepared) error {
 	return err
 }
 
-// Err returns the first write error, after which every Send fails with it.
+// Err returns the first write error, after which every Send fails with it
+// and the transport is closed.
 func (q *Queue) Err() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -184,10 +192,52 @@ func (q *Queue) reserve(n int) error {
 	return nil
 }
 
+// control queues a ping or pong without waiting for it. Both skip the
+// limit, except that past it a pong replaces one the writer has not taken
+// yet: RFC 6455 allows answering only the most recent ping, and a peer that
+// pings without reading then adds one pong rather than one per ping.
+// Callers hold wmu.
+func (q *Queue) control(op codec.Opcode, header, body []byte) error {
+	if op == codec.Pong && q.replacePong(header, body) {
+		return nil
+	}
+	seq, err := q.enqueue(header, body, nil)
+	if op == codec.Pong {
+		q.pong = seq
+	}
+	return err
+}
+
+// replacePong swaps the latest pong for this one if the queue is past its
+// limit and the pong is still waiting. Waiting frames hold the last
+// len(segments) sequence numbers. Callers hold wmu.
+func (q *Queue) replacePong(header, body []byte) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	after := q.enqueued - q.pong // Frames queued after the pong.
+	if q.err != nil || q.size <= q.limit || q.pong == 0 || after >= uint64(len(q.segments)) {
+		return false
+	}
+
+	i := len(q.segments) - 1 - int(after)
+	old := q.segments[i]
+	if old.end == len(q.cur.b) {
+		q.cur.b = q.cur.b[:old.start] // Reuse its bytes, so repeated swaps do not grow the arena.
+	}
+	start := len(q.cur.b)
+	if need := start + len(header) + len(body); need > cap(q.cur.b) && need > poolKeep {
+		q.growLarge(need)
+	}
+	q.cur.b = append(append(q.cur.b, header...), body...)
+	q.segments[i] = segment{start: start, end: len(q.cur.b)}
+	q.size += len(q.cur.b) - start - (old.end - old.start)
+	return true
+}
+
 // enqueue appends one frame, copied from header and body or referenced as
 // ext, and returns its sequence number. The limit is reserve's business, so
-// synchronous callers that wait for the write skip it. Callers hold wmu,
-// which makes enqueue order the encode order.
+// synchronous callers that wait for the write and control frames skip it.
+// Callers hold wmu, which makes enqueue order the encode order.
 func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -203,11 +253,7 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 		}
 		start := len(q.cur.b)
 		if need := start + n; need > cap(q.cur.b) && need > poolKeep {
-			// Past poolKeep the arena moves to size-class storage.
-			large := bufpool.Get(need)
-			large.B = append(large.B, q.cur.b...)
-			bufpool.Put(q.cur.large)
-			q.cur.large, q.cur.b = large, large.B
+			q.growLarge(need)
 		}
 		q.cur.b = append(append(q.cur.b, header...), body...)
 		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
@@ -220,6 +266,16 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 		go q.start()
 	}
 	return q.enqueued, nil
+}
+
+// growLarge moves the producer's arena to size-class storage of at least
+// need bytes, which it uses past poolKeep. Kept out of enqueue, where the
+// rest of the copy stays inline. Callers hold mu.
+func (q *Queue) growLarge(need int) {
+	large := bufpool.Get(need)
+	large.B = append(large.B, q.cur.b...)
+	bufpool.Put(q.cur.large)
+	q.cur.large, q.cur.b = large, large.B
 }
 
 // await completes a synchronous write: a nil queue means it was written
@@ -286,9 +342,20 @@ func (q *Queue) run() {
 		q.cond.Broadcast()
 		q.mu.Unlock()
 		if err != nil {
+			q.closeTransport(err)
 			return
 		}
 	}
+}
+
+// closeTransport ends the connection after a write error. Nothing more can
+// be sent, not even a close frame, so the transport is closed: the reader's
+// next read returns err, and the application's disconnect path runs even if
+// the peer is silent. Storing &err in run itself would move err to the heap
+// on every flush; here only a failure pays for it.
+func (q *Queue) closeTransport(err error) {
+	q.c.failed.Store(&err)
+	q.c.conn.Close()
 }
 
 // flush writes the writer-side frames under the transport lock only, so
