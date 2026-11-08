@@ -31,8 +31,10 @@
 //
 // A Queue sends asynchronously through a goroutine that runs only while the
 // queue is nonempty and coalesces everything accumulated into one write;
-// once a connection has a queue its synchronous writes join it in order.
-// Prepared encodes a message once for many recipients.
+// once a connection has a queue its synchronous writes, pings and pongs join
+// it in order. A write error fails the queue and closes the transport, so a
+// blocked read returns it. Prepared encodes a message once for many
+// recipients.
 //
 // # Borrowing
 //
