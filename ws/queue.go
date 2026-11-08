@@ -353,9 +353,18 @@ func (q *Queue) run() {
 // next read returns err, and the application's disconnect path runs even if
 // the peer is silent. Storing &err in run itself would move err to the heap
 // on every flush; here only a failure pays for it.
+//
+// A transport layered over another, as tls.Conn is, has the one underneath
+// closed instead: closing a tls.Conn first sends close_notify under its own
+// five-second deadline, which a peer that stopped reading makes it wait out,
+// and after a failed write there is nothing left to tell the peer.
 func (q *Queue) closeTransport(err error) {
 	q.c.failed.Store(&err)
-	q.c.conn.Close()
+	conn := q.c.conn
+	if layered, ok := conn.(interface{ NetConn() net.Conn }); ok {
+		conn = layered.NetConn()
+	}
+	conn.Close()
 }
 
 // flush writes the writer-side frames under the transport lock only, so
