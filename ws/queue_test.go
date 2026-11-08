@@ -406,35 +406,38 @@ func TestQueueFailureCloseWritten(t *testing.T) {
 
 // TestQueueWriteTimeout: with Config.WriteTimeout and no deadline of the
 // application's, a flush to a peer that stops reading fails at the timeout,
-// which closes the transport and ends the read.
+// which closes the transport and ends the read. Over TLS the close must not
+// wait out tls.Conn's close_notify deadline either.
 func TestQueueWriteTimeout(t *testing.T) {
-	server, _ := pair(t, ws.Config{WriteTimeout: 50 * time.Millisecond}, ws.Config{})
-	q := server.NewQueue(0)
-	read := make(chan error, 1)
-	go func() {
-		_, _, err := server.ReadMessage()
-		read <- err
-	}()
+	overTransports(t, func(t *testing.T, connect func(testing.TB, ws.Config, ws.Config) (*ws.Conn, *ws.Conn)) {
+		server, _ := connect(t, ws.Config{WriteTimeout: 50 * time.Millisecond}, ws.Config{})
+		q := server.NewQueue(0)
+		read := make(chan error, 1)
+		go func() {
+			_, _, err := server.ReadMessage()
+			read <- err
+		}()
 
-	if err := q.Send(codec.Binary, []byte("never read")); err != nil {
-		t.Fatal(err)
-	}
-	waited := make(chan error, 1)
-	go func() { waited <- q.Wait() }()
-	select {
-	case err := <-waited:
-		if !errors.Is(err, os.ErrDeadlineExceeded) {
-			t.Fatalf("flush: %v", err)
+		if err := q.Send(codec.Binary, []byte("never read")); err != nil {
+			t.Fatal(err)
 		}
-	case <-time.After(time.Second):
-		t.Fatal("the flush to a stalled peer did not time out")
-	}
-	select {
-	case err := <-read:
-		if err != q.Err() {
-			t.Fatalf("read returned %v, want the queue's %v", err, q.Err())
+		waited := make(chan error, 1)
+		go func() { waited <- q.Wait() }()
+		select {
+		case err := <-waited:
+			if !errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Fatalf("flush: %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("the flush to a stalled peer did not time out")
 		}
-	case <-time.After(time.Second):
-		t.Fatal("the write timed out but the read is still blocked")
-	}
+		select {
+		case err := <-read:
+			if err != q.Err() {
+				t.Fatalf("read returned %v, want the queue's %v", err, q.Err())
+			}
+		case <-time.After(time.Second):
+			t.Fatal("the write timed out but the read is still blocked")
+		}
+	})
 }

@@ -2,9 +2,15 @@ package ws_test
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	crand "crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"math/rand/v2"
 	"net"
 	"os"
@@ -33,6 +39,50 @@ func pair(t testing.TB, serverCfg, clientCfg ws.Config) (server, client *ws.Conn
 		t.Fatal(err)
 	}
 	return server, client
+}
+
+// tlsPair is pair over TLS on a pipe, with a throwaway self-signed
+// certificate: a transport with no writev, whose deadlines pass through
+// tls.Conn and whose writes fail for good once one times out.
+func tlsPair(t testing.TB, serverCfg, clientCfg ws.Config) (server, client *ws.Conn) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(crand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, cc := net.Pipe()
+	t.Cleanup(func() { sc.Close(); cc.Close() })
+	ts := tls.Server(sc, &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}})
+	tc := tls.Client(cc, &tls.Config{InsecureSkipVerify: true})
+	handshake := make(chan error, 1)
+	go func() { handshake <- tc.Handshake() }()
+	if err := ts.Handshake(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-handshake; err != nil {
+		t.Fatal(err)
+	}
+
+	serverCfg.Role, clientCfg.Role = ws.Server, ws.Client
+	if server, err = ws.NewConn(ts, serverCfg); err != nil {
+		t.Fatal(err)
+	}
+	if client, err = ws.NewConn(tc, clientCfg); err != nil {
+		t.Fatal(err)
+	}
+	return server, client
+}
+
+// overTransports runs f over a plain pipe and over TLS on a pipe.
+func overTransports(t *testing.T, f func(t *testing.T, connect func(testing.TB, ws.Config, ws.Config) (*ws.Conn, *ws.Conn))) {
+	t.Run("pipe", func(t *testing.T) { f(t, pair) })
+	t.Run("tls", func(t *testing.T) { f(t, tlsPair) })
 }
 
 // raw connects a server Conn to a bare pipe end for hand-built frames.
@@ -1573,34 +1623,36 @@ func TestLargeMessagesPooled(t *testing.T) {
 // a peer that reads slowly but steadily is not cut off once the writes
 // together take longer than the timeout.
 func TestWriteTimeout(t *testing.T) {
-	const timeout = 100 * time.Millisecond
-	server, client := pair(t, ws.Config{WriteTimeout: timeout}, ws.Config{})
-	wait := run(t, func() error {
+	overTransports(t, func(t *testing.T, connect func(testing.TB, ws.Config, ws.Config) (*ws.Conn, *ws.Conn)) {
+		const timeout = 100 * time.Millisecond
+		server, client := connect(t, ws.Config{WriteTimeout: timeout}, ws.Config{})
+		wait := run(t, func() error {
+			for i := range 5 {
+				time.Sleep(timeout / 2)
+				if _, _, err := client.ReadMessage(); err != nil {
+					return fmt.Errorf("message %d: %v", i, err)
+				}
+			}
+			return nil
+		})
+		start := time.Now()
 		for i := range 5 {
-			time.Sleep(timeout / 2)
-			if _, _, err := client.ReadMessage(); err != nil {
-				return fmt.Errorf("message %d: %v", i, err)
+			if err := server.Write(codec.Binary, []byte("slow")); err != nil {
+				t.Fatalf("write %d after %v: %v", i, time.Since(start), err)
 			}
 		}
-		return nil
-	})
-	start := time.Now()
-	for i := range 5 {
-		if err := server.Write(codec.Binary, []byte("slow")); err != nil {
-			t.Fatalf("write %d after %v: %v", i, time.Since(start), err)
-		}
-	}
-	wait()
+		wait()
 
-	// The client stops reading.
-	start = time.Now()
-	err := server.Write(codec.Binary, []byte("stalled"))
-	if !errors.Is(err, os.ErrDeadlineExceeded) {
-		t.Fatalf("write to a stalled peer: %v", err)
-	}
-	if elapsed := time.Since(start); elapsed > 10*timeout {
-		t.Fatalf("write failed after %v, want about %v", elapsed, timeout)
-	}
+		// The client stops reading.
+		start = time.Now()
+		err := server.Write(codec.Binary, []byte("stalled"))
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Fatalf("write to a stalled peer: %v", err)
+		}
+		if elapsed := time.Since(start); elapsed > 10*timeout {
+			t.Fatalf("write failed after %v, want about %v", elapsed, timeout)
+		}
+	})
 }
 
 // TestWriteTimeoutReplacesDeadline: with Config.WriteTimeout the next write
