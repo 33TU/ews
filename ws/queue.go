@@ -224,8 +224,13 @@ func (q *Queue) replacePong(header, body []byte) bool {
 	if old.end == len(q.cur.b) {
 		q.cur.b = q.cur.b[:old.start] // Reuse its bytes, so repeated swaps do not grow the arena.
 	}
-	q.segments[i] = q.copyIn(header, body)
-	q.size += q.segments[i].end - q.segments[i].start - (old.end - old.start)
+	start := len(q.cur.b)
+	if need := start + len(header) + len(body); need > cap(q.cur.b) && need > poolKeep {
+		q.growLarge(need)
+	}
+	q.cur.b = append(append(q.cur.b, header...), body...)
+	q.segments[i] = segment{start: start, end: len(q.cur.b)}
+	q.size += len(q.cur.b) - start - (old.end - old.start)
 	return true
 }
 
@@ -239,13 +244,22 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
+	n := len(header) + len(body) + len(ext)
 	if ext != nil {
 		q.segments = append(q.segments, segment{ext: ext})
 	} else {
-		q.segments = append(q.segments, q.copyIn(header, body))
+		if q.cur == nil {
+			q.cur = arenaPool.Get().(*arena)
+		}
+		start := len(q.cur.b)
+		if need := start + n; need > cap(q.cur.b) && need > poolKeep {
+			q.growLarge(need)
+		}
+		q.cur.b = append(append(q.cur.b, header...), body...)
+		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
 	}
 
-	q.size += len(header) + len(body) + len(ext)
+	q.size += n
 	q.enqueued++
 	if !q.running {
 		q.running = true
@@ -254,21 +268,14 @@ func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 	return q.enqueued, nil
 }
 
-// copyIn copies a frame into the producer's arena. Callers hold mu.
-func (q *Queue) copyIn(header, body []byte) segment {
-	if q.cur == nil {
-		q.cur = arenaPool.Get().(*arena)
-	}
-	start := len(q.cur.b)
-	if need := start + len(header) + len(body); need > cap(q.cur.b) && need > poolKeep {
-		// Past poolKeep the arena moves to size-class storage.
-		large := bufpool.Get(need)
-		large.B = append(large.B, q.cur.b...)
-		bufpool.Put(q.cur.large)
-		q.cur.large, q.cur.b = large, large.B
-	}
-	q.cur.b = append(append(q.cur.b, header...), body...)
-	return segment{start: start, end: len(q.cur.b)}
+// growLarge moves the producer's arena to size-class storage of at least
+// need bytes, which it uses past poolKeep. Kept out of enqueue, where the
+// rest of the copy stays inline. Callers hold mu.
+func (q *Queue) growLarge(need int) {
+	large := bufpool.Get(need)
+	large.B = append(large.B, q.cur.b...)
+	bufpool.Put(q.cur.large)
+	q.cur.large, q.cur.b = large, large.B
 }
 
 // await completes a synchronous write: a nil queue means it was written
@@ -335,14 +342,20 @@ func (q *Queue) run() {
 		q.cond.Broadcast()
 		q.mu.Unlock()
 		if err != nil {
-			// Nothing more can be sent, not even a close frame, so close the
-			// transport: the reader's next read returns err, and the
-			// application's disconnect path runs even if the peer is silent.
-			q.c.failed.Store(&err)
-			q.c.conn.Close()
+			q.closeTransport(err)
 			return
 		}
 	}
+}
+
+// closeTransport ends the connection after a write error. Nothing more can
+// be sent, not even a close frame, so the transport is closed: the reader's
+// next read returns err, and the application's disconnect path runs even if
+// the peer is silent. Storing &err in run itself would move err to the heap
+// on every flush; here only a failure pays for it.
+func (q *Queue) closeTransport(err error) {
+	q.c.failed.Store(&err)
+	q.c.conn.Close()
 }
 
 // flush writes the writer-side frames under the transport lock only, so
