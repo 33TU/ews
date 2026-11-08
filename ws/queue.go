@@ -1,11 +1,11 @@
 package ws
 
 import (
-	"github.com/33TU/ews/internal/bufpool"
 	"net"
 	"sync"
 
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/internal/bufpool"
 )
 
 // Queue sends messages asynchronously: Send encodes a message and returns
