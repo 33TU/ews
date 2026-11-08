@@ -1,11 +1,11 @@
 package ws
 
 import (
-	"github.com/33TU/ews/internal/bufpool"
 	"io"
 	"sync"
 
 	"github.com/33TU/ews/codec"
+	"github.com/33TU/ews/internal/bufpool"
 	"github.com/33TU/ews/internal/utf8"
 )
 
@@ -399,23 +399,9 @@ func (c *Conn) discard() error {
 
 	c.decomp.streaming = false
 	for c.inMessage {
-		chunk, done, err := c.rx.Payload()
-		if err != nil {
-			return c.fail(err)
-		}
-		if !done {
-			if len(chunk) == 0 {
-				if err := c.fill(); err != nil {
-					return err
-				}
-			}
-			continue
-		}
-		if !c.rx.MessageOpen() {
+		if _, err := c.nextChunk(); err == io.EOF {
 			c.inMessage = false
-			return nil
-		}
-		if err := c.nextFrame(); err != nil {
+		} else if err != nil {
 			return err
 		}
 	}

@@ -54,9 +54,6 @@ func (s *sender) EncodeFragment(op codec.Opcode, final bool, payload []byte, com
 }
 
 func (s *sender) encode(op codec.Opcode, payload []byte, compressed bool) (header, body []byte, err error) {
-	if s.closeSent && op != codec.Pong {
-		return nil, nil, ErrClosing
-	}
 	switch op {
 	case codec.Text, codec.Binary:
 	case codec.Ping, codec.Pong:
