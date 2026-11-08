@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"net"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -113,11 +114,16 @@ type Conn struct {
 	comp  compressorContext
 	frag  fragmentState
 	out   writeBuffers
+
+	// failed is the Queue's write error, stored before the writer closes
+	// the transport, so the reader returns it in place of the closed read.
+	failed atomic.Pointer[error]
 }
 
 // NewConn wraps an upgraded transport. Deadlines and addresses are the
 // transport's, reachable through the Conn; closing it stays with the caller,
-// since Close on a Conn sends the close frame.
+// since Close on a Conn sends the close frame. The one exception is a Queue
+// whose write fails, which closes the transport so that reads end too.
 func NewConn(conn net.Conn, cfg Config) (*Conn, error) {
 	if conn == nil || cfg.Role != Server && cfg.Role != Client || cfg.ReadBufferSize < 0 || cfg.MaxMessageSize < 0 || cfg.FragmentSize < 0 {
 		return nil, ErrInvalidConfig

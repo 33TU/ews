@@ -22,6 +22,10 @@ import (
 // Pong return once the frame is queued, so a reader answering pings never
 // waits on a slow peer.
 //
+// A write error fails the queue for good: every later send returns it, and
+// the queue closes the transport, so a read in progress returns it too and
+// the connection ends even when the peer is silent.
+//
 // A Queue is safe for concurrent use.
 type Queue struct {
 	c     *Conn
@@ -150,7 +154,8 @@ func (q *Queue) SendPrepared(p *Prepared) error {
 	return err
 }
 
-// Err returns the first write error, after which every Send fails with it.
+// Err returns the first write error, after which every Send fails with it
+// and the transport is closed.
 func (q *Queue) Err() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -330,6 +335,11 @@ func (q *Queue) run() {
 		q.cond.Broadcast()
 		q.mu.Unlock()
 		if err != nil {
+			// Nothing more can be sent, not even a close frame, so close the
+			// transport: the reader's next read returns err, and the
+			// application's disconnect path runs even if the peer is silent.
+			q.c.failed.Store(&err)
+			q.c.conn.Close()
 			return
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -338,5 +339,35 @@ func TestQueuePingFlood(t *testing.T) {
 	wait()
 	if len(got) != 1 || got[0] != "ping 49" {
 		t.Fatalf("pongs %q, want only the last", got)
+	}
+}
+
+// TestQueueFailureEndsRead: a failed flush closes the transport, so a read
+// in progress returns, with the queue's error rather than the closed read's,
+// even though the peer is silent and nothing more is sent.
+func TestQueueFailureEndsRead(t *testing.T) {
+	server, _ := pair(t, ws.Config{}, ws.Config{})
+	q := server.NewQueue(0)
+	read := make(chan error, 1)
+	go func() {
+		_, _, err := server.ReadMessage() // The peer never sends.
+		read <- err
+	}()
+
+	// The peer never reads either, so the flush fails at the deadline.
+	server.SetWriteDeadline(time.Now().Add(50 * time.Millisecond))
+	if err := q.Send(codec.Binary, []byte("never read")); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Wait(); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("flush: %v", err)
+	}
+	select {
+	case err := <-read:
+		if err != q.Err() {
+			t.Fatalf("read returned %v, want the queue's %v", err, q.Err())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the flush failed but the read is still blocked")
 	}
 }
