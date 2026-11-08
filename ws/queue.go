@@ -18,7 +18,9 @@ import (
 // submission order and return when those frames have been written, so
 // message order and compressed-stream order are preserved and the two
 // styles mix freely. Close joins it as well, so the close frame follows
-// every message queued before it. Pings and pongs bypass the queue.
+// every message queued before it. Pings and pongs join it too, but Ping and
+// Pong return once the frame is queued, so a reader answering pings never
+// waits on a slow peer.
 //
 // A Queue is safe for concurrent use.
 type Queue struct {
@@ -34,6 +36,7 @@ type Queue struct {
 	err      error
 	enqueued uint64 // Frames ever enqueued; a frame's sequence number.
 	written  uint64 // Frames written so far.
+	pong     uint64 // Sequence number of the latest pong. Guarded by wmu.
 	// start is q.run as a func value, made once here so that starting the
 	// writer allocates nothing: a go statement with a receiver or arguments
 	// heap-allocates a closure to carry them, one with none does not.
@@ -184,42 +187,83 @@ func (q *Queue) reserve(n int) error {
 	return nil
 }
 
+// control queues a control frame without waiting for it. Control frames
+// skip the limit, except that past it a pong replaces one the writer has not
+// taken yet: RFC 6455 allows answering only the most recent ping, and a peer
+// that pings without reading then adds one pong rather than one per ping.
+// Callers hold wmu.
+func (q *Queue) control(op codec.Opcode, header, body []byte) error {
+	if op == codec.Pong && q.replacePong(header, body) {
+		return nil
+	}
+	seq, err := q.enqueue(header, body, nil)
+	if op == codec.Pong {
+		q.pong = seq
+	}
+	return err
+}
+
+// replacePong swaps the latest pong for this one if the queue is past its
+// limit and the pong is still waiting. Waiting frames hold the last
+// len(segments) sequence numbers. Callers hold wmu.
+func (q *Queue) replacePong(header, body []byte) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	after := q.enqueued - q.pong // Frames queued after the pong.
+	if q.err != nil || q.size <= q.limit || q.pong == 0 || after >= uint64(len(q.segments)) {
+		return false
+	}
+
+	i := len(q.segments) - 1 - int(after)
+	old := q.segments[i]
+	if old.end == len(q.cur.b) {
+		q.cur.b = q.cur.b[:old.start] // Reuse its bytes, so repeated swaps do not grow the arena.
+	}
+	q.segments[i] = q.copyIn(header, body)
+	q.size += q.segments[i].end - q.segments[i].start - (old.end - old.start)
+	return true
+}
+
 // enqueue appends one frame, copied from header and body or referenced as
 // ext, and returns its sequence number. The limit is reserve's business, so
-// synchronous callers that wait for the write skip it. Callers hold wmu,
-// which makes enqueue order the encode order.
+// synchronous callers that wait for the write and control frames skip it.
+// Callers hold wmu, which makes enqueue order the encode order.
 func (q *Queue) enqueue(header, body, ext []byte) (uint64, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.err != nil {
 		return 0, q.err
 	}
-	n := len(header) + len(body) + len(ext)
 	if ext != nil {
 		q.segments = append(q.segments, segment{ext: ext})
 	} else {
-		if q.cur == nil {
-			q.cur = arenaPool.Get().(*arena)
-		}
-		start := len(q.cur.b)
-		if need := start + n; need > cap(q.cur.b) && need > poolKeep {
-			// Past poolKeep the arena moves to size-class storage.
-			large := bufpool.Get(need)
-			large.B = append(large.B, q.cur.b...)
-			bufpool.Put(q.cur.large)
-			q.cur.large, q.cur.b = large, large.B
-		}
-		q.cur.b = append(append(q.cur.b, header...), body...)
-		q.segments = append(q.segments, segment{start: start, end: len(q.cur.b)})
+		q.segments = append(q.segments, q.copyIn(header, body))
 	}
 
-	q.size += n
+	q.size += len(header) + len(body) + len(ext)
 	q.enqueued++
 	if !q.running {
 		q.running = true
 		go q.start()
 	}
 	return q.enqueued, nil
+}
+
+// copyIn copies a frame into the producer's arena. Callers hold mu.
+func (q *Queue) copyIn(header, body []byte) segment {
+	if q.cur == nil {
+		q.cur = arenaPool.Get().(*arena)
+	}
+	start := len(q.cur.b)
+	if need := start + len(header) + len(body); need > cap(q.cur.b) && need > poolKeep {
+		// Past poolKeep the arena moves to size-class storage.
+		large := bufpool.Get(need)
+		large.B = append(large.B, q.cur.b...)
+		bufpool.Put(q.cur.large)
+		q.cur.large, q.cur.b = large, large.B
+	}
+	q.cur.b = append(append(q.cur.b, header...), body...)
+	return segment{start: start, end: len(q.cur.b)}
 }
 
 // await completes a synchronous write: a nil queue means it was written

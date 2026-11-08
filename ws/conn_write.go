@@ -229,10 +229,13 @@ func (c *Conn) endFragmented(err error) error {
 	return err
 }
 
-// Ping sends a ping with at most 125 payload bytes.
+// Ping sends a ping with at most 125 payload bytes. On a connection with a
+// Queue the ping is queued, and Ping returns without waiting for the write.
 func (c *Conn) Ping(payload []byte) error { return c.send(codec.Ping, payload) }
 
-// Pong sends a pong with at most 125 payload bytes. Pongs are allowed after Close.
+// Pong sends a pong with at most 125 payload bytes. Pongs are allowed after
+// Close. On a connection with a Queue the pong is queued, and Pong returns
+// without waiting for the write.
 func (c *Conn) Pong(payload []byte) error { return c.send(codec.Pong, payload) }
 
 // Close sends a close frame once. Code zero sends an empty payload and
@@ -270,6 +273,18 @@ func (c *Conn) send(op codec.Opcode, payload []byte) error {
 	header, body, err := c.tx.Encode(op, payload)
 	if err != nil {
 		return err
+	}
+	return c.sendControl(op, header, body)
+}
+
+// sendControl writes a control frame directly, or on a connection with a
+// Queue queues it without waiting. A direct write would wait for the
+// transport lock while holding wmu, so a flush stalled on a peer that stops
+// reading would block every sender behind a reply to that peer's ping.
+// Callers hold wmu.
+func (c *Conn) sendControl(op codec.Opcode, header, body []byte) error {
+	if q := c.queue; q != nil {
+		return q.control(op, header, body)
 	}
 	return c.write(header, body)
 }
@@ -336,6 +351,6 @@ func (c *Conn) sendClose(code uint16) {
 		return
 	}
 	if header, body, err := c.tx.EncodeClose(code, ""); err == nil {
-		_ = c.write(header, body)
+		_ = c.sendControl(codec.Close, header, body)
 	}
 }
