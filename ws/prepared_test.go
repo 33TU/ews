@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/33TU/ews/codec"
 	"github.com/33TU/ews/deflate"
@@ -190,4 +192,28 @@ func TestPrepareAppend(t *testing.T) {
 	if _, err := ws.PrepareAppend(codec.Binary, 0, func([]byte) ([]byte, error) { return []byte("x"), nil }); err != ws.ErrProtocol {
 		t.Fatal("a fill that drops dst was accepted")
 	}
+}
+
+// TestWritePreparedWriteTimeout: WritePrepared on a connection without a
+// Queue writes under Config.WriteTimeout like every other write, so a
+// broadcast loop does not block on a peer that stopped reading.
+func TestWritePreparedWriteTimeout(t *testing.T) {
+	overTransports(t, func(t *testing.T, connect func(testing.TB, ws.Config, ws.Config) (*ws.Conn, *ws.Conn)) {
+		const timeout = 50 * time.Millisecond
+		server, _ := connect(t, ws.Config{WriteTimeout: timeout}, ws.Config{})
+		p, err := ws.Prepare(codec.Binary, []byte("never read"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- server.WritePrepared(p) }()
+		select {
+		case err := <-done:
+			if !errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Fatalf("WritePrepared to a stalled peer: %v", err)
+			}
+		case <-time.After(20 * timeout):
+			t.Fatal("WritePrepared to a stalled peer ignored WriteTimeout")
+		}
+	})
 }

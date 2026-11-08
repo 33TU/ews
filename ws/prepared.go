@@ -153,9 +153,7 @@ func (c *Conn) WritePrepared(p *Prepared) error {
 		c.wmu.Unlock()
 		return await(q, seq, err)
 	}
-	c.iomu.Lock()
-	_, err = c.conn.Write(frame)
-	c.iomu.Unlock()
+	err = c.write(frame, nil)
 	c.wmu.Unlock()
 	return err
 }
